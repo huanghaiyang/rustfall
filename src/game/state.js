@@ -75,6 +75,8 @@ export const G = reactive({
     spread: 0,
   },
   ecosystem: { roaches: 0, plants: 0, critters: 0, scrap: 0, active: 0 },
+  // 生态战争：跨房间持久化的怪物冲突 / 阵亡 / 重生计时（systems/ecosystem-war.js 维护）
+  war: { clock: 0, rooms: {} },
   settings: {
     postfx: false,
     glow: false,
@@ -272,6 +274,7 @@ export function resetState() {
   G.companions = {}
   G.archive.entries = []
   G.archive.unread = 0
+  G.war = { clock: 0, rooms: {} }
   G.flags = {}
   G.bestiary = {}
   G.deathReason = ''

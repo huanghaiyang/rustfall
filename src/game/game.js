@@ -126,6 +126,8 @@ export class Game {
     this.ecosystem = null
     this.weaponClass = null
     this.ecosystemFactory = null
+    this.war = null
+    this.warFactory = null
 
     this.weather = new WeatherSystem(this.scene)
     this.particles = new Particles(this.scene)
@@ -243,6 +245,11 @@ export class Game {
       console.warn('[rustfall] 生态模块缺失', e)
     }
     try {
+      this.warFactory = (await import('./systems/ecosystem-war.js')).createEcosystemWar
+    } catch (e) {
+      console.warn('[rustfall] 生态战争模块缺失', e)
+    }
+    try {
       const fx = await import('./render/fx/postfx.js')
       this.postfx = fx.createPostFX(this.renderer)
       this.postfx.resize(this.renderer.domElement.width, this.renderer.domElement.height)
@@ -272,6 +279,7 @@ export class Game {
     if (this.RescueClass) this.rescue = new this.RescueClass(this)
     if (!this.chaos) this.chaos = createChaosAI(this)
     if (!this.lighting) this.lighting = createLighting(this)
+    if (!this.war && this.warFactory) this.war = this.warFactory(this)
     this.syncInventoryState()
   }
 
@@ -375,6 +383,11 @@ export class Game {
   }
 
   loadRoom(regionId, roomId, entry = null, opts = {}) {
+    try {
+      this.war?.leaveRoom?.()
+    } catch (e) {
+      /* ignore */
+    }
     if (this.room) {
       this.scene.remove(this.room.group)
       this.room.dispose()
@@ -410,6 +423,13 @@ export class Game {
       }
     }
     this.chaos?.reset?.(data)
+    if (!opts.preview && !data.shelter) {
+      try {
+        this.war?.enterRoom?.({ ...data, regionId, roomId })
+      } catch (e) {
+        console.warn('[rustfall] 生态战争恢复失败', e)
+      }
+    }
     if (this.rescue) {
       try {
         this.rescue.registerCages(data)
@@ -701,6 +721,7 @@ export class Game {
     this.room.update(dt)
     if (this.director) this.director.update(dt)
     this.chaos?.update?.(dt)
+    this.war?.update?.(dt)
     this.lighting?.update?.(dt)
     if (this.weapons) {
       this.weapons.setHolding?.(this.input.isDown('attack'))
@@ -1484,6 +1505,15 @@ export class Game {
   }
 
   onMonsterKilled(monster) {
+    // 生态冲突中互相打死的：不计入玩家击杀/经验，只走导演的结算（掉落照常）
+    if (monster.__warKilled) {
+      try {
+        this.director?.onMonsterKilled?.(monster)
+      } catch (e) {
+        /* ignore */
+      }
+      return
+    }
     G.stats.kills++
     G.bestiary[monster.id] = (G.bestiary[monster.id] || 0) + 1
     this.quests?.notify('kill', { monsterId: monster.id, n: 1 })
@@ -2135,6 +2165,7 @@ export class Game {
     if (save.settings) Object.assign(G.settings, save.settings)
     this.applySettings()
     this.dayNight?.load?.(save.dayNight)
+    this.war?.load?.(save.war)
     this.quests?.load?.(save.quests || {})
     this.rescue?.load?.(save.rescue || {})
     this.lastShelter = save.lastShelter || { regionId: 'city', roomId: 'city_shelter' }
@@ -2262,6 +2293,7 @@ export class Game {
       buffs: (G.buffs || []).map((b) => ({ ...b })),
       rescue: this.rescue?.serialize?.() || {},
       dayNight: this.dayNight?.serialize?.() || null,
+      war: this.war?.serialize?.() || null,
       settings: { ...G.settings },
       mods: getModEnabledMap(),
     }

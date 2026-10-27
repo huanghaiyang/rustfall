@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 import { Content, KIND } from '../src/game/core/registry.js'
-import '../src/game/chassis/index.js' // 注册 8 台机体：compatMatrix / canEquip 需要真实 carry/family
+import '../src/game/chassis/index.js' // 注册 10 台机体：compatMatrix / canEquip 需要真实 carry/family
 import { G } from '../src/game/state.js'
 import { makeRng } from '../src/game/render/rng.js'
 import {
@@ -107,7 +107,7 @@ const AMMO_LIST = [
   'ammo_9mm', 'ammo_laser', 'ammo_nail', 'ammo_scrap', 'ammo_arc', 'ammo_rail',
   'ammo_core', 'ammo_tesla', 'ammo_plasma', 'ammo_nuke',
 ]
-const CHASSIS_LIST = ['unit7', 'tesla', 'agibot', 'atlas', 'spider', 'mule', 'ghost', 'hulk']
+const CHASSIS_LIST = ['unit7', 'tesla', 'agibot', 'atlas', 'spider', 'mule', 'ghost', 'hulk', 'warden', 'hopper']
 
 // ---------------------------------------------------------------------------
 // Stub 引擎
@@ -311,12 +311,12 @@ check('武器辅助函数（cooldown/reload/art/class）', () => {
 // ===========================================================================
 group('2 机体兼容')
 
-check('compatMatrix 覆盖 18×8，且不兼容时给出中文 reason', () => {
+check('compatMatrix 覆盖 18×10，且不兼容时给出中文 reason', () => {
   const m = compatMatrix()
   assertEq(Object.keys(m).length, 18, 'weapon rows')
   for (const id of WEAPON_LIST) {
     assert(m[id], `missing row ${id}`)
-    assertEq(Object.keys(m[id]).length, 8, `${id} chassis cols`)
+    assertEq(Object.keys(m[id]).length, 10, `${id} chassis cols`)
     for (const cid of CHASSIS_LIST) {
       const cell = m[id][cid]
       assert(typeof cell.ok === 'boolean', `${id}/${cid}.ok`)

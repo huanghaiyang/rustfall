@@ -36,6 +36,8 @@ const CH = Object.freeze({
   mule: 'mule',
   ghost: 'ghost',
   hulk: 'hulk',
+  warden: 'warden',
+  hopper: 'hopper',
 })
 
 const ALL_CHASSIS = Object.freeze(Object.values(CH))
@@ -421,7 +423,7 @@ export const WEAPON_DEFS = [
     stack: 1,
     desc: '拆墙用的八角锤，柄是新换的，锤头上有别人砸出来的凹坑。挥一次要缓半秒，缓过来之后什么都挡不住。',
     melee: { arc: 1.0, knockback: 320, stagger: 0.7 },
-    compat: { chassis: [CH.atlas, CH.hulk, CH.mule], minCarry: 1.1, minHitbox: 20, reason: '这条机械臂握不住重锤' },
+    compat: { chassis: [CH.atlas, CH.hulk, CH.mule, CH.warden], minCarry: 1.1, minHitbox: 20, reason: '这条机械臂握不住重锤' },
     bonus: { dig: 0.04 },
     tags: ['weapon', 'melee', 'heavy', 'blunt'],
     art: 'hammer',
@@ -440,7 +442,7 @@ export const WEAPON_DEFS = [
     stack: 1,
     desc: '一米二的大号管钳扳手，咬口还是好的。拧得动主阀，也砸得开外壳，取决于你把它对准哪儿。',
     melee: { arc: 0.95, knockback: 260, stagger: 0.55 },
-    compat: { chassis: [CH.atlas, CH.hulk, CH.mule], minCarry: 1.1, minHitbox: 20, reason: '重型扳手的扭矩会拧断这条机械臂' },
+    compat: { chassis: [CH.atlas, CH.hulk, CH.mule, CH.warden], minCarry: 1.1, minHitbox: 20, reason: '重型扳手的扭矩会拧断这条机械臂' },
     bonus: { dig: 0.05 },
     tags: ['weapon', 'melee', 'heavy', 'tool'],
     art: 'wrench_heavy',

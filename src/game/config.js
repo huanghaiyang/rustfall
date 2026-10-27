@@ -23,7 +23,7 @@ export const BASE_CARRY_WEIGHT = 42
 export const DEFAULT_CHASSIS = 'unit7'
 export const CHASSIS_SWITCH_CD = 1.4
 export const CHASSIS_SWITCH_COST = 1
-export const CHASSIS_START_UNLOCKED = ['unit7', 'tesla', 'agibot', 'atlas']
+export const CHASSIS_START_UNLOCKED = ['unit7', 'tesla', 'agibot', 'atlas', 'warden', 'hopper']
 
 // —— 战斗 / 工具 ——
 export const ATTACK_CD = 0.42

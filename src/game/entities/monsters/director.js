@@ -590,6 +590,11 @@ export function createMonsterDirector(game) {
     populate,
     update,
     clear,
+    /** 清空待刷队列（生态战争恢复房间人口时用，避免队列继续补怪） */
+    clearQueue() {
+      queue.length = 0
+      spawnTick = 0
+    },
     spawn,
     spawnLarge,
     aliveCount,

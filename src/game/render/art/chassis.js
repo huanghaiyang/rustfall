@@ -252,6 +252,18 @@ const T = {
     lite: mix(PAL.steel, PAL.rust, 0.5),
     dark: mix(PAL.steelDark, PAL.void, 0.5),
   },
+  // 镇暴机体：城防蓝 + 冷白装甲线（复用 heavy 骨架）
+  warden: {
+    base: mix(PAL.steelBlue, PAL.steelDark, 0.35),
+    lite: mix(PAL.steelBlue, PAL.steelWhite, 0.55),
+    dark: mix(PAL.steelBlue, PAL.void, 0.62),
+  },
+  // 弹跳机体：旧游乐设施的橄榄绿 + 黄铜弹簧（复用 light 骨架）
+  hopper: {
+    base: mix(PAL.ochre, PAL.toxicDark, 0.35),
+    lite: mix(PAL.ochre, PAL.sand, 0.55),
+    dark: mix(PAL.ochre, PAL.void, 0.55),
+  },
 }
 
 const SPECS = {
@@ -271,6 +283,10 @@ const SPECS = {
   ghost: { w: 38, h: 44, rig: 'ghost', seed: 0x9011, eye: PAL.neon, eye2: PAL.neon, cx: 19, ground: 43 },
   // 重型破拆：装甲板、巨臂
   hulk: { w: 56, h: 52, rig: 'heavy', seed: 0x8e11, eye: PAL.neonRed, eye2: PAL.neonWarm, cx: 28, ground: 51, hipY: 39, shoulderY: 24, headTop: 10 },
+  // 镇暴：heavy 骨架 + 独立配色 + 盾牌/肩灯配件
+  warden: { w: 52, h: 50, rig: 'heavy', pal: 'warden', shield: true, seed: 0x4c17, eye: PAL.neonCold, eye2: PAL.neonCold, cx: 26, ground: 49, hipY: 37, shoulderY: 22, headTop: 9 },
+  // 弹跳：light 骨架 + 独立配色 + 弹簧/稳定轮配件
+  hopper: { w: 38, h: 42, rig: 'light', pal: 'hopper', spring: true, seed: 0x2b93, eye: PAL.neonWarm, eye2: PAL.neonWarm, cx: 19, ground: 41 },
 }
 
 const OUTLINE = {}
@@ -303,7 +319,7 @@ function biped(sp, P) {
   const s = new Surf(sp.w, sp.h, sp.seed + 977 * (P.i || 0) + (P.hurt ? 31 : 0))
   P.g = P.g || []
   const heavy = sp.rig === 'heavy'
-  const id = heavy ? 'hulk' : 'unit7'
+  const id = sp.pal || (heavy ? 'hulk' : 'unit7')
   const tn = T[id]
   const g = sp.ground
   const bob = P.bob | 0
@@ -550,6 +566,25 @@ function biped(sp, P) {
     const kx = cx - stride - 2
     s.px(kx, g - 1, PAL.dust, 0.35)
     if (phase % 1.2 < 0.5) s.px(kx - 2, g - 2, PAL.dust, 0.22)
+  }
+
+  // —— WARDEN 专属：前臂破盾 + 肩头警报灯 ——
+  if (sp.shield) {
+    const sx = hand.x + 3
+    const sy = hand.y - 7
+    plate(s, sx, sy, 5, 13, { base: T.warden.lite, lite: PAL.steelWhite, dark: T.warden.dark })
+    s.line(sx + 1, sy + 2, sx + 3, sy + 2, PAL.rust, 0.8)
+    s.line(sx + 1, sy + 10, sx + 3, sy + 10, PAL.rust, 0.6)
+    s.rect(sx + 1, sy + 5, 2, 3, PAL.rustDark, 0.9)
+    s.disc(sx + 2, sy + 6, 1.4, PAL.void)
+    s.px(sx + 2, sy + 6, T.warden.lite)
+  }
+  if (sp.pal === 'warden') {
+    const bx = cx - halfW - 1
+    const by = sp.shoulderY - 3
+    s.rect(bx, by, 3, 3, PAL.steelDark)
+    s.px(bx + 1, by + 1, PAL.neonCold, 0.95)
+    eyeAt(P, bx + 1, by + 1, PAL.neonCold, 0.6, 7)
   }
   return finish(s, sp, P)
 }
@@ -1055,7 +1090,7 @@ function quad(sp, P) {
 function light(sp, P) {
   const s = new Surf(sp.w, sp.h, sp.seed + 977 * (P.i || 0))
   P.g = P.g || []
-  const t = T.mule
+  const t = T[sp.pal] || T.mule
   const g = sp.ground
   const cx = sp.cx
   const bob = P.bob | 0
@@ -1081,7 +1116,7 @@ function light(sp, P) {
     s.rect(footX - 1, footY, 4, 1, PAL.steelDark)
     s.px(footX, footY - 1, PAL.steelLight)
   }
-  drawLeg(Math.PI, true)
+  if (!sp.spring) drawLeg(Math.PI, true)
 
   // 躯干（细长）
   s.poly(
@@ -1140,6 +1175,28 @@ function light(sp, P) {
   vent(s, hx + 4, hy + hh - 2, 7, 1, PAL.steelDark)
 
   drawLeg(0, false)
+
+  // —— HOPPER 专属：单弹簧腿 + 侧稳定轮 ——
+  if (sp.spring) {
+    let px = cx
+    let py = hipY + 1
+    for (let i = 1; i <= 8; i++) {
+      const off = i === 8 ? 0 : i % 2 ? 3.4 : -3.4
+      const nx = cx + off
+      const ny = hipY + 1 + (g - hipY - 2) * (i / 8)
+      s.thick(px, py, nx, ny, 1.5, i % 2 ? t.lite : t.base)
+      px = nx
+      py = ny
+    }
+    s.rect(cx - 3, g - 1, 7, 2, PAL.steelDark)
+    s.px(cx, g - 1, PAL.steelLight)
+    // 侧稳定轮
+    s.disc(cx + 9, g - 4, 4.4, PAL.steelDark)
+    s.disc(cx + 9, g - 4, 2.8, PAL.rustDark)
+    s.disc(cx + 9, g - 4, 1.1, PAL.steelLight)
+    s.line(cx + 9, g - 4, cx + 11, g - 6, PAL.steel, 0.7)
+    s.rect(cx + 5, g - 8, 3, 5, PAL.steel, 0.9)
+  }
 
   if (P.tool) handTool(s, P.tool, cx + 9, hipY - 10, 1)
   return finish(s, sp, P)
@@ -1289,7 +1346,7 @@ function ghost(sp, P) {
  * ========================================================================== */
 
 function finish(s, sp, P) {
-  const id = rigId(sp.rig)
+  const id = sp.pal || rigId(sp.rig)
   const tn = T[id]
   // 手持枪械 / 枪口火焰（shoot / hold 帧）
   if (P.gun) heldGun(s, sp, P)
@@ -1527,7 +1584,7 @@ function poseSet(rig, sp) {
 /** 死亡帧：k=1 侧塌（半倒） / k=2 完全瘫平。k=0 用 rig 画的跪倒。 */
 function deadPose(sp, k = 2) {
   const s = new Surf(sp.w, sp.h, sp.seed + 555 + k * 17, 'chassis')
-  const id = rigId(sp.rig)
+  const id = sp.pal || rigId(sp.rig)
   const tn = T[id]
   const g = sp.ground
   const cx = sp.cx
@@ -2101,11 +2158,14 @@ const BUSTS = {
   mule: bustMule,
   ghost: bustGhost,
   hulk: bustHulk,
+  // 复用半身像构图，靠独立配色区分
+  warden: bustHulk,
+  hopper: bustMule,
 }
 
 /** 64×64 半身像：角色层（锈蚀/描边）→ 合成到背景层 → 发光。 */
 function portraitFor(sp) {
-  const id = rigId(sp.rig)
+  const id = sp.pal || rigId(sp.rig)
   const tn = T[id]
   const body = new Surf(64, 64, sp.seed + 33)
   const P = { g: [] }
@@ -2123,7 +2183,7 @@ function portraitFor(sp) {
  * 15. 公开 API
  * ========================================================================== */
 
-export const CHASSIS_ART_IDS = ['unit7', 'tesla', 'agibot', 'atlas', 'spider', 'mule', 'ghost', 'hulk']
+export const CHASSIS_ART_IDS = ['unit7', 'tesla', 'agibot', 'atlas', 'spider', 'mule', 'ghost', 'hulk', 'warden', 'hopper']
 
 const CACHE = new Map()
 
