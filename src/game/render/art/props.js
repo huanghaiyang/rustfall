@@ -1,0 +1,2786 @@
+// ============================================================================
+// 锈雨 · RUSTFALL —— 场景道具（PROP）程序化像素美术
+// ----------------------------------------------------------------------------
+// 契约：
+//   export function getPropArt(kind) -> THREE.CanvasTexture
+//
+// 约定：
+//   · 每种 kind 尺寸固定（见 SIZES 表），底部贴地（最后一行 = 地面），
+//     水平中心对齐（x = w/2），朝右或正对镜头。
+//   · 骨骼 / 尸骸必须读得出人形 / 动物形；全部半埋、破败，带接触阴影。
+//   · 每个 prop 都走同一条收尾管线：
+//       造型 → 锈蚀/裂纹/积尘（确定性）→ 上缘高光/下缘暗部 → 1px 描边 → 发光
+//   · 未知 kind 退回通用废物堆（不会返回空）。
+// ============================================================================
+
+import * as THREE from 'three'
+import { PAL } from '../palette.js'
+import { mulberry32 } from '../rng.js'
+import { Surf, mix, shade, rgb, setArtModule, ALPHA_STATS } from './core.js'
+setArtModule('props')
+
+const TAU = Math.PI * 2
+
+/* ============================================================================
+ * 1. 颜色 / 像素表面（与其它 art 模块同构，自带一份避免跨模块耦合）
+ * ========================================================================== */
+
+
+/* ============================================================================
+ * 2. 通用零件画笔
+ * ========================================================================== */
+
+/** 贴地投影（宽椭圆）。 */
+function ground(s, cx, rx, al = 0.34) {
+  s.shadow(cx, s.h - 1.5, rx, 1.8, al)
+}
+
+/** 骨：中段杆 + 两端骨节。 */
+function bone(s, x0, y0, x1, y1, r = 1.3, c = PAL.bone) {
+  s.thick(x0, y0, x1, y1, r, PAL.boneDeep)
+  s.thick(x0, y0, x1, y1, r - 0.5, c)
+  s.disc(x0, y0, r + 0.9, PAL.boneDark)
+  s.disc(x1, y1, r + 0.9, PAL.boneDark)
+  s.disc(x0, y0, r + 0.2, c)
+  s.disc(x1, y1, r + 0.2, c)
+  s.px(x0, y0 - 1, PAL.white, 0.5)
+}
+
+/** 竖直锈痕（从孔洞 / 接缝往下淌）。 */
+function rustStreak(s, x, y, len, seed) {
+  const rnd = mulberry32(seed >>> 0)
+  for (let i = 0; i < len; i++) {
+    const p = i / len
+    if (rnd() < 0.22 + p * 0.4) continue
+    s.px(x + (rnd() < 0.2 ? 1 : 0), y + i, rnd() < 0.5 ? PAL.rustDark : PAL.rust, 0.35 + rnd() * 0.4)
+  }
+}
+
+/** 裂纹：一条主线 + 两条分叉。 */
+function crack(s, x, y, len, dir, seed) {
+  const rnd = mulberry32(seed >>> 0)
+  let px = x
+  let py = y
+  for (let i = 0; i < len; i++) {
+    px += dir * (rnd() < 0.7 ? 1 : 0)
+    py += rnd() < 0.75 ? 1 : 0
+    s.px(px, py, PAL.void, 0.55 + rnd() * 0.3)
+    if (rnd() < 0.18) {
+      s.px(px + (rnd() < 0.5 ? 1 : -1), py, PAL.void, 0.4)
+      s.px(px, py + 1, PAL.void, 0.35)
+    }
+    if (i === Math.floor(len * 0.5)) {
+      for (let k = 0; k < 4; k++) s.px(px - dir * k, py + k, PAL.void, 0.35)
+    }
+  }
+}
+
+/** 碎石 / 瓦砾。 */
+function rubble(s, x, y, w, n, seed) {
+  const rnd = mulberry32(seed >>> 0)
+  for (let k = 0; k < n; k++) {
+    const px = x + rnd() * w
+    const py = y - rnd() * 3
+    const r = 0.8 + rnd() * 1.6
+    s.ell(px, py, r, r * 0.7, rnd() < 0.5 ? PAL.ashPale : PAL.dust)
+    s.px(px - 0.5, py - 1, PAL.dustLight, 0.6)
+  }
+}
+
+/** 木板（带纹理与端头）。 */
+function plank(s, x, y, w, h, tone = PAL.dust, seed = 1) {
+  s.rect(x, y, w, h, tone)
+  s.rect(x, y, w, 1, shade(tone, 0.18))
+  s.rect(x, y + h - 1, w, 1, shade(tone, -0.3))
+  const rnd = mulberry32(seed >>> 0)
+  for (let i = 0; i < Math.floor(w / 3); i++) {
+    s.px(x + 1 + rnd() * (w - 2), y + 1 + rnd() * (h - 2), shade(tone, -0.18), 0.5)
+  }
+}
+
+/** 散热格栅 / 板缝。 */
+function vent(s, x, y, w, n, c, step = 2) {
+  for (let k = 0; k < n; k++) s.rect(x, y + k * step, w, 1, c)
+}
+
+/** 窗户（碎玻璃 / 黑洞 / 微光）。 */
+function window(s, x, y, w, h, mode, seed) {
+  const frame = PAL.steelDark
+  s.rect(x, y, w, h, PAL.void)
+  if (mode === 'broken') {
+    s.rect(x, y, w, h, PAL.black)
+    // 残玻璃锯齿
+    const rnd = mulberry32(seed >>> 0)
+    for (let i = 0; i < w; i++) {
+      const d = Math.floor(rnd() * (h - 1))
+      for (let k = 0; k < d; k++) s.px(x + i, y + k, PAL.glass, 0.18)
+      s.px(x + i, y + d, PAL.glass, 0.45)
+    }
+    s.line(x, y + h - 1, x + w - 1, y + 1, PAL.steelLight, 0.2)
+  } else if (mode === 'lit') {
+    s.rect(x, y, w, h, PAL.ochre, 0.35)
+    s.rect(x + 1, y + 1, w - 2, h - 2, PAL.neonWarm, 0.25)
+    s.glow(x + w / 2, y + h / 2, Math.max(w, h) * 0.7, PAL.neonWarm, 0.14)
+  } else {
+    s.rect(x, y, w, h, PAL.ash, 0.7)
+  }
+  // 窗框（十字）
+  s.rect(x, y, w, 1, frame)
+  s.rect(x, y + h - 1, w, 1, frame)
+  s.rect(x, y, 1, h, frame)
+  s.rect(x + w - 1, y, 1, h, frame)
+  if (w > 8) s.rect(x + Math.floor(w / 2), y, 1, h, frame, 0.85)
+}
+
+/* ============================================================================
+ * 3. 各民族：33 种道具
+ * ========================================================================== */
+
+/** 人形骨架（半埋、侧躺，能读出人形）。 */
+function propSkeletonHuman(s) {
+  const g = s.h - 1
+  ground(s, 44, 30)
+  const boneC = PAL.bone
+  const boneD = PAL.boneDark
+  // 土堆（半埋）
+  s.poly(
+    [
+      [8, g],
+      [16, g - 6],
+      [34, g - 8],
+      [58, g - 5],
+      [70, g],
+    ],
+    PAL.dust,
+  )
+  s.speck(10, g - 8, 60, 9, PAL.sandDark, 0.25)
+  // 脊柱（从骨盆到颈椎）
+  bone(s, 40, g - 6, 74, g - 5, 1.4, boneC)
+  for (let k = 0; k < 8; k++) {
+    const x = 42 + k * 4
+    s.px(x, g - 7, boneD, 0.7)
+  }
+  // 骨盆
+  s.ell(40, g - 6, 5, 3, boneD)
+  s.ell(40, g - 6, 4, 2.2, boneC)
+  s.px(39, g - 8, PAL.void, 0.8)
+  // 胸腔（肋骨，压在土堆上，向右前倾）
+  const rc = [54, g - 9]
+  s.ell(rc[0], rc[1], 7.5, 4.6, boneD)
+  s.ell(rc[0], rc[1], 6.5, 3.7, boneC)
+  for (let k = 0; k < 4; k++) {
+    s.line(rc[0] - 6, rc[1] - 3 + k * 2, rc[0] + 6, rc[1] - 4 + k * 2, PAL.boneDeep, 0.65)
+  }
+  s.rect(rc[0] - 1, rc[1] - 3, 2, 6, PAL.void, 0.5)
+  // 锁骨
+  bone(s, 60, g - 11, 68, g - 12, 1.1, boneC)
+  // 头骨（略仰，朝向右侧）
+  const sk = [74, g - 12]
+  s.ell(sk[0], sk[1], 5.5, 5, boneD)
+  s.ell(sk[0], sk[1], 4.6, 4.2, boneC)
+  s.ell(sk[0] + 1, sk[1] + 2, 2.6, 2.2, boneD)
+  // 眼窝 / 鼻腔
+  s.rect(sk[0] - 2, sk[1] - 2, 2, 2, PAL.void)
+  s.rect(sk[0] + 1, sk[1] - 2, 2, 2, PAL.void)
+  s.px(sk[0], sk[1] + 1, PAL.void)
+  // 牙
+  for (let k = 0; k < 4; k++) s.px(sk[0] - 2 + k, sk[1] + 3, PAL.white, 0.8)
+  // 下颌（脱开，落在地上）
+  s.poly(
+    [
+      [sk[0] + 2, g - 6],
+      [sk[0] + 7, g - 5],
+      [sk[0] + 6, g - 3],
+      [sk[0] + 2, g - 4],
+    ],
+    boneD,
+  )
+  // 左臂（伸向画外）
+  bone(s, 66, g - 12, 78, g - 8, 1.2, boneC)
+  bone(s, 78, g - 8, 88, g - 9, 1.1, boneC)
+  // 右臂（折在胸前）
+  bone(s, 64, g - 10, 60, g - 4, 1.2, boneD)
+  bone(s, 60, g - 4, 68, g - 3, 1.1, boneD)
+  // 腿（一条伸直、一条屈起）
+  bone(s, 36, g - 5, 22, g - 3, 1.4, boneC)
+  bone(s, 22, g - 3, 10, g - 4, 1.3, boneC)
+  bone(s, 38, g - 5, 30, g - 9, 1.4, boneD)
+  bone(s, 30, g - 9, 20, g - 7, 1.2, boneD)
+  // 指骨 / 散落
+  for (let k = 0; k < 4; k++) s.px(86 + k, g - 7 + (k % 2), boneD, 0.9)
+  // 残留布料
+  s.poly(
+    [
+      [48, g - 4],
+      [56, g - 6],
+      [60, g - 3],
+      [52, g - 1],
+    ],
+    PAL.rustDark,
+    0.9,
+  )
+  s.line(49, g - 3, 58, g - 2, PAL.rust, 0.5)
+  // 压在土里的骨屑
+  rubble(s, 12, g, 70, 8, 0x51)
+}
+
+/** 动物骨架（四足、肋骨外露）。 */
+function propSkeletonAnimal(s) {
+  const g = s.h - 1
+  ground(s, 34, 22)
+  const bc = PAL.bone
+  const bd = PAL.boneDark
+  // 土堆
+  s.poly(
+    [
+      [6, g],
+      [14, g - 5],
+      [40, g - 6],
+      [56, g - 4],
+      [64, g],
+    ],
+    PAL.dust,
+  )
+  // 脊柱（横贯）
+  bone(s, 22, g - 8, 54, g - 7, 1.3, bc)
+  for (let k = 0; k < 7; k++) s.px(24 + k * 4, g - 9, bd, 0.75)
+  // 胸腔
+  s.ell(33, g - 9, 5, 4, bd)
+  s.ell(33, g - 9, 4.2, 3.2, bc)
+  for (let k = 0; k < 3; k++) s.line(29, g - 11 + k * 2, 38, g - 12 + k * 2, PAL.boneDeep, 0.6)
+  // 肩胛 / 骨盆
+  s.ell(43, g - 6, 4, 2.6, bd)
+  s.ell(43, g - 6, 3.2, 2, bc)
+  s.ell(21, g - 7, 3, 2, bd)
+  // 头骨（长吻、朝右）
+  const sk = [60, g - 10]
+  s.poly(
+    [
+      [sk[0] - 5, sk[1] - 2],
+      [sk[0] + 2, sk[1] - 4],
+      [sk[0] + 7, sk[1] - 1],
+      [sk[0] + 5, sk[1] + 2],
+      [sk[0] - 4, sk[1] + 2],
+    ],
+    bc,
+  )
+  s.poly(
+    [
+      [sk[0] + 1, sk[1] + 2],
+      [sk[0] + 6, sk[1] + 1],
+      [sk[0] + 5, sk[1] + 3],
+      [sk[0] + 1, sk[1] + 4],
+    ],
+    bd,
+  )
+  s.rect(sk[0] - 2, sk[1] - 2, 2, 2, PAL.void)
+  s.px(sk[0] + 3, sk[1], PAL.void)
+  // 角（骨刺）
+  s.line(sk[0] - 1, sk[1] - 3, sk[0] - 4, sk[1] - 7, bc)
+  s.line(sk[0] + 1, sk[1] - 3, sk[0] + 1, sk[1] - 7, bd)
+  // 四条腿（折叠）
+  for (const [hx, kx, fx] of [
+    [22, 20, 16],
+    [24, 28, 30],
+    [42, 40, 36],
+    [44, 48, 52],
+  ]) {
+    bone(s, hx, g - 6, kx, g - 3, 1.1, bd)
+    bone(s, kx, g - 3, fx, g - 2, 0.9, bc)
+  }
+  // 尾骨
+  bone(s, 19, g - 7, 12, g - 9, 1, bd)
+  bone(s, 12, g - 9, 8, g - 6, 0.8, bd)
+  // 残毛 / 皮
+  s.poly(
+    [
+      [26, g - 5],
+      [34, g - 7],
+      [40, g - 4],
+      [30, g - 2],
+    ],
+    PAL.rustDark,
+    0.8,
+  )
+  rubble(s, 10, g, 50, 6, 0x66)
+}
+
+/** 尸体（还带衣物，比骨架完整）。 */
+function propCorpse(s) {
+  const g = s.h - 1
+  ground(s, 40, 26)
+  const cloth = mix(PAL.dust, PAL.rustDark, 0.35)
+  // 身体（蜷曲侧躺）
+  s.poly(
+    [
+      [12, g - 6],
+      [18, g - 12],
+      [34, g - 14],
+      [46, g - 12],
+      [54, g - 8],
+      [46, g - 3],
+      [22, g - 2],
+    ],
+    cloth,
+  )
+  s.line(16, g - 10, 30, g - 12, PAL.dustLight, 0.6)
+  s.line(24, g - 4, 46, g - 6, PAL.rustDark, 0.8)
+  // 头（侧脸贴地）
+  const hx = 60
+  const hy = g - 9
+  s.ell(hx, hy, 6, 5, PAL.boneDark)
+  s.ell(hx, hy, 5, 4.2, PAL.bone)
+  s.ell(hx + 4, hy + 2, 2.6, 1.8, PAL.boneDark, 0.6)
+  s.rect(hx - 2, hy - 2, 1, 2, PAL.void, 0.8)
+  s.px(hx + 1, hy + 4, PAL.bloodDark)
+  // 头发（稀疏）
+  s.line(hx - 4, hy - 3, hx + 2, hy - 5, PAL.ink, 0.8)
+  // 手臂（一只手伸出）
+  s.thick(52, g - 6, 66, g - 2, 2, cloth)
+  s.thick(66, g - 2, 72, g - 1, 1.7, PAL.boneDark)
+  for (let k = 0; k < 3; k++) s.px(73 + k, g - 1 - (k % 2), PAL.bone)
+  // 腿（一条弯曲）
+  s.thick(20, g - 5, 8, g - 6, 2.4, cloth)
+  s.thick(26, g - 4, 16, g - 1, 2.2, shade(cloth, -0.2))
+  s.rect(6, g - 7, 4, 2, PAL.ink)
+  // 血渍
+  s.ell(40, g - 1, 10, 2, PAL.bloodDark, 0.55)
+  s.ell(46, g - 2, 5, 1.4, PAL.blood, 0.35)
+  // 破洞 / 渗透
+  s.speck(16, g - 12, 38, 10, PAL.bloodDark, 0.05, 0.5)
+  s.px(58, g - 4, PAL.void, 0.7)
+  rubble(s, 4, g, 20, 4, 0x71)
+}
+
+/** 头骨。 */
+function propSkull(s) {
+  const g = s.h - 1
+  ground(s, 10, 6, 0.3)
+  s.ell(10, 9, 6.5, 6, PAL.boneDark)
+  s.ell(10, 9, 5.6, 5.2, PAL.bone)
+  // 颅顶高光
+  s.line(6, 6, 11, 4, PAL.white, 0.55)
+  // 眼窝
+  s.rect(7, 8, 2, 3, PAL.void)
+  s.rect(12, 8, 2, 3, PAL.void)
+  s.px(7, 8, PAL.boneDark)
+  // 鼻腔
+  s.px(10, 11, PAL.void)
+  s.px(10, 12, PAL.void)
+  // 上颌牙
+  s.rect(7, 13, 6, 2, PAL.boneDark)
+  for (let k = 0; k < 5; k++) s.px(7 + k, 13, PAL.white, 0.75)
+  // 下颌（掉落在右下）
+  s.poly(
+    [
+      [12, 15],
+      [17, 14],
+      [16, 17],
+      [13, 17],
+    ],
+    PAL.boneDark,
+  )
+  s.px(14, 16, PAL.bone)
+  // 裂纹 + 缺角
+  s.line(13, 4, 15, 8, PAL.boneDeep, 0.7)
+  s.px(4, 9, PAL.boneDeep)
+  // 土
+  s.ell(10, g, 8, 1.4, PAL.dust, 0.5)
+}
+
+/** 肋骨（半埋、斜插在土里）。 */
+function propRibcage(s) {
+  const g = s.h - 1
+  ground(s, 28, 18)
+  s.poly(
+    [
+      [8, g],
+      [16, g - 5],
+      [36, g - 6],
+      [48, g - 3],
+      [52, g],
+    ],
+    PAL.dust,
+  )
+  const cx = 28
+  const cy = g - 14
+  // 胸骨
+  s.thick(cx - 2, cy - 4, cx + 2, cy + 12, 1.6, PAL.boneDark)
+  s.thick(cx - 2, cy - 4, cx + 2, cy + 12, 1, PAL.bone)
+  // 左右肋骨各 7 根（弧线）
+  for (let k = 0; k < 7; k++) {
+    const t = k / 6
+    const y = cy - 3 + k * 2.2
+    const len = 15 * Math.sin(Math.PI * (0.35 + t * 0.6))
+    s.line(cx - 1, y, cx - 1 - len, y + 3 + t * 2, PAL.boneDark, 0.95)
+    s.line(cx + 1, y, cx + 1 + len, y + 3 + t * 2, PAL.boneDark, 0.95)
+    s.line(cx - 2, y - 0.4, cx - len, y + 2.6 + t * 2, PAL.bone, 0.9)
+    s.line(cx + 2, y - 0.4, cx + len, y + 2.6 + t * 2, PAL.bone, 0.9)
+  }
+  // 断口 / 土覆盖底部
+  s.ell(cx, g - 3, 20, 3, PAL.dust, 0.8)
+  s.speck(10, g - 5, 38, 5, PAL.sandDark, 0.25)
+  rubble(s, 12, g, 34, 7, 0x88)
+}
+
+/** 汽车残骸（压扁、缺轮、碎窗）。 */
+function propCarWreck(s) {
+  const g = s.h - 1
+  ground(s, 60, 44)
+  const body = mix(PAL.rust, PAL.rustDark, 0.35)
+  const bodyL = mix(PAL.rust, PAL.rustLight, 0.45)
+  // 车体（侧视，车头朝右，压低）
+  s.poly(
+    [
+      [8, g - 8],
+      [14, g - 20],
+      [40, g - 24],
+      [56, g - 30],
+      [78, g - 28],
+      [96, g - 22],
+      [110, g - 16],
+      [112, g - 8],
+      [104, g - 4],
+      [16, g - 4],
+    ],
+    body,
+  )
+  // 顶部高光 / 腰线
+  s.line(16, g - 19, 98, g - 21, bodyL, 0.9)
+  s.line(12, g - 10, 108, g - 10, PAL.rustDark, 0.8)
+  // 车窗（碎）
+  window(s, 34, g - 24, 18, 8, 'broken', 0x31)
+  window(s, 58, g - 28, 20, 8, 'broken', 0x32)
+  // 前挡风（塌陷）
+  s.poly(
+    [
+      [82, g - 26],
+      [98, g - 22],
+      [94, g - 16],
+      [80, g - 18],
+    ],
+    PAL.black,
+  )
+  s.line(84, g - 24, 92, g - 18, PAL.glass, 0.3)
+  // 车门缝 / 把手
+  s.line(56, g - 22, 56, g - 6, PAL.void, 0.55)
+  s.rect(46, g - 15, 5, 1, PAL.steelLight, 0.6)
+  // 轮拱（轮子没了）
+  s.ell(30, g - 6, 9, 7, PAL.void, 0.9)
+  s.ell(90, g - 6, 9, 7, PAL.void, 0.9)
+  s.ell(30, g - 6, 8, 6, PAL.black, 0.8)
+  s.ell(90, g - 6, 8, 6, PAL.black, 0.8)
+  // 保险杠 / 车灯
+  s.rect(106, g - 12, 6, 5, PAL.steelDark)
+  s.rect(108, g - 11, 4, 2, PAL.glass, 0.5)
+  s.px(110, g - 10, PAL.neonWarm, 0.5)
+  s.rect(6, g - 12, 5, 5, PAL.steelDark)
+  // 锈斑 / 破洞 / 弹孔
+  s.speck(14, g - 26, 90, 22, PAL.rustDark, 0.14, 0.6)
+  s.speck(14, g - 26, 90, 22, PAL.rustLight, 0.06, 0.5)
+  s.ell(70, g - 14, 3, 2, PAL.void, 0.85)
+  crack(s, 24, g - 20, 8, 1, 0x41)
+  // 悬空的破线 / 弹簧
+  s.line(52, g - 5, 48, g - 1, PAL.oilSheen)
+  s.line(70, g - 5, 74, g - 2, PAL.oilSheen)
+  rubble(s, 4, g, 112, 10, 0x21)
+  // 杂草
+  for (let k = 0; k < 5; k++) {
+    s.line(20 + k * 18, g, 22 + k * 18, g - 4, PAL.weed, 0.7)
+  }
+}
+
+/** 公交车残骸（侧视长条，车窗成排）。 */
+function propBusWreck(s) {
+  const g = s.h - 1
+  ground(s, 100, 78)
+  const body = mix(PAL.skyDay, PAL.rustDark, 0.55)
+  const bodyL = mix(body, PAL.sand, 0.35)
+  // 车身
+  s.poly(
+    [
+      [6, g - 10],
+      [10, g - 44],
+      [26, g - 52],
+      [166, g - 52],
+      [190, g - 44],
+      [194, g - 12],
+      [186, g - 4],
+      [14, g - 4],
+    ],
+    body,
+  )
+  // 车顶高光 / 腰线 / 裙边
+  s.line(16, g - 50, 172, g - 50, bodyL, 0.9)
+  s.line(8, g - 38, 192, g - 38, PAL.sand, 0.28)
+  s.rect(10, g - 14, 182, 4, PAL.rustDark, 0.85)
+  s.rect(10, g - 10, 182, 2, PAL.rust, 0.6)
+  // 车窗（7 扇，多数碎）
+  for (let k = 0; k < 7; k++) {
+    const x = 22 + k * 23
+    const mode = k === 2 || k === 5 ? 'lit' : k === 3 ? 'dark' : 'broken'
+    window(s, x, g - 44, 17, 12, mode, 0x100 + k)
+  }
+  // 车门（开着）
+  s.poly(
+    [
+      [150, g - 42],
+      [166, g - 42],
+      [168, g - 10],
+      [148, g - 10],
+    ],
+    PAL.void,
+  )
+  s.line(150, g - 42, 148, g - 10, PAL.steelLight, 0.5)
+  // 前脸 / 车灯
+  s.poly(
+    [
+      [186, g - 44],
+      [198, g - 38],
+      [198, g - 20],
+      [186, g - 16],
+    ],
+    PAL.steelDark,
+  )
+  s.rect(189, g - 34, 7, 6, PAL.glass, 0.45)
+  s.px(192, g - 31, PAL.neonWarm, 0.7)
+  s.glow(192, g - 31, 8, PAL.neonWarm, 0.18)
+  // 车轮（左前爆胎、右后缺失）
+  for (const [wx, flat] of [
+    [40, true],
+    [148, false],
+  ]) {
+    s.disc(wx, g - 7, 8, PAL.oil)
+    s.disc(wx, g - 7, 5.5, PAL.steelDark)
+    s.disc(wx, g - 7, 2, PAL.steelLight)
+    if (flat) {
+      s.ell(wx, g - 1, 9, 2, PAL.oil, 0.9)
+      s.disc(wx, g - 5, 8, PAL.oil)
+    }
+  }
+  s.ell(100, g - 4, 10, 6, PAL.void, 0.85)
+  // 锈 / 涂鸦 / 弹孔
+  s.speck(14, g - 50, 170, 46, PAL.rustDark, 0.1, 0.55)
+  s.speck(14, g - 50, 170, 46, PAL.rustLight, 0.04, 0.45)
+  for (let k = 0; k < 5; k++) rustStreak(s, 30 + k * 34, g - 50, 14 + k * 3, 0x200 + k)
+  s.line(70, g - 30, 86, g - 26, PAL.bloodDark, 0.5)
+  s.line(72, g - 26, 84, g - 30, PAL.bloodDark, 0.4)
+  crack(s, 120, g - 48, 10, 1, 0x51)
+  // 地面杂草 / 碎玻璃
+  for (let k = 0; k < 8; k++) s.px(20 + k * 22, g - 1 - (k % 2), PAL.weed, 0.6)
+  for (let k = 0; k < 12; k++) s.px(20 + s.r() * 160, g - 1, PAL.glass, 0.3)
+}
+
+/** 楼房立面（窗格 / 阳台 / 破洞）。 */
+function propBuildingFacade(s) {
+  const g = s.h - 1
+  ground(s, 80, 74, 0.3)
+  const wall = mix(PAL.dust, PAL.ash, 0.45)
+  const wallL = mix(wall, PAL.sand, 0.3)
+  const wallD = mix(wall, PAL.void, 0.4)
+  // 主体
+  s.rect(4, 6, 152, g - 6, wall)
+  s.rect(4, 6, 152, 3, wallL)
+  s.rect(4, 6, 3, g - 6, wallL, 0.7)
+  s.rect(153, 6, 3, g - 6, wallD)
+  // 楼顶檐口 + 女儿墙
+  s.rect(2, 2, 156, 5, PAL.ashPale)
+  s.rect(2, 2, 156, 1, PAL.steelLight, 0.5)
+  s.rect(2, 6, 156, 2, PAL.void, 0.5)
+  // 窗格（5 列 × 7 行），部分破损
+  const cols = 5
+  const rows = 7
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = 12 + c * 28
+      const y = 16 + r * 27
+      const rnd = mulberry32(0x300 + r * 17 + c)
+      const mode = rnd() < 0.22 ? 'lit' : rnd() < 0.6 ? 'broken' : 'dark'
+      window(s, x, y, 18, 14, mode, 0x300 + r * 17 + c)
+      // 窗台
+      s.rect(x - 2, y + 14, 22, 2, PAL.ashPale)
+      s.rect(x - 2, y + 14, 22, 1, PAL.steelLight, 0.4)
+      // 铁栏 / 空调 / 花盆
+      if (rnd() < 0.3) {
+        for (let k = 0; k < 6; k++) s.line(x + 1 + k * 3, y, x + 1 + k * 3, y + 13, PAL.steelDark, 0.55)
+      }
+      if (rnd() < 0.18) {
+        s.rect(x + 4, y + 16, 9, 6, PAL.steelDark)
+        vent(s, x + 5, y + 18, 7, 2, PAL.steelLight)
+      }
+    }
+  }
+  // 楼层分隔线
+  for (let r = 0; r <= rows; r++) {
+    const y = 12 + r * 27
+    if (y < g - 4) s.line(4, y, 155, y, wallD, 0.35)
+  }
+  // 破洞（露出内部与钢筋）
+  s.ell(120, g - 60, 12, 16, PAL.void, 0.92)
+  s.ell(120, g - 60, 9, 12, PAL.black, 0.8)
+  for (let k = 0; k < 5; k++) {
+    s.line(112 + k * 4, g - 50, 116 + k * 4, g - 70, PAL.rustDark, 0.8)
+  }
+  s.ell(40, g - 110, 8, 10, PAL.void, 0.75)
+  // 门洞（底层）
+  s.rect(24, g - 42, 26, 42, PAL.void)
+  s.rect(24, g - 42, 26, 2, PAL.ashPale)
+  s.rect(24, g - 42, 2, 42, PAL.ashPale)
+  s.line(30, g - 30, 46, g - 26, PAL.rust, 0.5)
+  // 涂鸦 / 裂纹 / 锈水痕
+  s.line(60, g - 30, 74, g - 14, PAL.bloodDark, 0.45)
+  s.line(74, g - 14, 66, g - 2, PAL.bloodDark, 0.35)
+  for (let k = 0; k < 8; k++) rustStreak(s, 8 + k * 19, 20 + (k % 3) * 40, 30 + k * 2, 0x400 + k)
+  crack(s, 60, 10, 40, 1, 0x71)
+  crack(s, 100, 40, 30, -1, 0x72)
+  // 底部瓦砾与草
+  rubble(s, 0, g, 160, 18, 0x81)
+  for (let k = 0; k < 10; k++) s.line(6 + k * 15, g, 8 + k * 15, g - 5, PAL.weed, 0.6)
+}
+
+/** 民居立面（坡顶 + 门廊）。 */
+function propHouseFacade(s) {
+  const g = s.h - 1
+  ground(s, 70, 62, 0.3)
+  const wall = mix(PAL.dust, PAL.sand, 0.25)
+  const wallL = mix(wall, PAL.sand, 0.28)
+  const wallD = mix(wall, PAL.void, 0.42)
+  // 墙体
+  s.rect(8, 34, 124, g - 34, wall)
+  s.rect(8, 34, 3, g - 34, wallL, 0.8)
+  s.rect(129, 34, 3, g - 34, wallD)
+  // 坡屋顶（两坡）
+  s.poly(
+    [
+      [4, 36],
+      [70, 6],
+      [136, 36],
+      [130, 40],
+      [70, 12],
+      [10, 40],
+    ],
+    mix(PAL.rustDark, PAL.dust, 0.4),
+  )
+  for (let k = 0; k < 5; k++) {
+    s.line(10 + k * 2, 38 - k * 6, 130 - k * 1, 38 - k * 6, PAL.rust, 0.35)
+  }
+  s.line(70, 6, 70, 12, PAL.rustDark, 0.8)
+  // 屋顶破洞
+  s.ell(40, 26, 5, 4, PAL.void, 0.85)
+  s.line(34, 30, 46, 22, PAL.rustDark, 0.7)
+  // 门窗
+  s.rect(58, g - 34, 20, 34, PAL.void)
+  s.rect(58, g - 34, 20, 2, PAL.ashPale)
+  s.rect(58, g - 34, 2, 34, PAL.ashPale)
+  s.rect(76, g - 34, 2, 34, PAL.ashPale)
+  s.px(74, g - 18, PAL.neonWarm, 0.7)
+  window(s, 24, 54, 18, 14, 'broken', 0x901)
+  window(s, 96, 54, 18, 14, 'lit', 0x902)
+  // 窗下花箱 / 晾衣绳
+  s.rect(22, 69, 22, 3, PAL.rustDark)
+  s.line(96, 70, 130, 66, PAL.oilSheen, 0.7)
+  s.rect(104, 66, 5, 4, PAL.dust, 0.8)
+  s.rect(116, 65, 4, 5, PAL.rustDark, 0.8)
+  // 墙皮剥落 / 霉斑 / 裂纹
+  s.poly(
+    [
+      [12, 44],
+      [26, 42],
+      [24, 54],
+      [14, 56],
+    ],
+    PAL.ash, 0.5,
+  )
+  s.speck(10, 36, 118, g - 38, PAL.rustDark, 0.06, 0.45)
+  s.speck(10, g - 20, 118, 18, PAL.mossDead, 0.05, 0.5)
+  crack(s, 40, 40, 26, 1, 0xa01)
+  crack(s, 110, 44, 20, -1, 0xa02)
+  // 台阶
+  s.rect(54, g - 8, 30, 3, PAL.ashPale)
+  s.rect(54, g - 5, 34, 4, PAL.ash)
+  rubble(s, 6, g, 130, 14, 0xb01)
+}
+
+/** 工厂管道（竖直，法兰 + 阀门）。 */
+function propFactoryPipe(s) {
+  const g = s.h - 1
+  ground(s, 24, 14)
+  const pipe = mix(PAL.steel, PAL.rustDark, 0.4)
+  const pipeL = mix(pipe, PAL.steelLight, 0.45)
+  const pipeD = mix(pipe, PAL.void, 0.45)
+  // 管身
+  s.rect(12, 6, 24, g - 6, pipe)
+  s.rect(12, 6, 4, g - 6, pipeL)
+  s.rect(32, 6, 4, g - 6, pipeD)
+  s.rect(17, 6, 3, g - 6, PAL.ashPale, 0.25)
+  // 法兰（三道）
+  for (const fy of [16, 66, 130]) {
+    s.rect(7, fy, 34, 8, PAL.steelDark)
+    s.rect(7, fy, 34, 1, PAL.steelLight)
+    s.rect(7, fy + 7, 34, 1, PAL.void, 0.6)
+    for (let k = 0; k < 4; k++) {
+      s.px(10 + k * 8, fy + 3, PAL.steelWhite, 0.7)
+      s.px(10 + k * 8, fy + 4, PAL.steelDark)
+    }
+  }
+  // 阀门
+  s.disc(24, 104, 9, PAL.steelDark)
+  s.disc(24, 104, 6, PAL.rust)
+  s.disc(24, 104, 2, PAL.steelDark)
+  s.line(15, 104, 33, 104, PAL.steelLight, 0.6)
+  s.line(24, 95, 24, 113, PAL.steelLight, 0.6)
+  s.rect(22, 92, 4, 6, PAL.steel)
+  // 保温层（破布缠的一段）
+  for (let k = 0; k < 5; k++) s.rect(12, 40 + k * 5, 24, 3, mix(PAL.dust, PAL.ash, 0.5), 0.8)
+  // 锈流 / 裂口
+  for (let k = 0; k < 6; k++) rustStreak(s, 14 + k * 4, 24 + k * 18, 18 + k * 5, 0xc00 + k)
+  s.ell(30, 74, 4, 6, PAL.void, 0.8)
+  s.line(28, 70, 32, 82, PAL.void, 0.6)
+  // 底部支撑与碎石
+  s.rect(8, g - 8, 32, 4, PAL.steelDark)
+  rubble(s, 4, g, 40, 8, 0xd01)
+}
+
+/** 油桶。 */
+function propBarrel(s) {
+  const g = s.h - 1
+  ground(s, 14, 11)
+  const body = mix(PAL.rust, PAL.rustDark, 0.3)
+  s.rect(4, 8, 20, g - 8, body)
+  s.rect(4, 8, 3, g - 8, mix(body, PAL.rustLight, 0.5))
+  s.rect(21, 8, 3, g - 8, shade(body, -0.35))
+  // 顶盖（椭圆）
+  s.ell(14, 8, 10, 3, PAL.steelDark)
+  s.ell(14, 8, 8.5, 2.2, mix(PAL.steel, PAL.rust, 0.4))
+  s.ell(14, 8, 2, 1, PAL.void, 0.8)
+  // 两道箍
+  for (const y of [16, 27]) {
+    s.rect(4, y, 20, 2, PAL.steelDark)
+    s.rect(4, y, 20, 1, PAL.steelLight, 0.6)
+  }
+  // 标签（褪色的危险三角）
+  s.rect(7, 19, 14, 8, PAL.sand, 0.55)
+  s.poly(
+    [
+      [14, 20],
+      [18, 25],
+      [10, 25],
+    ],
+    PAL.ink, 0.65,
+  )
+  s.px(14, 22, PAL.warn, 0.8)
+  // 锈 / 凹陷 / 漏液
+  s.speck(4, 8, 20, g - 8, PAL.rustDark, 0.2, 0.6)
+  s.speck(4, 8, 20, g - 8, PAL.rustLight, 0.07, 0.5)
+  s.ell(18, 22, 3, 4, PAL.void, 0.35)
+  s.ell(14, g - 1, 9, 1.6, PAL.oil, 0.5)
+  s.px(11, 10, PAL.steelWhite, 0.4)
+}
+
+/** 木箱。 */
+function propCrate(s) {
+  const g = s.h - 1
+  ground(s, 20, 14)
+  const wood = PAL.dust
+  // 箱体
+  s.rect(4, 6, 32, g - 6, wood)
+  s.rect(4, 6, 32, 2, mix(wood, PAL.sand, 0.4))
+  s.rect(4, g - 5, 32, 2, shade(wood, -0.35))
+  // 木板横纹
+  for (let k = 0; k < 4; k++) s.rect(4, 10 + k * 6, 32, 1, shade(wood, -0.25), 0.7)
+  // X 形加固
+  s.line(5, 7, 35, g - 5, shade(wood, -0.28), 0.8)
+  s.line(35, 7, 5, g - 5, shade(wood, -0.28), 0.8)
+  s.line(6, 8, 34, g - 6, mix(wood, PAL.sand, 0.35), 0.5)
+  // 金属包角
+  for (const [x, y] of [
+    [4, 6],
+    [30, 6],
+    [4, g - 8],
+    [30, g - 8],
+  ]) {
+    s.rect(x, y, 6, 2, PAL.steelDark)
+    s.rect(x, y, 2, 6, PAL.steelDark)
+    s.px(x + 1, y + 1, PAL.steelLight)
+  }
+  // 钉子 / 破洞 / 污渍
+  for (let k = 0; k < 5; k++) s.px(7 + k * 6, 12, PAL.steelLight, 0.6)
+  s.px(22, 20, PAL.void, 0.7)
+  s.poly(
+    [
+      [26, 24],
+      [33, 22],
+      [34, 29],
+      [28, 30],
+    ],
+    shade(wood, -0.45),
+  )
+  s.speck(4, 6, 32, g - 6, PAL.rust, 0.05, 0.4)
+  rubble(s, 2, g, 36, 5, 0xe01)
+}
+
+/** 轮胎堆。 */
+function propTirePile(s) {
+  const g = s.h - 1
+  ground(s, 28, 22)
+  const tires = [
+    [16, g - 6, 13, 6],
+    [38, g - 6, 13, 6],
+    [26, g - 15, 13, 6],
+    [36, g - 22, 11, 5],
+  ]
+  for (const [cx, cy, rx, ry] of tires) {
+    s.ell(cx, cy, rx, ry, PAL.oil)
+    s.ell(cx, cy, rx - 2, ry - 1.4, PAL.black)
+    s.ell(cx, cy, rx - 4.5, ry - 2.4, PAL.void)
+    // 胎纹
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI
+      s.px(cx - Math.cos(a) * (rx - 2.4), cy - Math.sin(a) * (ry - 1.2), PAL.ashPale, 0.55)
+    }
+    // 侧壁高光
+    s.line(cx - rx + 3, cy - ry + 1, cx + rx - 3, cy - ry + 1, PAL.ashPale, 0.4)
+  }
+  // 靠着的半只
+  s.ell(48, g - 10, 7, 9, PAL.oil)
+  s.ell(48, g - 10, 4.5, 6.6, PAL.black)
+  // 杂草 / 水渍
+  s.ell(28, g - 1, 20, 1.6, PAL.oil, 0.4)
+  for (let k = 0; k < 4; k++) s.line(8 + k * 12, g, 10 + k * 12, g - 4, PAL.weed, 0.55)
+}
+
+/** 围栏（铁丝网 + 立柱，破口）。 */
+function propFence(s) {
+  const g = s.h - 1
+  ground(s, 32, 30)
+  // 立柱
+  for (const x of [3, 59]) {
+    s.rect(x, 4, 3, g - 4, PAL.steelDark)
+    s.rect(x, 4, 1, g - 4, PAL.steelLight, 0.6)
+    s.rect(x - 1, 4, 5, 2, PAL.steelDark)
+  }
+  // 上下横杆
+  s.rect(4, 8, 56, 2, PAL.steel)
+  s.rect(4, 8, 56, 1, PAL.steelLight, 0.6)
+  s.rect(4, g - 8, 56, 2, PAL.steel)
+  // 铁丝网格（菱形）
+  for (let x = 6; x < 58; x += 5) {
+    s.line(x, 10, x + 4, g - 8, PAL.ashPale, 0.35)
+    s.line(x + 4, 10, x, g - 8, PAL.ashPale, 0.35)
+  }
+  // 破口（下缘被撕开）
+  s.poly(
+    [
+      [22, g - 8],
+      [38, g - 8],
+      [36, g - 2],
+      [26, g - 4],
+    ],
+    PAL.void, 0.0,
+  )
+  // 锈
+  s.speck(4, 4, 56, g - 4, PAL.rustDark, 0.14, 0.6)
+  s.line(28, 12, 34, 22, PAL.void, 0.55)
+  // 挂在上面的破布
+  s.poly(
+    [
+      [44, 14],
+      [50, 16],
+      [48, 24],
+      [43, 22],
+    ],
+    PAL.dust, 0.85,
+  )
+  rubble(s, 2, g, 60, 6, 0xf01)
+}
+
+/** 路灯（弯曲灯臂，灯罩碎了）。 */
+function propStreetlight(s) {
+  const g = s.h - 1
+  ground(s, 12, 9)
+  // 基座
+  s.rect(5, g - 8, 14, 8, PAL.ashPale)
+  s.rect(5, g - 8, 14, 1, PAL.steelLight, 0.5)
+  // 灯杆
+  s.rect(10, 22, 4, g - 30, PAL.steel)
+  s.rect(10, 22, 1, g - 30, PAL.steelLight, 0.7)
+  s.rect(13, 22, 1, g - 30, PAL.steelDark)
+  // 弯臂
+  for (let k = 0; k <= 8; k++) {
+    const t = k / 8
+    const x = 12 + Math.sin(t * Math.PI * 0.5) * 9
+    const y = 22 - t * 12
+    s.disc(x, y, 1.4, PAL.steel)
+    s.px(x, y - 1, PAL.steelLight, 0.6)
+  }
+  // 灯罩（破）
+  s.poly(
+    [
+      [16, 8],
+      [24, 8],
+      [22, 14],
+      [18, 14],
+    ],
+    PAL.steelDark,
+  )
+  s.rect(17, 13, 4, 2, PAL.glass, 0.35)
+  s.line(18, 9, 22, 12, PAL.glass, 0.4)
+  s.px(20, 15, PAL.neonWarm, 0.25)
+  s.glow(20, 15, 9, PAL.neonWarm, 0.1)
+  // 锈与藤
+  for (let k = 0; k < 4; k++) rustStreak(s, 10 + k, 40 + k * 14, 22, 0x110 + k)
+  s.line(14, g - 30, 16, g - 40, PAL.mossDead, 0.6)
+  s.line(16, g - 40, 12, g - 46, PAL.weed, 0.5)
+  // 底座阴影
+  s.ell(12, g, 9, 1.6, PAL.void, 0.3)
+}
+
+/** 老电视（CRT，碎屏）。 */
+function propTv(s) {
+  const g = s.h - 1
+  ground(s, 18, 12)
+  // 机身（后厚前薄）
+  s.poly(
+    [
+      [3, 6],
+      [26, 8],
+      [24, g - 6],
+      [4, g - 6],
+    ],
+    PAL.ashPale,
+  )
+  s.poly(
+    [
+      [5, 8],
+      [23, 10],
+      [22, g - 8],
+      [6, g - 8],
+    ],
+    PAL.ash,
+  )
+  // 屏幕
+  s.rect(7, 10, 13, 11, PAL.black)
+  s.rect(8, 11, 11, 9, PAL.ash, 0.5)
+  // 裂纹（蛛网）
+  s.line(10, 12, 18, 19, PAL.steelLight, 0.5)
+  s.line(17, 11, 9, 18, PAL.steelLight, 0.4)
+  s.line(13, 10, 13, 20, PAL.steelLight, 0.3)
+  s.glow(13, 16, 7, PAL.neon, 0.08)
+  // 旋钮 / 喇叭
+  s.disc(23, 13, 1.6, PAL.steelDark)
+  s.disc(23, 17, 1.6, PAL.steelDark)
+  s.rect(21, 20, 3, 5, PAL.steelDark, 0.8)
+  vent(s, 21, 21, 2, 2, PAL.steelLight)
+  // 天线（断了）
+  s.line(8, 6, 4, 1, PAL.steelLight)
+  s.line(12, 6, 14, 2, PAL.steelDark)
+  s.px(14, 2, PAL.steelLight)
+  // 支架 / 灰
+  s.rect(8, g - 5, 3, 4, PAL.steelDark)
+  s.rect(18, g - 5, 3, 4, PAL.steelDark)
+  s.speck(3, 6, 24, g - 6, PAL.dust, 0.1, 0.5)
+  s.speck(3, 6, 24, g - 6, PAL.rustDark, 0.06, 0.5)
+}
+
+/** 沙发（塌陷、破皮）。 */
+function propSofa(s) {
+  const g = s.h - 1
+  ground(s, 32, 28)
+  const fab = mix(PAL.bloodDark, PAL.dust, 0.45)
+  const fabL = mix(fab, PAL.dustLight, 0.4)
+  // 靠背
+  s.poly(
+    [
+      [6, 4],
+      [58, 4],
+      [56, 16],
+      [8, 16],
+    ],
+    fab,
+  )
+  s.line(6, 5, 58, 5, fabL, 0.8)
+  // 坐垫（塌）
+  s.poly(
+    [
+      [4, 15],
+      [60, 15],
+      [58, g - 5],
+      [6, g - 5],
+    ],
+    mix(fab, PAL.rustDark, 0.25),
+  )
+  s.line(4, 15, 60, 15, fabL, 0.6)
+  // 扶手
+  s.poly(
+    [
+      [2, 8],
+      [8, 8],
+      [8, g - 4],
+      [2, g - 4],
+    ],
+    fab,
+  )
+  s.poly(
+    [
+      [56, 8],
+      [62, 8],
+      [62, g - 4],
+      [56, g - 4],
+    ],
+    fab,
+  )
+  s.rect(2, 8, 6, 1, fabL, 0.8)
+  s.rect(56, 8, 6, 1, fabL, 0.8)
+  // 裂口露填充物 / 弹簧
+  s.ell(30, 20, 9, 3, PAL.void, 0.7)
+  for (let k = 0; k < 4; k++) s.line(22 + k * 5, 18, 24 + k * 5, 22, PAL.rustDark, 0.8)
+  s.speck(26, 16, 14, 8, PAL.boneDark, 0.25, 0.7)
+  // 腿
+  s.rect(6, g - 4, 3, 3, PAL.rustDark)
+  s.rect(54, g - 4, 3, 3, PAL.rustDark)
+  // 污渍
+  s.ell(44, 22, 6, 3, PAL.bloodDark, 0.45)
+  s.speck(4, 4, 56, g - 8, PAL.dust, 0.08, 0.4)
+}
+
+/** 衣柜（门开、内部黑）。 */
+function propWardrobe(s) {
+  const g = s.h - 1
+  ground(s, 24, 16)
+  const wood = mix(PAL.rustDark, PAL.dust, 0.35)
+  const woodL = mix(wood, PAL.sand, 0.25)
+  // 柜体
+  s.rect(6, 4, 36, g - 4, wood)
+  s.rect(6, 4, 3, g - 4, woodL)
+  s.rect(39, 4, 3, g - 4, shade(wood, -0.4))
+  s.rect(4, 2, 40, 4, mix(wood, PAL.dust, 0.3))
+  s.rect(4, 2, 40, 1, woodL)
+  // 左门（关）
+  s.rect(8, 8, 16, g - 16, mix(wood, PAL.dust, 0.15))
+  s.line(8, 8, 24, 8, woodL, 0.7)
+  s.rect(19, 40, 2, 4, PAL.steelLight, 0.7)
+  // 右门（开，内部黑）
+  s.poly(
+    [
+      [26, 8],
+      [34, 6],
+      [36, g - 12],
+      [27, g - 10],
+    ],
+    PAL.void,
+  )
+  s.poly(
+    [
+      [36, 6],
+      [41, 10],
+      [42, g - 8],
+      [37, g - 12],
+    ],
+    mix(wood, PAL.dust, 0.2),
+  )
+  // 内部：挂着的破衣
+  s.line(27, 12, 34, 12, PAL.steelLight, 0.5)
+  s.poly(
+    [
+      [28, 12],
+      [32, 12],
+      [32, 30],
+      [28, 28],
+    ],
+    PAL.dust, 0.7,
+  )
+  // 底板 / 灰
+  s.rect(6, g - 8, 36, 3, PAL.rustDark)
+  s.speck(6, 4, 36, g - 8, PAL.rustDark, 0.08, 0.45)
+  s.speck(6, g - 14, 36, 10, PAL.dust, 0.12, 0.4)
+}
+
+/** 婴儿摇篮（翻倒）。 */
+function propCradle(s) {
+  const g = s.h - 1
+  ground(s, 20, 15)
+  const wood = mix(PAL.sand, PAL.dust, 0.4)
+  // 篮子（翻倒，开口朝左）
+  s.poly(
+    [
+      [16, g - 16],
+      [34, g - 14],
+      [33, g - 4],
+      [14, g - 5],
+    ],
+    wood,
+  )
+  s.poly(
+    [
+      [18, g - 15],
+      [31, g - 13],
+      [30, g - 5],
+      [16, g - 6],
+    ],
+    PAL.void,
+  )
+  // 板条
+  for (let k = 0; k < 5; k++) s.line(19 + k * 3, g - 15, 18 + k * 3, g - 5, shade(wood, 0.2), 0.7)
+  // 弧形摇脚
+  s.line(14, g - 4, 18, g - 1, PAL.rustDark)
+  s.line(18, g - 1, 30, g - 1, PAL.rustDark)
+  s.line(30, g - 1, 34, g - 4, PAL.rustDark)
+  // 破毯子（垂在外面）
+  s.poly(
+    [
+      [12, g - 7],
+      [18, g - 6],
+      [17, g - 1],
+      [10, g - 2],
+    ],
+    PAL.dust, 0.85,
+  )
+  s.line(11, g - 5, 16, g - 4, PAL.sandDark, 0.6)
+  // 木纹 / 坠落时磕掉的角
+  s.px(33, g - 14, PAL.void, 0.7)
+  s.speck(14, g - 16, 20, 14, PAL.rust, 0.12, 0.5)
+  rubble(s, 1, g, 36, 5, 0x120)
+}
+
+/** 墓碑（歪斜、半埋）。 */
+function propGrave(s) {
+  const g = s.h - 1
+  ground(s, 14, 10)
+  // 土堆
+  s.ell(14, g - 1, 12, 2.4, PAL.dust)
+  s.speck(3, g - 4, 22, 4, PAL.sandDark, 0.3)
+  // 石碑（右倾）
+  s.poly(
+    [
+      [7, g - 4],
+      [20, g - 5],
+      [21, 8],
+      [16, 3],
+      [8, 6],
+    ],
+    PAL.ashPale,
+  )
+  s.poly(
+    [
+      [9, g - 5],
+      [19, g - 6],
+      [19.5, 9],
+      [15.5, 5],
+      [9, 7],
+    ],
+    PAL.ash,
+  )
+  // 高光边
+  s.line(9, 7, 10, g - 5, PAL.steelLight, 0.5)
+  // 刻字（磨损）
+  s.rect(11, 11, 6, 1, PAL.void, 0.35)
+  s.rect(11, 14, 7, 1, PAL.void, 0.3)
+  s.rect(11, 17, 5, 1, PAL.void, 0.25)
+  // 十字 / 符号
+  s.line(15, 8, 15, 12, PAL.void, 0.4)
+  s.line(13, 10, 17, 10, PAL.void, 0.4)
+  // 裂缝 / 苔
+  crack(s, 12, 12, 8, 1, 0x130)
+  s.speck(8, 12, 12, 10, PAL.mossDead, 0.1, 0.5)
+  // 歪倒
+  s.rect(7, g - 5, 3, 3, PAL.ash, 0.8)
+  rubble(s, 4, g, 20, 4, 0x131)
+}
+
+/** 牢笼（营救点：铁栅 + 锁）。 */
+function propCage(s) {
+  const g = s.h - 1
+  ground(s, 32, 28)
+  const iron = PAL.steelDark
+  const ironL = PAL.steelLight
+  // 底板
+  s.rect(4, g - 6, 56, 6, iron)
+  s.rect(4, g - 6, 56, 1, ironL, 0.6)
+  // 后栅（暗）
+  for (let k = 0; k < 8; k++) s.rect(8 + k * 7, 10, 2, g - 16, shade(iron, -0.35))
+  // 两侧立柱（粗）
+  s.rect(2, 4, 5, g - 4, iron)
+  s.rect(2, 4, 1, g - 4, ironL, 0.8)
+  s.rect(57, 4, 5, g - 4, iron)
+  s.rect(61, 4, 1, g - 4, ironL, 0.5)
+  // 顶横梁 + 顶栅
+  s.rect(2, 4, 60, 4, iron)
+  s.rect(2, 4, 60, 1, ironL, 0.7)
+  for (let k = 0; k < 8; k++) s.line(7 + k * 7, 8, 12 + k * 7, 4, iron, 0.9)
+  // 前栅（可读的竖条 + 横档）
+  for (let k = 0; k < 8; k++) {
+    const x = 8 + k * 7
+    s.rect(x, 12, 2, g - 18, k % 2 ? iron : shade(iron, 0.12))
+    s.px(x, 12, ironL, 0.7)
+  }
+  s.rect(4, 26, 56, 2, iron)
+  s.rect(4, 26, 56, 1, ironL, 0.35)
+  s.rect(4, g - 12, 56, 2, iron)
+  // 锁与链（点题：这是“牢笼”）
+  s.rect(28, 30, 8, 7, PAL.rust)
+  s.rect(29, 31, 6, 5, PAL.rustLight)
+  s.rect(30, 33, 4, 1, PAL.void)
+  s.line(26, 32, 28, 32, PAL.rustDark)
+  s.line(36, 32, 38, 34, PAL.rustDark)
+  s.px(34, 36, PAL.steelWhite, 0.6)
+  // 地上的稻草 / 骨头 / 划痕
+  for (let k = 0; k < 7; k++) {
+    s.line(10 + k * 7, g - 7, 14 + k * 7, g - 9, PAL.ochre, 0.35)
+  }
+  s.px(20, g - 8, PAL.bone, 0.8)
+  s.px(21, g - 8, PAL.boneDark)
+  for (let k = 0; k < 5; k++) s.line(12 + k * 4, g - 14, 14 + k * 4, g - 10, PAL.ashPale, 0.35)
+  // 锈
+  s.speck(2, 4, 60, g - 4, PAL.rustDark, 0.09, 0.5)
+  for (let k = 0; k < 4; k++) rustStreak(s, 8 + k * 14, 12, 20, 0x140 + k)
+  rubble(s, 0, g, 60, 6, 0x141)
+}
+
+/** 工作台（台面、台钳、工具）。 */
+function propWorkbench(s) {
+  const g = s.h - 1
+  ground(s, 36, 30)
+  const wood = mix(PAL.dust, PAL.sand, 0.18)
+  // 台面
+  s.rect(4, 12, 64, 5, wood)
+  s.rect(4, 12, 64, 1, mix(wood, PAL.sand, 0.45))
+  s.rect(4, 16, 64, 1, shade(wood, -0.4))
+  // 台腿
+  s.rect(8, 17, 4, g - 17, shade(wood, -0.25))
+  s.rect(60, 17, 4, g - 17, shade(wood, -0.25))
+  s.rect(8, 17, 1, g - 17, wood, 0.6)
+  // 横撑
+  s.rect(10, g - 12, 52, 2, shade(wood, -0.3))
+  // 台钳（左侧）
+  s.rect(6, 6, 10, 6, PAL.steelDark)
+  s.rect(7, 7, 8, 4, PAL.steel)
+  s.rect(4, 8, 3, 3, PAL.steelLight)
+  s.px(12, 8, PAL.steelWhite, 0.7)
+  // 工具：锤子 / 扳手 / 螺丝
+  s.line(24, 12, 30, 4, PAL.rustDark)
+  s.rect(29, 2, 5, 3, PAL.steelLight)
+  s.rect(30, 3, 3, 1, PAL.steelDark)
+  s.line(40, 12, 46, 6, PAL.steelLight)
+  s.rect(45, 4, 4, 3, PAL.steel)
+  s.rect(52, 10, 6, 2, PAL.rust)
+  // 零件散落 / 油污
+  s.px(58, 11, PAL.steelLight)
+  s.px(37, 11, PAL.ochre)
+  s.ell(20, 13, 7, 1.6, PAL.oil, 0.4)
+  s.speck(4, 12, 64, 6, PAL.rustDark, 0.12, 0.5)
+  // 台下杂物
+  s.rect(24, g - 8, 10, 8, PAL.rustDark)
+  s.px(26, g - 6, PAL.rust)
+  rubble(s, 2, g, 68, 7, 0x150)
+}
+
+/** 终端（亮屏，青绿冷光）。 */
+function propTerminal(s) {
+  const g = s.h - 1
+  ground(s, 22, 17)
+  // 机柜
+  s.rect(6, 18, 32, g - 18, PAL.ashPale)
+  s.rect(6, 18, 32, 2, PAL.steelLight, 0.6)
+  s.rect(36, 18, 2, g - 18, PAL.steelDark)
+  // 键盘
+  s.poly(
+    [
+      [8, g - 8],
+      [34, g - 8],
+      [38, g - 2],
+      [6, g - 2],
+    ],
+    PAL.steelDark,
+  )
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 8; c++) {
+      s.px(9 + c * 3 + r, g - 7 + r * 2, PAL.ashPale, 0.8)
+    }
+  }
+  // 显示器
+  s.poly(
+    [
+      [4, 4],
+      [40, 4],
+      [38, 22],
+      [6, 22],
+    ],
+    PAL.ashPale,
+  )
+  s.rect(7, 7, 28, 12, PAL.black)
+  // 屏幕内容：扫描线 + 光标 + 数据条
+  for (let y = 8; y < 19; y += 2) s.rect(8, y, 26, 1, PAL.toxicDark, 0.55)
+  s.rect(9, 9, 12, 1, PAL.neon, 0.75)
+  s.rect(9, 12, 18, 1, PAL.neon, 0.45)
+  s.rect(9, 15, 8, 1, PAL.neonWarm, 0.6)
+  s.rect(9, 17, 2, 2, PAL.neon)
+  s.glow(21, 13, 13, PAL.neon, 0.28)
+  // 侧面板 / 散热 / 线
+  vent(s, 30, 24, 6, 4, PAL.steelDark)
+  s.line(38, 30, 44, g - 4, PAL.oilSheen)
+  s.px(44, g - 4, PAL.rust)
+  // 锈与灰
+  s.speck(4, 4, 36, g - 4, PAL.rustDark, 0.08, 0.5)
+  s.speck(6, g - 14, 32, 10, PAL.dust, 0.1, 0.4)
+  rubble(s, 2, g, 40, 5, 0x160)
+}
+
+/** 发电机（柴油机 + 排气 + 电缆）。 */
+function propGenerator(s) {
+  const g = s.h - 1
+  ground(s, 32, 28)
+  const metal = mix(PAL.steelBlue, PAL.rustDark, 0.35)
+  // 底座
+  s.rect(4, g - 8, 56, 8, PAL.ash)
+  s.rect(4, g - 8, 56, 1, PAL.steelLight, 0.4)
+  // 主机体
+  s.poly(
+    [
+      [6, 16],
+      [56, 14],
+      [58, g - 8],
+      [6, g - 8],
+    ],
+    metal,
+  )
+  s.line(7, 17, 55, 15, mix(metal, PAL.steelLight, 0.5))
+  // 散热格栅
+  for (let k = 0; k < 5; k++) s.rect(10, 22 + k * 4, 18, 2, PAL.ashPale)
+  s.rect(8, 20, 22, 22, PAL.steelDark, 0.5)
+  // 排气筒
+  s.rect(48, 2, 6, 14, PAL.steelDark)
+  s.rect(48, 2, 2, 14, PAL.steelLight, 0.6)
+  s.rect(47, 1, 8, 2, PAL.rust)
+  s.ell(51, 1, 4, 1.4, PAL.ashPale, 0.5)
+  // 控制面板 + 指示灯
+  s.rect(36, 22, 16, 12, PAL.ash)
+  s.rect(38, 24, 5, 3, PAL.toxicDark)
+  s.rect(39, 25, 3, 1, PAL.toxicGlow)
+  s.disc(46, 26, 1.6, PAL.steelDark)
+  s.px(46, 26, PAL.neonWarm, 0.9)
+  s.glow(46, 26, 4, PAL.neonWarm, 0.3)
+  // 电缆
+  s.thick(58, g - 12, 62, g - 5, 1.4, PAL.oil)
+  s.thick(58, g - 12, 62, g - 5, 0.7, PAL.oilSheen, 0.6)
+  s.px(62, g - 5, PAL.rustLight)
+  // 油污 / 锈
+  s.speck(6, 14, 50, g - 22, PAL.rustDark, 0.12, 0.55)
+  s.ell(20, g - 9, 14, 2, PAL.oil, 0.45)
+  rubble(s, 2, g, 60, 6, 0x170)
+}
+
+/** 中继站（中继塔 + 天线盘）。 */
+function propRelay(s) {
+  const g = s.h - 1
+  ground(s, 20, 14)
+  // 底座
+  s.rect(8, g - 8, 24, 8, PAL.ash)
+  s.rect(8, g - 8, 24, 1, PAL.steelLight, 0.4)
+  // 桅杆
+  s.rect(17, 8, 6, g - 16, PAL.steel)
+  s.rect(17, 8, 2, g - 16, PAL.steelLight, 0.7)
+  s.rect(22, 8, 1, g - 16, PAL.steelDark)
+  // 三角支撑
+  s.line(20, g - 10, 8, g - 2, PAL.steelDark)
+  s.line(20, g - 10, 32, g - 2, PAL.steelDark)
+  // 中继器箱
+  s.rect(8, 46, 24, 12, PAL.ashPale)
+  s.rect(8, 46, 24, 1, PAL.steelLight, 0.5)
+  s.rect(11, 49, 8, 3, PAL.toxicDark)
+  s.rect(12, 50, 6, 1, PAL.neon)
+  s.disc(26, 50, 1.6, PAL.steelDark)
+  s.px(26, 50, PAL.neonRed, 0.9)
+  s.glow(26, 50, 4, PAL.neonRed, 0.3)
+  // 抛物面天线（左上）
+  s.poly(
+    [
+      [4, 18],
+      [16, 12],
+      [20, 24],
+      [8, 28],
+    ],
+    PAL.steelDark,
+  )
+  s.poly(
+    [
+      [6, 19],
+      [15, 14],
+      [18, 23],
+      [9, 26],
+    ],
+    PAL.steelLight,
+  )
+  s.line(16, 20, 20, 18, PAL.steelLight)
+  s.px(20, 18, PAL.neonWarm, 0.8)
+  s.glow(19, 19, 5, PAL.neonWarm, 0.25)
+  // 顶灯 + 拉线
+  s.rect(19, 4, 2, 4, PAL.steelDark)
+  s.px(20, 3, PAL.neonRed)
+  s.glow(20, 3, 6, PAL.neonRed, 0.45)
+  s.line(18, 10, 4, g - 6, PAL.ashPale, 0.3)
+  s.line(22, 10, 36, g - 6, PAL.ashPale, 0.3)
+  // 锈
+  s.speck(4, 2, 32, g - 2, PAL.rustDark, 0.1, 0.5)
+  rubble(s, 4, g, 32, 5, 0x180)
+}
+
+/** 天线（高塔，桁架结构）。 */
+function propAntenna(s) {
+  const g = s.h - 1
+  ground(s, 15, 12)
+  // 基座
+  s.rect(7, g - 8, 16, 8, PAL.ash)
+  s.rect(7, g - 8, 16, 1, PAL.steelLight, 0.35)
+  // 主杆（收分）
+  for (let y = 12; y < g - 8; y++) {
+    const t = (y - 12) / (g - 20)
+    const half = 1.2 + t * 4
+    s.rect(15 - half, y, half * 2, 1, PAL.steel)
+    if (Math.abs(y % 6) < 1) s.px(15 - half, y, PAL.steelLight, 0.6)
+  }
+  s.rect(14, 8, 2, g - 16, PAL.steelDark, 0.8)
+  // 桁架斜撑
+  for (let y = 20; y < g - 14; y += 12) {
+    const t = (y - 12) / (g - 20)
+    const half = 1.2 + t * 4
+    s.line(15 - half, y, 15 + half, y + 10, PAL.steelDark, 0.8)
+    s.line(15 + half, y, 15 - half, y + 10, PAL.steelDark, 0.8)
+    s.line(15 - half, y, 15 + half, y, PAL.steel, 0.7)
+  }
+  // 顶部天线杆 + 航空灯
+  s.rect(14.5, 2, 1, 7, PAL.steelLight)
+  s.px(15, 1, PAL.neonRed)
+  s.glow(15, 1, 7, PAL.neonRed, 0.5)
+  // 横担 + 绝缘子
+  for (const y of [30, 58, 86]) {
+    s.rect(4, y, 22, 1.5, PAL.steelDark)
+    s.px(5, y - 1, PAL.glass, 0.8)
+    s.px(24, y - 1, PAL.glass, 0.8)
+  }
+  // 垂落的电线
+  s.line(4, 30, 2, g - 4, PAL.oilSheen, 0.6)
+  s.line(25, 58, 28, g - 10, PAL.oilSheen, 0.5)
+  // 锈与积雪般的灰
+  s.speck(6, 4, 20, g - 8, PAL.rustDark, 0.12, 0.5)
+  s.speck(10, 4, 12, 30, PAL.sandDark, 0.08, 0.4)
+}
+
+/** 卫星天线（落地式）。 */
+function propSatellite(s) {
+  const g = s.h - 1
+  ground(s, 30, 24)
+  // 支架
+  s.rect(24, g - 14, 12, 14, PAL.steelDark)
+  s.line(30, g - 14, 12, g - 2, PAL.steelDark)
+  s.line(30, g - 14, 46, g - 2, PAL.steelDark)
+  s.rect(20, g - 4, 20, 4, PAL.ash)
+  // 抛物面（斜向天空）
+  s.poly(
+    [
+      [8, 16],
+      [34, 2],
+      [56, 14],
+      [40, 36],
+      [14, 30],
+    ],
+    PAL.steelDark,
+  )
+  s.poly(
+    [
+      [11, 17],
+      [34, 5],
+      [52, 15],
+      [38, 32],
+      [16, 27],
+    ],
+    PAL.steelLight,
+  )
+  // 盘面同心环
+  s.ell(33, 18, 16, 11, PAL.steel, 0.7)
+  s.ell(33, 18, 9, 6, PAL.steelLight, 0.8)
+  s.ell(33, 18, 3, 2, PAL.steelDark)
+  s.px(33, 18, PAL.steelWhite)
+  // 馈源支架 + 接收头
+  s.line(33, 18, 30, 12, PAL.steelDark)
+  s.rect(28, 9, 4, 4, PAL.steelDark)
+  s.px(30, 10, PAL.neon)
+  s.glow(30, 10, 6, PAL.neon, 0.35)
+  // 破损（缺角 + 破洞）
+  s.poly(
+    [
+      [44, 24],
+      [54, 16],
+      [50, 28],
+    ],
+    PAL.void,
+  )
+  s.ell(24, 12, 3, 2, PAL.void, 0.5)
+  // 锈 / 苔
+  s.speck(10, 4, 44, 30, PAL.rustDark, 0.1, 0.5)
+  s.speck(8, 24, 16, 10, PAL.mossDead, 0.08, 0.4)
+  rubble(s, 12, g, 36, 6, 0x190)
+}
+
+/** 营火（火焰 + 光晕）。 */
+function propCampfire(s) {
+  const g = s.h - 1
+  ground(s, 18, 13)
+  // 石圈
+  for (let k = 0; k < 6; k++) {
+    const x = 5 + k * 5
+    s.ell(x, g - 3, 2.4, 1.8, PAL.ashPale)
+    s.px(x - 0.5, g - 4, PAL.steelLight, 0.5)
+  }
+  // 柴堆
+  s.thick(8, g - 5, 26, g - 8, 1.8, PAL.rustDark)
+  s.thick(10, g - 8, 24, g - 4, 1.8, PAL.dust)
+  s.px(15, g - 7, PAL.rust)
+  // 火焰（抖动块 + 内焰）
+  s.poly(
+    [
+      [18, g - 8],
+      [14, g - 14],
+      [17, g - 13],
+      [16, g - 20],
+      [20, g - 15],
+      [22, g - 22],
+      [23, g - 14],
+      [26, g - 12],
+      [22, g - 7],
+    ],
+    PAL.rustHot,
+  )
+  s.poly(
+    [
+      [18, g - 8],
+      [17, g - 13],
+      [20, g - 17],
+      [21, g - 11],
+      [23, g - 9],
+    ],
+    PAL.neonWarm,
+  )
+  s.poly(
+    [
+      [18, g - 8],
+      [19, g - 11],
+      [21, g - 9],
+    ],
+    PAL.white,
+  )
+  // 余烬飞升
+  for (let k = 0; k < 7; k++) {
+    const r = mulberry32(0x1a0 + k)
+    s.px(16 + r() * 10, g - 14 - r() * 8, PAL.neonWarm, 0.4 + r() * 0.5)
+  }
+  s.glow(20, g - 12, 13, PAL.neonWarm, 0.45)
+  s.glow(20, g - 6, 10, PAL.rustHot, 0.2)
+}
+
+/** 帐篷（补丁帆布）。 */
+function propTent(s) {
+  const g = s.h - 1
+  ground(s, 35, 30)
+  const canvas = mix(PAL.sand, PAL.dust, 0.35)
+  const canvasL = mix(canvas, PAL.sand, 0.4)
+  const canvasD = mix(canvas, PAL.dust, 0.5)
+  // 帐篷主体（三角）
+  s.poly(
+    [
+      [4, g - 2],
+      [35, 6],
+      [66, g - 2],
+    ],
+    canvas,
+  )
+  // 受光面
+  s.poly(
+    [
+      [6, g - 3],
+      [35, 8],
+      [35, g - 3],
+    ],
+    canvasL,
+  )
+  // 门帘（拉开）
+  s.poly(
+    [
+      [28, g - 3],
+      [35, 16],
+      [42, g - 3],
+    ],
+    PAL.void,
+  )
+  s.poly(
+    [
+      [26, g - 3],
+      [33, 18],
+      [29, 17],
+    ],
+    canvasD,
+  )
+  // 布褶
+  for (let k = 0; k < 4; k++) {
+    s.line(12 + k * 14, g - 4, 30 + k * 2, 10 + k * 2, canvasD, 0.5)
+  }
+  // 补丁
+  s.rect(42, 24, 9, 7, PAL.rustDark, 0.9)
+  s.line(42, 24, 51, 24, PAL.rust, 0.7)
+  s.rect(16, 32, 8, 6, PAL.dustLight, 0.6)
+  // 拉绳 + 地钉
+  s.line(35, 6, 3, g - 1, PAL.ashPale, 0.5)
+  s.line(35, 6, 68, g - 1, PAL.ashPale, 0.5)
+  s.px(3, g - 1, PAL.steelLight)
+  s.px(68, g - 1, PAL.steelLight)
+  // 顶旗
+  s.line(35, 6, 35, 1, PAL.steelDark)
+  s.poly(
+    [
+      [36, 1],
+      [42, 3],
+      [36, 5],
+    ],
+    PAL.blood,
+    0.9,
+  )
+  // 污渍与破洞
+  s.poly(
+    [
+      [50, 30],
+      [56, 32],
+      [54, 38],
+      [48, 36],
+    ],
+    PAL.void, 0.75,
+  )
+  s.speck(10, 10, 54, g - 12, PAL.dust, 0.1, 0.4)
+  rubble(s, 2, g, 64, 6, 0x1b0)
+}
+
+/** 废物堆。 */
+function propJunkHeap(s) {
+  const g = s.h - 1
+  ground(s, 45, 38)
+  const r = mulberry32(0x1c0)
+  // 底层碎石
+  for (let k = 0; k < 12; k++) {
+    const x = 6 + r() * 78
+    s.ell(x, g - 2 - r() * 3, 3 + r() * 4, 2 + r() * 2, r() < 0.5 ? PAL.ash : PAL.dust)
+  }
+  // 轮廓堆
+  s.poly(
+    [
+      [4, g - 2],
+      [14, g - 20],
+      [30, g - 34],
+      [52, g - 30],
+      [72, g - 18],
+      [86, g - 4],
+    ],
+    PAL.steelDark,
+  )
+  // 废件：板、管、齿轮、轮胎
+  s.rect(12, g - 16, 20, 4, PAL.rust)
+  s.rect(12, g - 16, 20, 1, PAL.rustLight)
+  s.line(30, g - 24, 50, g - 12, PAL.steel)
+  s.line(30, g - 24, 50, g - 12, PAL.steelLight, 0.5)
+  s.disc(56, g - 22, 6, PAL.steelDark)
+  s.disc(56, g - 22, 4, PAL.steel)
+  s.disc(56, g - 22, 1.6, PAL.void)
+  s.ell(70, g - 8, 8, 4, PAL.oil)
+  s.ell(70, g - 8, 5, 2.4, PAL.black)
+  s.rect(24, g - 30, 14, 5, PAL.rustDark)
+  s.rect(24, g - 30, 14, 1, PAL.rust, 0.8)
+  s.poly(
+    [
+      [40, g - 32],
+      [50, g - 26],
+      [42, g - 22],
+    ],
+    PAL.ashPale,
+  )
+  // 露出的线缆 / 弹簧
+  wireJunk(s, 34, g - 28, r)
+  // 锈与高光
+  s.speck(6, g - 34, 78, 32, PAL.rustDark, 0.12, 0.55)
+  s.speck(6, g - 34, 78, 32, PAL.steelLight, 0.03, 0.35)
+  rubble(s, 2, g, 84, 8, 0x1c1)
+}
+
+function wireJunk(s, x, y, r) {
+  let px = x
+  let py = y
+  for (let k = 0; k < 10; k++) {
+    px += (r() - 0.5) * 4
+    py += 1 + r() * 1.5
+    s.px(px, py, PAL.oilSheen)
+    s.px(px + 1, py, PAL.oil, 0.8)
+  }
+}
+
+/** 枯树。 */
+function propTreeDead(s) {
+  const g = s.h - 1
+  ground(s, 30, 20)
+  const bark = mix(PAL.rustDark, PAL.dust, 0.3)
+  const barkL = mix(bark, PAL.sand, 0.28)
+  const barkD = mix(bark, PAL.void, 0.4)
+  // 根
+  s.poly(
+    [
+      [22, g - 2],
+      [24, g - 10],
+      [34, g - 10],
+      [40, g - 1],
+    ],
+    bark,
+  )
+  // 主干（略弯）
+  for (let y = g - 8; y > 20; y--) {
+    const t = (g - 8 - y) / (g - 30)
+    const x = 28 + Math.sin(t * 2.2) * 3
+    const w = 7 - t * 4
+    s.rect(x - w / 2, y, w, 1, bark)
+    s.px(x - w / 2, y, barkL, 0.8)
+    s.px(x + w / 2 - 1, y, barkD, 0.9)
+  }
+  // 大枝
+  const branches = [
+    [28, 32, 12, 20, 2.6],
+    [29, 46, 46, 32, 2.4],
+    [28, 58, 14, 48, 2.2],
+    [29, 68, 44, 58, 2],
+    [28, 80, 20, 74, 1.8],
+  ]
+  for (const [x0, y0, x1, y1, r] of branches) {
+    s.thick(x0, y0, x1, y1, r, bark)
+    s.thick(x0, y0 - 1, x1, y1 - 1, r * 0.5, barkL, 0.5)
+    s.thick(x0, y0 + 1, x1, y1 + 1, r * 0.45, barkD, 0.6)
+  }
+  // 细枝（枯枝交错）
+  const twigs = [
+    [12, 20, 4, 8],
+    [12, 20, 18, 6],
+    [46, 32, 56, 22],
+    [46, 32, 50, 42],
+    [14, 48, 4, 40],
+    [14, 48, 8, 56],
+    [44, 58, 56, 50],
+    [20, 74, 8, 66],
+    [20, 74, 26, 64],
+  ]
+  for (const [x0, y0, x1, y1] of twigs) {
+    s.line(x0, y0, x1, y1, barkD)
+    s.px(x1, y1, bark, 0.9)
+  }
+  // 树皮纹理 / 断口
+  for (let k = 0; k < 10; k++) {
+    const r = mulberry32(0x1d0 + k)
+    s.px(24 + r() * 9, 24 + r() * (g - 34), barkD, 0.5)
+  }
+  s.ell(28, 24, 3, 2, PAL.void, 0.6)
+  s.ell(12, 20, 2, 1.4, PAL.void, 0.5)
+  // 树下碎枝
+  for (let k = 0; k < 5; k++) {
+    s.line(6 + k * 6, g - 1, 10 + k * 6, g - 3, barkD, 0.7)
+  }
+  rubble(s, 6, g, 46, 7, 0x1d1)
+}
+
+/** 枯草（几丛）。 */
+function propWeed(s) {
+  const g = s.h - 1
+  ground(s, 15, 11, 0.26)
+  for (let k = 0; k < 9; k++) {
+    const r = mulberry32(0x1e0 + k)
+    const bx = 4 + r() * 23
+    const h = 8 + r() * 10
+    const lean = (r() - 0.5) * 8
+    const c = r() < 0.5 ? PAL.weed : PAL.mossDead
+    let x = bx
+    for (let i = 0; i < h; i++) {
+      const t = i / h
+      x = bx + lean * t * t
+      s.px(x, g - 1 - i, c, 0.85 - t * 0.35)
+      if (i % 4 === 2) s.px(x + (lean > 0 ? 1 : -1), g - 1 - i, mix(c, PAL.sand, 0.4), 0.7)
+    }
+    // 穗
+    if (h > 12) {
+      s.px(x, g - 2 - h, PAL.sandDark, 0.8)
+      s.px(x + 1, g - 3 - h, PAL.sandDark, 0.6)
+    }
+  }
+  // 底部枯叶
+  for (let k = 0; k < 5; k++) s.line(5 + k * 5, g, 3 + k * 5, g - 2, PAL.dust, 0.5)
+}
+
+/** 毒水洼。 */
+function propPuddleToxic(s) {
+  const g = s.h - 1
+  const cy = g - 6
+  // 湿痕
+  s.ell(40, g - 4, 38, 5, PAL.toxicDark, 0.25)
+  // 水面
+  s.ell(38, cy, 34, 6.5, PAL.toxicDark)
+  s.ell(38, cy, 31, 5, mix(PAL.toxicDark, PAL.toxic, 0.45))
+  s.ell(38, cy - 1, 26, 3.4, PAL.toxic)
+  // 反光（横向短线，不使用渐变）
+  for (let k = 0; k < 7; k++) {
+    const r = mulberry32(0x1f0 + k)
+    const x = 12 + r() * 50
+    s.line(x, cy - 2 + r() * 3, x + 4 + r() * 6, cy - 2 + r() * 3, PAL.toxicGlow, 0.5)
+  }
+  // 气泡（几个亮点 + 破泡环）
+  for (let k = 0; k < 5; k++) {
+    const r = mulberry32(0x200 + k)
+    const x = 18 + r() * 42
+    const y = cy - 2 + r() * 4
+    s.disc(x, y, 1.4, PAL.toxicGlow, 0.5)
+    s.px(x - 0.5, y - 0.5, PAL.white, 0.8)
+  }
+  // 边缘污垢
+  s.ell(38, cy + 2, 33, 4, PAL.toxicDark, 0.5)
+  s.speck(6, cy - 4, 64, 10, PAL.toxicGlow, 0.06, 0.4)
+  s.glow(38, cy, 26, PAL.toxicGlow, 0.12)
+  // 岸边的死草、骨头
+  s.line(4, g - 1, 8, g - 4, PAL.mossDead, 0.6)
+  s.line(74, g - 2, 70, g - 5, PAL.mossDead, 0.5)
+  s.px(66, cy + 1, PAL.bone, 0.85)
+  s.px(67, cy + 1, PAL.boneDark)
+}
+
+/* ============================================================================
+ * 3b. 港口 / 医疗 / 工业扩展件（worldgen 51 kind 对齐）
+ * ========================================================================== */
+
+/** 通风口：嵌入式格栅，百叶有一片被压弯。 */
+function propVent(s) {
+  const g = s.h - 1
+  ground(s, 23, 17)
+  // 外框（水泥/铁框）
+  s.rect(3, 4, 40, g - 6, PAL.ash)
+  s.rect(3, 4, 40, 2, PAL.ashPale)
+  s.rect(4, 6, 38, g - 10, PAL.void)
+  s.rect(5, 7, 36, g - 12, PAL.black)
+  // 百叶（6 片）
+  for (let k = 0; k < 6; k++) {
+    const y = 8 + k * 2.2
+    s.rect(6, y, 34, 2, PAL.steelDark)
+    s.rect(6, y, 34, 1, PAL.steel)
+    s.line(7, y, 38, y, PAL.steelLight, 0.6)
+  }
+  // 压弯的一片
+  s.poly(
+    [
+      [6, 15],
+      [24, 13],
+      [38, 17],
+      [38, 19],
+      [6, 18],
+    ],
+    PAL.steelLight,
+  )
+  s.line(8, 16, 34, 17, PAL.steelWhite, 0.7)
+  // 框上的螺丝 + 锈
+  for (const [x, y] of [
+    [5, 6],
+    [40, 6],
+    [5, 17],
+    [40, 17],
+  ]) {
+    s.px(x, y, PAL.steelLight)
+    s.px(x + 1, y + 1, PAL.steelDark)
+  }
+  for (let k = 0; k < 4; k++) rustStreak(s, 8 + k * 9, 6, 10 + k * 2, 0x610 + k)
+  // 里面的风：一点灰
+  for (let k = 0; k < 5; k++) s.px(12 + k * 5, g - 2, PAL.dust, 0.8)
+  rubble(s, 2, g, 42, 4, 0x611)
+}
+
+/** 通风管：方形镀锌管，接缝缠胶带。 */
+function propDuct(s) {
+  const g = s.h - 1
+  ground(s, 32, 26)
+  // 管体（侧面 + 顶面）
+  s.poly(
+    [
+      [4, 6],
+      [58, 4],
+      [60, 10],
+      [60, g - 4],
+      [4, g - 3],
+    ],
+    PAL.steel,
+  )
+  s.poly(
+    [
+      [4, 6],
+      [58, 4],
+      [60, 10],
+      [6, 12],
+    ],
+    PAL.steelLight,
+  )
+  // 顶面高光
+  s.line(6, 7, 57, 5, PAL.steelWhite, 0.8)
+  // 侧面分节
+  for (let k = 1; k < 4; k++) {
+    const x = 4 + k * 14
+    s.line(x, 9, x, g - 3, PAL.steelDark, 0.9)
+    s.line(x + 1, 9, x + 1, g - 4, PAL.ashPale, 0.5)
+  }
+  // 底部阴影
+  s.rect(4, g - 5, 56, 2, shade(PAL.steel, -0.45))
+  // 吊装带（两条）
+  for (const bx of [18, 44]) {
+    s.rect(bx, 2, 3, g - 4, PAL.ashPale)
+    s.line(bx, 3, bx, g - 4, PAL.steelLight, 0.5)
+    s.px(bx + 1, 3, PAL.rust)
+  }
+  // 胶带补丁
+  s.rect(30, 12, 9, 6, mix(PAL.dust, PAL.sand, 0.3))
+  s.line(30, 13, 38, 13, PAL.sandDark, 0.8)
+  s.line(30, 16, 38, 16, PAL.sandDark, 0.6)
+  // 锈与凹痕
+  for (let k = 0; k < 4; k++) rustStreak(s, 8 + k * 13, 10, 9 + k * 2, 0x620 + k)
+  s.ell(50, 18, 3, 2, PAL.void, 0.5)
+  rubble(s, 2, g, 58, 5, 0x621)
+}
+
+/** 钢筋堆：一捆生锈螺纹钢，断口是新的。 */
+function propRebarPile(s) {
+  const g = s.h - 1
+  ground(s, 27, 22)
+  const rods = [
+    [3, g - 3, 50, g - 4],
+    [2, g - 6, 51, g - 7],
+    [4, g - 9, 49, g - 10],
+    [6, g - 12, 47, g - 13],
+    [10, g - 15, 44, g - 16],
+  ]
+  for (const [x0, y0, x1, y1] of rods) {
+    s.thick(x0, y0, x1, y1, 1.6, PAL.rustDark)
+    s.thick(x0, y0 - 0.4, x1, y1 - 0.4, 0.9, PAL.rust)
+    // 螺纹肋
+    for (let x = x0 + 3; x < x1 - 2; x += 4) {
+      s.px(x, y0 - 1, PAL.rustLight, 0.9)
+      s.px(x + 1, y0 + 1, PAL.rustDark, 0.8)
+    }
+    // 断口（亮金属）
+    s.px(x1, y1, PAL.steelWhite)
+    s.px(x1 - 1, y1, PAL.steelLight)
+  }
+  // 一截斜靠在堆上
+  s.thick(38, g - 16, 52, g - 2, 1.4, PAL.rust)
+  for (let k = 0; k < 4; k++) s.px(40 + k * 3, g - 14 + k * 3, PAL.rustDark, 0.9)
+  s.px(52, g - 2, PAL.steelWhite)
+  // 捆扎铁丝
+  s.thick(16, g - 14, 18, g - 2, 0.8, PAL.steelDark)
+  s.thick(34, g - 15, 36, g - 3, 0.8, PAL.steelDark)
+  rubble(s, 2, g, 50, 5, 0x630)
+}
+
+/** 沙袋：三层码放，灌的是湿沙。 */
+function propSandbag(s) {
+  const g = s.h - 1
+  ground(s, 20, 16)
+  const burlap = mix(PAL.dust, PAL.sand, 0.35)
+  const burlapD = shade(burlap, -0.3)
+  const burlapL = shade(burlap, 0.25)
+  const bag = (cx, cy, w, h) => {
+    s.ell(cx, cy, w, h, burlapD)
+    s.ell(cx, cy - 0.6, w - 0.6, h - 0.6, burlap)
+    s.ell(cx - w * 0.2, cy - h * 0.35, w * 0.55, h * 0.45, burlapL, 0.5)
+    // 缝线 / 褶皱
+    s.line(cx - w + 1, cy, cx + w - 1, cy - 0.5, burlapD, 0.9)
+    s.line(cx - w * 0.6, cy + h * 0.4, cx + w * 0.5, cy + h * 0.2, PAL.sandDark, 0.7)
+    // 潮湿暗斑
+    s.ell(cx + w * 0.25, cy + h * 0.25, w * 0.3, h * 0.3, PAL.dust, 0.9)
+  }
+  bag(12, g - 5, 10, 5)
+  bag(30, g - 5, 10, 5)
+  bag(21, g - 14, 11, 5)
+  // 袋与袋之间的深缝（让三层袋子读得出来）
+  s.line(4, g - 3, 36, g - 3, PAL.void)
+  s.ell(21, g - 9.5, 10.5, 1.2, PAL.void, 1)
+  s.ell(21, g - 9.5, 9, 0.8, PAL.black, 1)
+  s.px(9, g - 6, PAL.void)
+  s.px(29, g - 6, PAL.void)
+  // 顶袋破了，漏沙
+  s.poly(
+    [
+      [26, g - 17],
+      [31, g - 18],
+      [30, g - 12],
+      [25, g - 12],
+    ],
+    PAL.void,
+    0.8,
+  )
+  for (let k = 0; k < 6; k++) s.px(26 + k * 1.5, g - 12 + (k % 3), PAL.sand, 0.9)
+  // 地面漏出的沙
+  s.ell(28, g - 1, 8, 1.6, PAL.sand, 0.8)
+  rubble(s, 2, g, 36, 4, 0x640)
+}
+
+/** 担架：两根杆 + 帆布，血迹干在布上。 */
+function propStretcher(s) {
+  const g = s.h - 1
+  ground(s, 36, 32)
+  // 两根杆
+  for (const dy of [0, 8]) {
+    s.thick(3, g - 4 - dy, 68, g - 5 - dy, 1.4, PAL.steelDark)
+    s.thick(3, g - 4.4 - dy, 68, g - 5.4 - dy, 0.8, PAL.steelLight)
+    // 握把胶套
+    s.rect(2, g - 6 - dy, 6, 4, PAL.ink)
+    s.rect(63, g - 6 - dy, 6, 4, PAL.ink)
+  }
+  // 帆布
+  s.poly(
+    [
+      [9, g - 5],
+      [62, g - 6],
+      [61, g - 13],
+      [10, g - 12],
+    ],
+    mix(PAL.dust, PAL.sand, 0.25),
+  )
+  s.line(10, g - 12, 61, g - 13, PAL.sandDark, 0.9)
+  // 折痕
+  s.line(20, g - 12, 19, g - 6, PAL.sandDark, 0.6)
+  s.line(34, g - 12, 35, g - 6, PAL.sandDark, 0.5)
+  s.line(48, g - 12, 47, g - 6, PAL.sandDark, 0.6)
+  // 干掉的血迹
+  s.ell(30, g - 9, 8, 2.4, PAL.bloodDark, 0.9)
+  s.ell(26, g - 8, 4, 1.4, PAL.blood, 0.8)
+  s.px(37, g - 8, PAL.blood, 0.7)
+  // 垂下来的绑带
+  s.line(24, g - 6, 22, g - 1, PAL.dust, 0.9)
+  s.line(44, g - 6, 46, g - 1, PAL.dust, 0.8)
+  rubble(s, 4, g, 60, 4, 0x650)
+}
+
+/** 推床：床轮卡死，床身还能拆电机。 */
+function propGurney(s) {
+  const g = s.h - 1
+  ground(s, 36, 30)
+  // 床面
+  s.rect(6, 10, 60, 5, PAL.steel)
+  s.rect(6, 10, 60, 1, PAL.steelLight)
+  s.rect(7, 11, 58, 3, PAL.ashPale)
+  // 床垫
+  s.poly(
+    [
+      [8, 9],
+      [64, 9],
+      [63, 5],
+      [9, 5],
+    ],
+    mix(PAL.sand, PAL.dust, 0.3),
+  )
+  s.line(9, 6, 62, 6, PAL.sand)
+  s.px(20, 7, PAL.bloodDark)
+  s.px(21, 7, PAL.bloodDark)
+  s.px(42, 8, PAL.dust)
+  // 侧栏
+  s.rect(10, 2, 2, 7, PAL.steelLight)
+  s.rect(9, 2, 46, 1, PAL.steelLight)
+  for (let k = 0; k < 4; k++) s.rect(12 + k * 11, 3, 1, 4, PAL.steelLight, 0.8)
+  // 腿 + 脚轮
+  for (const lx of [12, 58]) {
+    s.rect(lx, 15, 3, g - 18, PAL.steelDark)
+    s.rect(lx + 1, 15, 1, g - 18, PAL.steel)
+    s.disc(lx + 1.5, g - 2, 2.4, PAL.oil)
+    s.px(lx + 1, g - 3, PAL.steelLight)
+  }
+  // 横撑 + 锈
+  s.rect(14, g - 12, 46, 2, PAL.steelDark)
+  for (let k = 0; k < 3; k++) rustStreak(s, 20 + k * 16, 10, 8, 0x660 + k)
+  rubble(s, 4, g, 60, 4, 0x661)
+}
+
+/** 常春藤：顺墙爬满，根须钻进砖缝。 */
+function propIvy(s) {
+  const g = s.h - 1
+  ground(s, 15, 12, 0.3)
+  const stem = mix(PAL.mossDead, PAL.weed, 0.5)
+  const leaf = mix(PAL.toxicDark, PAL.mossDead, 0.5)
+  const leafL = mix(leaf, PAL.toxic, 0.45)
+  const rnd = mulberry32(0x670)
+  // 三条主藤
+  for (let v = 0; v < 3; v++) {
+    let x = 5 + v * 9 + rnd() * 2
+    for (let y = g - 1; y > 2; y--) {
+      const t = (g - y) / g
+      x += Math.sin((y + v * 7) * 0.16) * 0.9
+      s.px(x, y, stem)
+      if (rnd() < 0.22) s.px(x + 1, y, shade(stem, 0.2))
+      // 叶片（左右交替）
+      if (y % 5 === 0) {
+        const dir = rnd() < 0.5 ? -1 : 1
+        const lx = x + dir * 2
+        s.poly(
+          [
+            [x, y],
+            [lx + dir * 2, y - 2],
+            [lx + dir * 2, y + 2],
+          ],
+          leaf,
+        )
+        s.px(lx + dir, y - 1, leafL, 0.9)
+        s.px(x, y, leafL, 0.6)
+      }
+      // 根须
+      if (y % 11 === 0 && rnd() < 0.6) s.line(x, y, x + (rnd() < 0.5 ? -1 : 1), y + 2, PAL.dust, 0.9)
+    }
+  }
+  // 枯叶 / 更密的底部
+  for (let k = 0; k < 14; k++) {
+    const x = 2 + rnd() * 26
+    const y = g - 2 - rnd() * 8
+    s.px(x, y, rnd() < 0.5 ? PAL.mossDead : PAL.rustDark, 0.9)
+  }
+  // 底部泥土
+  s.ell(15, g - 1, 10, 1.6, PAL.dust, 0.8)
+}
+
+/** 苔石：石头上一层黄绿苔，摸上去是湿的。 */
+function propMossRock(s) {
+  const g = s.h - 1
+  ground(s, 24, 20)
+  const rock = mix(PAL.ash, PAL.dust, 0.4)
+  const rockD = shade(rock, -0.35)
+  const rockL = shade(rock, 0.3)
+  s.poly(
+    [
+      [4, g - 2],
+      [7, g - 14],
+      [16, g - 22],
+      [30, g - 24],
+      [42, g - 16],
+      [45, g - 5],
+      [38, g - 1],
+      [10, g - 1],
+    ],
+    rockD,
+  )
+  s.poly(
+    [
+      [6, g - 3],
+      [9, g - 13],
+      [17, g - 20],
+      [29, g - 21],
+      [40, g - 14],
+      [42, g - 6],
+      [36, g - 3],
+    ],
+    rock,
+  )
+  // 棱面
+  s.poly(
+    [
+      [10, g - 12],
+      [18, g - 19],
+      [28, g - 20],
+      [24, g - 12],
+    ],
+    rockL,
+  )
+  s.line(12, g - 10, 26, g - 11, rockD, 0.8)
+  s.line(26, g - 11, 39, g - 14, rockD, 0.6)
+  // 裂缝
+  crack(s, 30, g - 20, 10, 1, 0x680)
+  // 苔（顶部一厚层 + 侧面斑）
+  for (let k = 0; k < 3; k++) {
+    s.dith(6 + k * 2, g - 22 + k * 3, 36 - k * 4, 5 + k * 2, k === 0 ? PAL.toxic : PAL.mossDead, 0.55 - k * 0.12)
+  }
+  for (let k = 0; k < 8; k++) s.px(8 + k * 4, g - 8 + (k % 2), PAL.mossDead, 0.8)
+  // 湿亮边
+  for (let k = 0; k < 5; k++) s.px(12 + k * 5, g - 21, PAL.toxicGlow, 0.7)
+  rubble(s, 2, g, 44, 6, 0x681)
+}
+
+/** 小货柜：两米转运柜，门锁撬过又焊死。 */
+function propContainerSmall(s) {
+  const g = s.h - 1
+  ground(s, 60, 56)
+  const c1 = mix(PAL.skyDay, PAL.rustDark, 0.5)
+  const c2 = mix(c1, PAL.sand, 0.3)
+  const c3 = shade(c1, -0.4)
+  // 箱体
+  s.rect(4, 8, 112, g - 8, c1)
+  s.rect(4, 8, 112, 2, c2)
+  s.rect(4, g - 6, 112, 5, c3)
+  // 波纹（竖向瓦楞）
+  for (let k = 0; k < 20; k++) {
+    const x = 8 + k * 5.4
+    s.rect(x, 10, 2, g - 18, c2, 0.65)
+    s.rect(x + 1, 10, 1, g - 18, c3, 0.5)
+  }
+  // 顶部横梁
+  s.rect(4, 6, 112, 3, PAL.steelDark)
+  s.rect(4, 6, 112, 1, PAL.steelLight, 0.6)
+  // 门端（右侧）：门框 + 锁杆
+  s.rect(96, 8, 20, g - 8, c3)
+  s.rect(98, 10, 16, g - 12, shade(c1, -0.2))
+  for (const lx of [102, 110]) {
+    s.rect(lx, 9, 2, g - 11, PAL.steelDark)
+    s.px(lx, 20, PAL.steelLight)
+    s.px(lx + 1, 34, PAL.steelLight)
+  }
+  // 焊接痕（锁被焊死）
+  s.line(99, 30, 114, 31, PAL.rustHot, 0.9)
+  s.line(99, 32, 114, 33, PAL.rust, 0.8)
+  s.rect(104, 24, 6, 3, PAL.rust)
+  // 标识 / 编号
+  s.rect(14, 22, 22, 9, PAL.sand, 0.55)
+  s.rect(16, 24, 8, 2, PAL.ink, 0.5)
+  s.rect(16, 27, 12, 1, PAL.ink, 0.4)
+  s.rect(44, 26, 16, 2, PAL.ink, 0.35)
+  // 锈流 / 破洞 / 底部碎石
+  for (let k = 0; k < 6; k++) rustStreak(s, 12 + k * 17, 12, 16 + k * 3, 0x690 + k)
+  s.poly(
+    [
+      [66, 40],
+      [76, 38],
+      [74, 48],
+      [66, 49],
+    ],
+    PAL.void,
+    0.85,
+  )
+  s.line(66, 40, 74, 48, PAL.rustLight, 0.7)
+  s.rect(4, g - 10, 112, 3, PAL.rustDark, 0.8)
+  rubble(s, 2, g, 116, 8, 0x691)
+}
+
+/** 电缆盘：木盘 + 还剩大半盘线。 */
+function propCableSpool(s) {
+  const g = s.h - 1
+  ground(s, 22, 18)
+  const wood = mix(PAL.dust, PAL.rustDark, 0.3)
+  const woodL = shade(wood, 0.3)
+  const woodD = shade(wood, -0.4)
+  // 侧盘（面向镜头的大圆）
+  s.ell(22, 24, 17, 17, woodD)
+  s.ell(22, 24, 15.5, 15.5, wood)
+  s.ell(22, 24, 5, 5, woodD)
+  s.ell(22, 24, 3.6, 3.6, PAL.black)
+  // 木盘板缝（放射状）
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2
+    s.line(22 + Math.cos(a) * 6, 24 + Math.sin(a) * 6, 22 + Math.cos(a) * 15, 24 + Math.sin(a) * 15, woodD, 0.7)
+  }
+  s.line(9, 14, 14, 9, woodL, 0.8)
+  // 线缆（缠在盘上，从左下绕出）
+  for (let k = 0; k < 5; k++) {
+    const r = 8 + k * 1.6
+    s.ell(22, 24, r, r, PAL.oil, 0)
+  }
+  for (let k = 0; k < 4; k++) {
+    const rr = 9 + k * 2
+    for (let a = 0.4; a < 3.2; a += 0.12) {
+      s.px(22 + Math.cos(a) * rr, 24 + Math.sin(a) * rr, k % 2 ? PAL.oil : PAL.oilSheen, 0.95)
+    }
+  }
+  // 线头拖到地上
+  s.thick(12, 38, 4, g - 1, 1, PAL.oil)
+  s.px(3, g - 1, PAL.rustLight)
+  s.thick(30, 38, 40, g - 2, 0.9, PAL.oilSheen)
+  // 支架（木架）
+  s.rect(4, g - 6, 36, 3, woodD)
+  s.rect(4, g - 6, 36, 1, woodL, 0.7)
+  // 锈 / 灰
+  for (let k = 0; k < 6; k++) s.px(10 + k * 5, 14 + (k % 4) * 5, PAL.rustDark, 0.85)
+  rubble(s, 2, g, 40, 4, 0x6a0)
+}
+
+/** 救生圈：挂在栏杆上，白漆的字被雨冲掉一半。 */
+function propLifeRing(s) {
+  const g = s.h - 1
+  ground(s, 12, 9)
+  // 环（正面圆环）
+  s.ell(12, 13, 9.5, 9.5, PAL.boneDark)
+  s.ell(12, 13, 8.5, 8.5, PAL.bone)
+  s.ell(12, 13, 4, 4, PAL.void)
+  s.ell(12, 13, 3.2, 3.2, PAL.ash, 0.8)
+  // 红色分段（四段）
+  for (let k = 0; k < 4; k++) {
+    const a0 = (k / 4) * Math.PI * 2 + 0.4
+    for (let a = a0; a < a0 + 0.55; a += 0.08) {
+      for (let r = 4.6; r < 8.6; r += 0.8) {
+        s.px(12 + Math.cos(a) * r, 13 + Math.sin(a) * r, PAL.danger, 0.95)
+      }
+    }
+  }
+  // 高光 / 磨损
+  s.line(6, 8, 10, 5, PAL.white, 0.8)
+  s.px(18, 17, PAL.rustDark, 0.8)
+  s.px(8, 19, PAL.dust, 0.9)
+  // 绳子（四向绑带）
+  for (const a of [0.5, 2.1, 3.7, 5.3]) {
+    s.line(12 + Math.cos(a) * 8, 13 + Math.sin(a) * 8, 12 + Math.cos(a) * 11, 13 + Math.sin(a) * 11, PAL.dust, 0.95)
+  }
+  // 半截字（白漆）
+  s.px(9, 11, PAL.white, 0.9)
+  s.px(10, 11, PAL.white, 0.8)
+  s.px(11, 12, PAL.white, 0.6)
+  s.shadow(12, g - 0.5, 8, 1.4, 0.5)
+}
+
+/** 吊钩：钩头砸进地里，钢缆还绷着一段。 */
+function propCraneHook(s) {
+  const g = s.h - 1
+  ground(s, 14, 10)
+  const steel = mix(PAL.steel, PAL.rust, 0.35)
+  // 钢缆（从顶上下来）
+  for (let y = 0; y < 20; y++) {
+    s.px(13 + (y % 2), y, PAL.steelDark)
+    s.px(14 - (y % 2), y, PAL.steel, 0.9)
+  }
+  s.px(13, 2, PAL.steelLight)
+  s.px(14, 9, PAL.steelLight)
+  // 滑轮组 / 吊钩座
+  s.rect(8, 20, 13, 9, PAL.steelDark)
+  s.rect(9, 21, 11, 7, steel)
+  s.disc(14, 24, 3.2, PAL.ashPale)
+  s.disc(14, 24, 1.6, PAL.steelDark)
+  s.px(12, 22, PAL.steelWhite, 0.8)
+  // 钩颈
+  s.thick(14, 29, 14, 34, 2.4, steel)
+  s.thick(14, 29, 14, 34, 1.2, PAL.steelLight, 0.7)
+  // 钩身（弯钩，砸进地面）
+  s.thick(14, 34, 12, 42, 2.6, steel)
+  s.thick(12, 42, 14, 47, 2.4, steel)
+  s.thick(14, 47, 18, 48, 2.2, steel)
+  s.thick(18, 48, 20, 45, 2, steel)
+  s.thick(15, 35, 13, 42, 1.2, PAL.steelLight, 0.6)
+  // 钩尖
+  s.poly(
+    [
+      [20, 45],
+      [22, 42],
+      [19, 45],
+    ],
+    PAL.steelWhite,
+  )
+  // 钩上的锈 / 泥
+  for (let k = 0; k < 8; k++) s.px(10 + (k % 8), 30 + k * 2, PAL.rustDark, 0.9)
+  s.ell(13, g - 1, 9, 2, PAL.dust, 0.9)
+  s.ell(16, g - 1, 6, 1.4, PAL.rust, 0.5)
+  rubble(s, 4, g, 20, 4, 0x6b0)
+}
+
+/** 闸机：三根不锈钢转杆，转起来还在响。 */
+function propTurnstile(s) {
+  const g = s.h - 1
+  ground(s, 22, 16)
+  const steel = PAL.steelLight
+  const steelD = PAL.steelDark
+  // 底座 + 立柱
+  s.rect(10, g - 6, 24, 5, steelD)
+  s.rect(10, g - 6, 24, 1, steel, 0.8)
+  s.rect(18, 12, 8, g - 18, steelD)
+  s.rect(19, 12, 6, g - 18, PAL.steel)
+  s.line(20, 13, 20, g - 8, PAL.steelWhite, 0.7)
+  // 顶部转盘
+  s.disc(22, 16, 5, steelD)
+  s.disc(22, 16, 3.6, steel)
+  s.disc(22, 16, 1.4, PAL.void)
+  // 三根转杆（其中一根被撞弯）
+  const arms = [
+    [-1, 0.25, 16],
+    [1, -0.1, 18],
+    [0, 1, 0],
+  ]
+  s.thick(22, 16, 6, 12, 1.6, steel)
+  s.thick(22, 16, 38, 13, 1.6, steel)
+  s.thick(22, 16, 26, 6, 1.6, steel)
+  s.line(21, 16, 6, 12, PAL.steelWhite, 0.6)
+  s.line(23, 16, 38, 13, PAL.steelWhite, 0.5)
+  // 撞弯的那根（垂下来）
+  s.thick(22, 16, 30, 24, 1.4, steel)
+  // 划痕 / 指纹 / 贴纸
+  s.px(20, 26, PAL.rustDark, 0.9)
+  s.px(21, 30, PAL.dust, 0.8)
+  s.rect(25, 20, 3, 2, PAL.ochre, 0.7)
+  // 侧面读卡器
+  s.rect(27, 26, 5, 8, steelD)
+  s.rect(28, 27, 3, 3, PAL.black)
+  s.px(29, 28, PAL.neonRed, 0.9)
+  rubble(s, 6, g, 30, 4, 0x6c0)
+}
+
+/** 病床：床垫被啃开，弹簧支棱出来。 */
+function propHospitalBed(s) {
+  const g = s.h - 1
+  ground(s, 40, 34)
+  const frame = PAL.steel
+  // 床头 / 床尾栏杆
+  for (const bx of [6, 64]) {
+    s.rect(bx, 4, 3, g - 8, PAL.steelDark)
+    s.rect(bx + 1, 4, 1, g - 8, frame)
+    s.rect(bx - 1, 6, 5, 2, PAL.steelDark)
+    s.rect(bx - 1, 9, 5, 1, PAL.steelLight, 0.7)
+  }
+  // 床板 + 床垫
+  s.rect(8, 12, 58, 4, PAL.steelDark)
+  s.rect(8, 12, 58, 1, PAL.steelLight, 0.8)
+  s.poly(
+    [
+      [9, 11],
+      [65, 11],
+      [64, 6],
+      [10, 7],
+    ],
+    mix(PAL.boneDark, PAL.sand, 0.3),
+  )
+  // 被啃开的洞 + 弹簧
+  s.ell(30, 8, 9, 3, PAL.void)
+  s.ell(30, 8, 6, 2, PAL.black)
+  for (let k = 0; k < 4; k++) {
+    s.line(23 + k * 4, 6, 24 + k * 4, 11, PAL.rust, 0.9)
+    s.px(23 + k * 4, 6, PAL.rustLight)
+  }
+  // 血渍 / 污
+  s.ell(48, 9, 7, 2, PAL.bloodDark, 0.85)
+  s.ell(52, 8, 3, 1.4, PAL.blood, 0.7)
+  for (let k = 0; k < 5; k++) s.px(12 + k * 4, 9 + (k % 2), PAL.dust, 0.8)
+  // 床腿 + 轮
+  for (const lx of [12, 58]) {
+    s.rect(lx, 16, 3, g - 20, PAL.steelDark)
+    s.disc(lx + 1.5, g - 3, 2.6, PAL.oil)
+    s.px(lx + 1, g - 4, PAL.steelLight)
+  }
+  s.rect(14, g - 14, 44, 2, PAL.steelDark, 0.9)
+  // 刻名（床栏上的划痕）
+  s.rect(66, 14, 1, 5, PAL.steelWhite, 0.6)
+  s.rect(68, 14, 1, 5, PAL.steelWhite, 0.4)
+  // 输液架断了，靠在床边
+  s.line(60, 4, 68, g - 6, PAL.steelLight, 0.5)
+  rubble(s, 4, g, 68, 5, 0x6d0)
+}
+
+/** 淤泥堆：港水退下去留下的淤泥，一脚陷到小腿。 */
+function propSiltMound(s) {
+  const g = s.h - 1
+  ground(s, 30, 26, 0.7)
+  const mud = mix(PAL.dust, PAL.void, 0.35)
+  const mudL = mix(PAL.dust, PAL.sandDark, 0.35)
+  const mudD = mix(mud, PAL.void, 0.4)
+  // 主体（低而宽）
+  s.poly(
+    [
+      [2, g - 1],
+      [6, g - 8],
+      [16, g - 14],
+      [30, g - 16],
+      [46, g - 12],
+      [56, g - 6],
+      [58, g - 1],
+    ],
+    mudD,
+  )
+  s.poly(
+    [
+      [4, g - 2],
+      [9, g - 9],
+      [18, g - 13],
+      [30, g - 14],
+      [44, g - 11],
+      [54, g - 5],
+      [55, g - 2],
+    ],
+    mud,
+  )
+  // 湿亮面（顶部）
+  s.ell(28, g - 12, 16, 3, mudL, 0.9)
+  for (let k = 0; k < 5; k++) s.px(16 + k * 6, g - 13, PAL.glass, 0.55)
+  // 脚印 / 凹陷
+  s.ell(38, g - 6, 4, 2, mudD, 0.9)
+  s.ell(20, g - 5, 3, 1.6, mudD, 0.8)
+  // 卡在泥里的杂物
+  s.rect(34, g - 9, 7, 3, PAL.rustDark)
+  s.px(36, g - 10, PAL.rustLight)
+  s.line(12, g - 8, 18, g - 10, PAL.steelDark, 0.9)
+  s.px(46, g - 7, PAL.steel, 0.9)
+  // 水洼反光
+  s.ell(10, g - 2, 7, 1.6, PAL.oil, 0.7)
+  s.px(8, g - 3, PAL.glass, 0.6)
+  rubble(s, 2, g, 54, 5, 0x6e0)
+}
+
+/** 货网：尼龙网兜着半箱泡水的零件。 */
+function propCargoNet(s) {
+  const g = s.h - 1
+  ground(s, 32, 26)
+  // 底下的货（半箱零件）
+  s.rect(12, g - 12, 40, 11, PAL.rustDark)
+  s.rect(13, g - 11, 38, 9, mix(PAL.rust, PAL.steel, 0.4))
+  for (let k = 0; k < 6; k++) s.px(15 + k * 6, g - 9 + (k % 3), PAL.steelLight, 0.8)
+  s.rect(12, g - 12, 40, 1, PAL.rust)
+  // 网（斜向网格，罩在货上）
+  const net = mix(PAL.sandDark, PAL.dust, 0.4)
+  for (let k = 0; k < 12; k++) {
+    s.line(2 + k * 6, g - 2, 12 + k * 6, g - 20, net, 0.9)
+    s.line(4 + k * 6, g - 2, 18 + k * 6, g - 18, net, 0.75)
+  }
+  for (let k = 0; k < 7; k++) {
+    s.line(2, g - 3 - k * 3, 62, g - 4 - k * 3, net, 0.55)
+  }
+  // 网结（增粗的点）
+  for (let i = 0; i < 10; i++) {
+    const x = 6 + i * 6
+    const y = g - 4 - ((i * 5) % 14)
+    s.px(x, y, PAL.sand, 0.9)
+  }
+  // 破口（网被扯开）
+  s.poly(
+    [
+      [38, g - 14],
+      [46, g - 16],
+      [44, g - 6],
+      [36, g - 5],
+    ],
+    PAL.void,
+    0.55,
+  )
+  s.line(38, g - 14, 44, g - 6, net, 0.9)
+  // 从网里漏出的零件
+  s.px(48, g - 2, PAL.steelLight)
+  s.px(50, g - 1, PAL.rust)
+  // 顶上的绳结 / 挂钩
+  s.thick(30, g - 20, 30, 2, 1, PAL.dust)
+  s.disc(30, 2, 2.4, PAL.steelDark)
+  s.px(30, 2, PAL.steelLight)
+  rubble(s, 6, g, 52, 4, 0x6f0)
+}
+
+/** 船体钢板：卷边的船壳板，焊缝比锈还厚。 */
+function propHullPlate(s) {
+  const g = s.h - 1
+  ground(s, 34, 28)
+  const hull = mix(PAL.steelBlue, PAL.rustDark, 0.45)
+  const hullL = mix(hull, PAL.steelLight, 0.4)
+  const hullD = shade(hull, -0.4)
+  // 钢板（略微卷边，斜靠）
+  s.poly(
+    [
+      [4, g - 2],
+      [10, 8],
+      [58, 4],
+      [66, 10],
+      [62, g - 4],
+      [40, g - 1],
+    ],
+    hullD,
+  )
+  s.poly(
+    [
+      [6, g - 4],
+      [12, 10],
+      [57, 6],
+      [63, 11],
+      [60, g - 6],
+      [40, g - 3],
+    ],
+    hull,
+  )
+  // 卷边高光（上缘）
+  s.line(12, 9, 57, 5, hullL, 0.9)
+  s.line(7, g - 6, 12, 11, hullL, 0.6)
+  // 焊缝（两条，比锈还厚）
+  for (const [x0, y0, x1, y1] of [
+    [20, 12, 26, g - 5],
+    [44, 8, 50, g - 6],
+  ]) {
+    s.thick(x0, y0, x1, y1, 1.8, PAL.rustDark)
+    for (let t = 0; t <= 1; t += 0.05) {
+      s.px(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, PAL.rustHot, 0.85)
+    }
+  }
+  // 铆钉（两排）
+  for (let k = 0; k < 7; k++) {
+    s.px(14 + k * 7, 12, PAL.steelLight)
+    s.px(15 + k * 7, 13, PAL.steelDark)
+    s.px(18 + k * 7, g - 8, PAL.steelLight, 0.9)
+  }
+  // 锈斑 / 破洞 / 掉漆
+  for (let k = 0; k < 10; k++) {
+    const r = mulberry32(0x700 + k)
+    s.px(12 + r() * 48, 10 + r() * (g - 20), r() < 0.5 ? PAL.rustDark : PAL.rust, 0.9)
+  }
+  s.ell(30, 20, 4, 3, PAL.void, 0.85)
+  s.line(28, 22, 32, 18, PAL.rustLight, 0.7)
+  // 斜靠的支撑（一截管子）
+  s.thick(62, g - 2, 54, g - 14, 1.4, PAL.steelDark, 0.9)
+  rubble(s, 2, g, 62, 6, 0x701)
+}
+
+/** 灯塔：塔身 + 灯室（光是不透明像素，不透明加色）。 */
+function propBeacon(s) {
+  const g = s.h - 1
+  ground(s, 24, 18)
+  const tower = mix(PAL.boneDark, PAL.rust, 0.45)
+  const towerL = mix(tower, PAL.sand, 0.35)
+  const towerD = shade(tower, -0.4)
+  // 基座
+  s.rect(8, g - 10, 32, 9, PAL.ash)
+  s.rect(8, g - 10, 32, 2, PAL.ashPale)
+  s.rect(10, g - 12, 28, 3, PAL.steelDark)
+  // 塔身（上收分）
+  for (let y = 18; y < g - 12; y++) {
+    const t = (y - 18) / (g - 30)
+    const half = 7 + t * 5
+    s.rect(24 - half, y, half * 2, 1, tower)
+    s.px(24 - half, y, towerL, 0.85)
+    s.px(24 + half - 1, y, towerD, 0.95)
+  }
+  // 红白条带（三圈）
+  for (let k = 0; k < 3; k++) {
+    const y = 42 + k * 22
+    const t = (y - 18) / (g - 30)
+    const half = 7 + t * 5
+    s.rect(24 - half, y, half * 2, 4, PAL.danger, 0.9)
+    s.rect(24 - half, y, half * 2, 1, PAL.warn, 0.6)
+  }
+  // 窗（两个）
+  for (const [wy, ww] of [
+    [60, 4],
+    [86, 3],
+  ]) {
+    s.rect(22, wy, ww, 5, PAL.black)
+    s.rect(23, wy + 1, 1, 3, PAL.neonWarm, 0.8)
+  }
+  // 平台 + 灯室
+  s.rect(14, 14, 20, 4, PAL.steelDark)
+  s.rect(14, 14, 20, 1, PAL.steelLight, 0.8)
+  s.rect(18, 4, 12, 11, PAL.steelDark)
+  // 灯室玻璃 + 灯
+  s.rect(19, 6, 10, 7, PAL.black)
+  s.rect(20, 7, 8, 5, PAL.neonWarm, 0.95)
+  s.rect(22, 8, 4, 3, PAL.white, 1)
+  s.glow(24, 9, 14, PAL.neonWarm, 1)
+  // 灯室顶
+  s.poly(
+    [
+      [17, 4],
+      [31, 4],
+      [27, 1],
+      [21, 1],
+    ],
+    PAL.steelDark,
+  )
+  s.px(24, 0, PAL.steelLight)
+  // 锈 / 藤 / 灰
+  for (let k = 0; k < 8; k++) rustStreak(s, 12 + k * 3, 30 + (k % 4) * 18, 10 + k, 0x710 + k)
+  s.line(16, g - 16, 12, g - 30, PAL.mossDead, 0.7)
+  s.line(12, g - 30, 9, g - 40, PAL.weed, 0.6)
+  rubble(s, 6, g, 36, 5, 0x711)
+}
+
+/* ============================================================================
+ * 4. 表：kind → 尺寸 / 绘制函数
+ * ========================================================================== */
+
+const DEFS = {
+  skeleton_human: { w: 90, h: 44, fn: propSkeletonHuman, seed: 0x11 },
+  skeleton_animal: { w: 70, h: 34, fn: propSkeletonAnimal, seed: 0x12 },
+  corpse: { w: 80, h: 36, fn: propCorpse, seed: 0x13 },
+  skull: { w: 20, h: 18, fn: propSkull, seed: 0x14 },
+  ribcage: { w: 56, h: 30, fn: propRibcage, seed: 0x15 },
+  car_wreck: { w: 120, h: 52, fn: propCarWreck, seed: 0x16 },
+  bus_wreck: { w: 200, h: 70, fn: propBusWreck, seed: 0x17 },
+  building_facade: { w: 160, h: 220, fn: propBuildingFacade, seed: 0x18 },
+  house_facade: { w: 140, h: 120, fn: propHouseFacade, seed: 0x19 },
+  factory_pipe: { w: 48, h: 160, fn: propFactoryPipe, seed: 0x1a },
+  barrel: { w: 28, h: 40, fn: propBarrel, seed: 0x1b },
+  crate: { w: 40, h: 34, fn: propCrate, seed: 0x1c },
+  tire_pile: { w: 56, h: 44, fn: propTirePile, seed: 0x1d },
+  fence: { w: 64, h: 40, fn: propFence, seed: 0x1e },
+  streetlight: { w: 24, h: 120, fn: propStreetlight, seed: 0x1f },
+  tv: { w: 36, h: 28, fn: propTv, seed: 0x20 },
+  sofa: { w: 64, h: 30, fn: propSofa, seed: 0x21 },
+  wardrobe: { w: 48, h: 80, fn: propWardrobe, seed: 0x22 },
+  cradle: { w: 40, h: 30, fn: propCradle, seed: 0x23 },
+  grave: { w: 28, h: 26, fn: propGrave, seed: 0x24 },
+  cage: { w: 64, h: 56, fn: propCage, seed: 0x25 },
+  workbench: { w: 72, h: 36, fn: propWorkbench, seed: 0x26 },
+  terminal: { w: 44, h: 50, fn: propTerminal, seed: 0x27 },
+  generator: { w: 64, h: 46, fn: propGenerator, seed: 0x28 },
+  relay: { w: 40, h: 90, fn: propRelay, seed: 0x29 },
+  antenna: { w: 30, h: 150, fn: propAntenna, seed: 0x2a },
+  satellite: { w: 60, h: 40, fn: propSatellite, seed: 0x2b },
+  campfire: { w: 36, h: 26, fn: propCampfire, seed: 0x2c },
+  tent: { w: 70, h: 44, fn: propTent, seed: 0x2d },
+  junk_heap: { w: 90, h: 50, fn: propJunkHeap, seed: 0x2e },
+  tree_dead: { w: 60, h: 110, fn: propTreeDead, seed: 0x2f },
+  weed: { w: 30, h: 22, fn: propWeed, seed: 0x30 },
+  puddle_toxic: { w: 80, h: 16, fn: propPuddleToxic, seed: 0x31 },
+  vent: { w: 46, h: 22, fn: propVent, seed: 0x611 },
+  duct: { w: 64, h: 24, fn: propDuct, seed: 0x621 },
+  rebar_pile: { w: 54, h: 20, fn: propRebarPile, seed: 0x631 },
+  sandbag: { w: 40, h: 22, fn: propSandbag, seed: 0x641 },
+  stretcher: { w: 72, h: 20, fn: propStretcher, seed: 0x651 },
+  ivy: { w: 30, h: 80, fn: propIvy, seed: 0x671 },
+  moss_rock: { w: 48, h: 32, fn: propMossRock, seed: 0x681 },
+  container_small: { w: 120, h: 60, fn: propContainerSmall, seed: 0x691 },
+  cable_spool: { w: 44, h: 44, fn: propCableSpool, seed: 0x6a1 },
+  life_ring: { w: 24, h: 24, fn: propLifeRing, seed: 0x6b1 },
+  crane_hook: { w: 28, h: 52, fn: propCraneHook, seed: 0x6b2 },
+  turnstile: { w: 44, h: 40, fn: propTurnstile, seed: 0x6c1 },
+  gurney: { w: 72, h: 30, fn: propGurney, seed: 0x661 },
+  hospital_bed: { w: 80, h: 36, fn: propHospitalBed, seed: 0x6d1 },
+  silt_mound: { w: 60, h: 24, fn: propSiltMound, seed: 0x6e1 },
+  cargo_net: { w: 64, h: 28, fn: propCargoNet, seed: 0x6f1 },
+  hull_plate: { w: 72, h: 30, fn: propHullPlate, seed: 0x701 },
+  beacon: { w: 48, h: 110, fn: propBeacon, seed: 0x711 },
+}
+
+export const PROP_ART_KINDS = Object.keys(DEFS)
+
+const CACHE = new Map()
+
+/**
+ * 道具贴图。kind 未知时退回 junk_heap 尺寸的通用废物堆（不会返回空）。
+ */
+// （返回的 texture.userData.cleanAlpha = true；alpha 仅 0/255，无半透明脏边）
+export function getPropArt(kind) {
+  const key = String(kind || '')
+  let tex = CACHE.get(key)
+  if (tex) return tex
+  const def = DEFS[key]
+  const s = def ? new Surf(def.w, def.h, def.seed) : new Surf(90, 50, 0x999)
+  if (def) {
+    def.fn(s)
+  } else {
+    propJunkHeap(s)
+  }
+  // 统一收尾：脏污 → 三层 → 描边
+  s.speck(0, 0, s.w, s.h, PAL.rustDark, 0.03, 0.35)
+  s.edges(mix(PAL.white, PAL.sand, 0.55), PAL.void, 0.3, 0.45)
+  s.outline(mix(PAL.void, PAL.rustDark, 0.22))
+  tex = s.tex()
+  tex.userData.propKind = key
+  CACHE.set(key, tex)
+  return tex
+}
+
+/** 预载全部道具贴图。 */
+export function preloadArt() {
+  for (const k of PROP_ART_KINDS) getPropArt(k)
+  return CACHE.size
+}
+
+/** 清缓存（热重载 / 换色用）。 */
+export function clearPropCache() {
+  CACHE.clear()
+}
+
+/** 尺寸查询（布置道具时算 AABB 用）。 */
+export function getPropSize(kind) {
+  const def = DEFS[kind]
+  return def ? { w: def.w, h: def.h } : { w: 90, h: 50 }
+}
+
+

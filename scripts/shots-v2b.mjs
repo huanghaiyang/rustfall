@@ -1,0 +1,20 @@
+import puppeteer from "puppeteer-core"
+const wait = (ms) => new Promise(r => setTimeout(r, ms))
+const b = await puppeteer.connect({ browserURL: "http://127.0.0.1:9333", defaultViewport: { width: 1600, height: 900 } })
+const p = await b.newPage(); await p.bringToFront()
+const errs = []; p.on("pageerror", e => errs.push(e.message.slice(0,200)))
+await p.goto("http://127.0.0.1:4180", { waitUntil: "networkidle2" }); await wait(4200)
+await p.click(".title-menu .btn.primary"); await wait(1500)
+await p.evaluate(() => [...document.querySelectorAll("button")].find(x => /以此机体开始/.test(x.textContent))?.click()); await wait(2800)
+for (const [r, rm, n] of [["city","city_street","v2b-city"],["village","village_field","v2b-village"],["dump","dump_pit","v2b-dump"],["city","city_slum","v2b-slum"]]) {
+  const info = await p.evaluate(({r,rm}) => { const g = window.__rustfall; g.loadRoom(r, rm, "left"); g.robot.invuln = 999; return { room: g.room.data.roomId, npcs: g.room.npcHolograms.length, cages: g.room.cages.length, landmarks: g.room.landmarks.length } }, {r,rm})
+  await wait(1700)
+  await p.screenshot({ path: `screenshots-v2/${n}.png` })
+  console.log(n, JSON.stringify(info))
+}
+await p.evaluate(() => { const g = window.__rustfall; g.loadRoom("city","city_plaza","left"); window.__G.timeLeft = 0.3 })
+await wait(5200)
+await p.screenshot({ path: "screenshots-v2/v2b-rain.png" })
+console.log("RAIN", await p.evaluate(() => window.__G.weatherPhase + " " + window.__G.weatherIntensity.toFixed(2)))
+console.log("ERR", JSON.stringify(errs.slice(0,5)))
+await p.close(); await b.disconnect()

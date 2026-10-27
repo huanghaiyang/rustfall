@@ -1,0 +1,76 @@
+{
+  "items": [
+    {
+      "id": "mod_salvage_core",
+      "name": "锈蚀核心",
+      "en": "SALVAGE CORE",
+      "category": "rare",
+      "rarity": 5,
+      "weight": 3.2,
+      "value": 480,
+      "stack": 1,
+      "desc": "一颗还在微微发烫的旧世界核心，表面全是盐渍。",
+      "lore": "拾荒者之间流传一句话：捡到核心的人，要么换一整个循环的补给，要么死在回来的路上。"
+    },
+    {
+      "id": "mod_salvage_wire",
+      "name": "缠成团的铜线",
+      "en": "TANGLED COPPER",
+      "category": "material",
+      "rarity": 1,
+      "weight": 0.3,
+      "value": 5,
+      "stack": 40,
+      "desc": "从墙里扯出来的老铜线，绝缘皮已经脆了。"
+    },
+    {
+      "id": "mod_salvage_thermos",
+      "name": "保温壶",
+      "en": "THERMOS",
+      "category": "artifact",
+      "rarity": 2,
+      "weight": 0.8,
+      "value": 22,
+      "stack": 1,
+      "desc": "壶里还剩一点水，凉的，尝起来像铁锈。",
+      "lore": "壶底刻着两个字母和一个日期。日期是酸雨纪元第三年。"
+    },
+    {
+      "id": "mod_salvage_tape",
+      "name": "黄色警示胶带",
+      "en": "CAUTION TAPE",
+      "category": "material",
+      "rarity": 1,
+      "weight": 0.1,
+      "value": 3,
+      "stack": 10,
+      "desc": "还粘。可以临时捆东西，也可以贴在显眼的地方。"
+    },
+    {
+      "id": "mod_salvage_lens",
+      "name": "烧蚀的镜片",
+      "en": "SCORCHED LENS",
+      "category": "component",
+      "rarity": 3,
+      "weight": 0.4,
+      "value": 68,
+      "stack": 4,
+      "desc": "光学模组的残片，边缘有一圈彩虹色的烧蚀痕。",
+      "slot": "sensor",
+      "bonus": { "speed": 0.02 }
+    }
+  ],
+  "lootTables": [
+    {
+      "id": "mod.salvage.cache",
+      "name": "拾荒补给箱",
+      "entries": [
+        { "id": "mod_salvage_core", "weight": 1, "min": 1, "max": 1 },
+        { "id": "mod_salvage_wire", "weight": 12, "min": 2, "max": 6 },
+        { "id": "mod_salvage_thermos", "weight": 4, "min": 1, "max": 1 },
+        { "id": "mod_salvage_tape", "weight": 8, "min": 1, "max": 2 },
+        { "id": "mod_salvage_lens", "weight": 3, "min": 1, "max": 1 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "id": "rustfall-salvage",
+  "name": "锈蚀拾荒包",
+  "version": "1.0.0",
+  "author": "RUSTFALL TEAM",
+  "description": "示例内容 mod：新增 5 种战利品、1 张掉落表。纯数据，不需要写代码。",
+  "content": ["items.json"],
+  "main": null
+}

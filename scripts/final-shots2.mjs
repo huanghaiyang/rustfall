@@ -1,0 +1,20 @@
+import puppeteer from "puppeteer-core"
+const wait = (ms) => new Promise(r => setTimeout(r, ms))
+const b = await puppeteer.connect({ browserURL: "http://127.0.0.1:9333", defaultViewport: { width: 1600, height: 900 } })
+const p = await b.newPage(); await p.bringToFront()
+await p.goto("http://127.0.0.1:4180", { waitUntil: "networkidle2" }); await wait(5000)
+await p.click(".title-menu .btn.primary"); await wait(1600)
+await p.evaluate(() => [...document.querySelectorAll("button")].find(x => /以此机体开始/.test(x.textContent))?.click()); await wait(2800)
+// 酸雨：进入暴风雨 2.2 秒后截图（还没死）
+await p.evaluate(() => { const g = window.__rustfall; g.loadRoom("city","city_plaza","left"); window.__G.timeLeft = 0.5; g.robot.invuln = 0 })
+await wait(3300)
+await p.screenshot({ path: "screenshots-v2/final-10-acid-rain.png" })
+console.log("RAIN", await p.evaluate(() => window.__G.weatherPhase + " exposed=" + window.__G.exposed.toFixed(1) + " hp=" + Math.round(window.__G.hp)))
+// 恢复 + 待机
+await p.evaluate(() => { const g = window.__rustfall; window.__G.phase = "playing"; g.robot.dead = false; g.robot.heal(999); g.loadRoom("city","city_shelter","shelter"); window.__G.power = 4; window.__G.timeLeft = 200 })
+await wait(1200)
+await p.keyboard.down("KeyS"); await wait(2100); await p.keyboard.up("KeyS")
+await wait(600)
+await p.screenshot({ path: "screenshots-v2/final-11-hibernate.png" })
+console.log("PHASE", await p.evaluate(() => window.__G.phase), "TITLE", await p.evaluate(() => document.querySelector(".panel-title")?.textContent || ""))
+await p.close(); await b.disconnect()

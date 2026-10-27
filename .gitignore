@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.npm-cache/
+.chrome-profile/
+*.log
+.DS_Store
+# 生成物 / 截图不入库（可用 scripts 重新生成）
+screenshots/
+screenshots-v2/
+screenshots-v3/
+screenshots-v4/
+results/
+.learn/

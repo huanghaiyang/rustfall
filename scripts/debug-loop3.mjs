@@ -1,0 +1,18 @@
+import puppeteer from "puppeteer-core"
+const wait = (ms) => new Promise(r => setTimeout(r, ms))
+const b = await puppeteer.connect({ browserURL: "http://127.0.0.1:9333", defaultViewport: { width: 1600, height: 900 } })
+const p = await b.newPage(); await p.bringToFront()
+await p.goto("http://127.0.0.1:4180", { waitUntil: "networkidle2" }); await wait(4200)
+await p.evaluate(() => { window.__errs = []; const old = console.error; console.error = (...a) => { window.__errs.push(a.map(x => (x && x.stack) || String(x)).join(' | ')); old(...a) } })
+await p.click(".title-menu .btn.primary"); await wait(1600)
+await p.evaluate(() => [...document.querySelectorAll("button")].find(x => /以此机体开始/.test(x.textContent))?.click())
+await wait(2500)
+const step = async (label, fn) => { const n = await p.evaluate(fn); await wait(800); const e = await p.evaluate(() => { const n = window.__errs.length; window.__errs.length = 0; return n }); console.log(label, "errors:", n, e) }
+await step("idle", () => 0)
+await step("equip+fire", () => { const g = window.__rustfall; g.inventory.add("laser_pistol",1); g.inventory.add("ammo_laser",30); g.equipItem("laser_pistol"); for(let i=0;i<3;i++) g.weapons.fire(); return window.__G.weapon.ammo })
+await step("no weapons", () => { window.__rustfall.weapons = null; return 0 })
+await step("no ecosystem", () => { window.__rustfall.ecosystem = null; return 0 })
+await step("no director", () => { window.__rustfall.director = null; return 0 })
+await step("no room.update?", () => { window.__rustfall.room.update = () => {}; return 0 })
+console.log(JSON.stringify((await p.evaluate(() => window.__errs.slice(0,2))), null, 1).slice(0, 1200))
+await p.close(); await b.disconnect()

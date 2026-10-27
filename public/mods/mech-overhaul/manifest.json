@@ -1,0 +1,9 @@
+{
+  "id": "mech-overhaul",
+  "name": "机体重制",
+  "version": "1.2.0",
+  "author": "RUSTFALL TEAM",
+  "description": "示例逻辑 mod：用 JS 注册一台新机体、一种自定义怪物（继承 api.BaseMonster），并给所有玩家一条开局提示。",
+  "content": ["content.json"],
+  "main": "mod.js"
+}

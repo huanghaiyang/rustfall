@@ -1,0 +1,39 @@
+{
+  "items": [
+    {
+      "id": "mod_mech_plate",
+      "name": "实验装甲板",
+      "en": "EXPERIMENTAL PLATE",
+      "category": "component",
+      "rarity": 4,
+      "weight": 2.4,
+      "value": 210,
+      "stack": 2,
+      "desc": "多层复合装甲，不知道是哪国的实验室流出来的。",
+      "slot": "armor",
+      "bonus": { "armor": 0.12, "hp": 12 }
+    }
+  ],
+  "chassis": [
+    {
+      "id": "mod_strider",
+      "name": "STRIDER-9 长腿",
+      "en": "STRIDER",
+      "family": "quad",
+      "maker": "mod",
+      "desc": "mod 追加的四足长腿机体，跳跃和负重都不错。",
+      "lore": "它的设计图是在一台打印机的缓存里找到的。",
+      "hp": 105,
+      "speed": 1.15,
+      "jump": 1.2,
+      "dig": 1.0,
+      "carry": 1.25,
+      "attack": 12,
+      "energyMax": 110,
+      "hitbox": [24, 30],
+      "abilities": ["doubleJump"],
+      "color": 9416250,
+      "artId": "spider"
+    }
+  ]
+}
