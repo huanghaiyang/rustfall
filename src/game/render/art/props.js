@@ -2680,6 +2680,261 @@ function propBeacon(s) {
 }
 
 /* ============================================================================
+ * 3.9 彩蛋道具（Fallout / Skyrim / NieR / Metro / Akira / Cyberpunk）
+ * ========================================================================== */
+
+/** 辐射：半埋的齿轮避难所大门。 */
+function propVaultDoor(s) {
+  const g = s.h - 1
+  const cx = s.w / 2
+  // 混凝土门框
+  s.rect(4, 12, s.w - 8, s.h - 14, PAL.steel)
+  s.rect(2, 8, s.w - 4, 14, PAL.steelLight, 0.9)
+  s.rect(0, g - 8, s.w, 9, PAL.ash)
+  // 圆门
+  s.disc(cx, g - 34, 30, PAL.steelDark)
+  s.disc(cx, g - 34, 27, PAL.steel)
+  s.disc(cx, g - 34, 22, mix(PAL.steel, PAL.rust, 0.2))
+  // 齿轮齿
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * TAU
+    const x = cx + Math.cos(a) * 31
+    const y = g - 34 + Math.sin(a) * 31
+    s.rect(x - 3, y - 3, 6, 6, PAL.steelDark)
+  }
+  // 中央轮盘 + 编号
+  s.disc(cx, g - 34, 13, PAL.steelDark)
+  for (let k = 0; k < 4; k++) {
+    const a = (k / 4) * TAU + 0.4
+    s.line(cx, g - 34, cx + Math.cos(a) * 12, g - 34 + Math.sin(a) * 12, PAL.steelLight, 0.9)
+  }
+  s.disc(cx, g - 34, 3, PAL.rustLight)
+  // 门牌
+  s.rect(cx - 14, 16, 28, 9, PAL.steelDark)
+  s.rect(cx - 13, 17, 26, 7, PAL.rust)
+  s.px(cx - 10, 20, PAL.neonWarm)
+  s.px(cx - 8, 20, PAL.neonWarm)
+  s.px(cx - 5, 20, PAL.neonWarm)
+  // 锈 / 灰
+  for (let k = 0; k < 9; k++) rustStreak(s, 8 + k * 9, 30 + (k % 3) * 20, 8 + k, 0x810 + k)
+  crack(s, cx + 22, g - 60, 10, 1, 0x820)
+  rubble(s, 4, g, s.w - 8, 8, 0x821)
+}
+
+/** 老滚5：发光的龙语石墙。 */
+function propWordWall(s) {
+  const g = s.h - 1
+  s.rect(2, 6, s.w - 4, s.h - 8, PAL.steelDark)
+  s.rect(4, 8, s.w - 8, s.h - 12, mix(PAL.ash, PAL.steel, 0.4))
+  // 石块接缝
+  for (let y = 14; y < g - 6; y += 12) {
+    s.line(4, y, s.w - 4, y, PAL.steelDark, 0.55)
+    const off = ((y / 12) % 2) * 14
+    for (let x = 18 + off; x < s.w - 8; x += 28) s.line(x, y, x, y + 12, PAL.steelDark, 0.45)
+  }
+  // 发光刻痕：三道爪痕一样的符文
+  const glyphs = [
+    [0.22, 0.2, 0.22, 0.62],
+    [0.34, 0.28, 0.42, 0.7],
+    [0.56, 0.18, 0.48, 0.58],
+    [0.66, 0.32, 0.72, 0.72],
+    [0.76, 0.24, 0.82, 0.6],
+  ]
+  for (let k = 0; k < glyphs.length; k++) {
+    const [x0, y0, x1, y1] = glyphs[k]
+    s.line(s.w * x0, s.h * y0, s.w * x1, s.h * y1, PAL.toxicGlow, 0.8)
+    s.line(s.w * x0 + 1, s.h * y0, s.w * x1 + 1, s.h * y1, PAL.neon, 0.35)
+    s.px(s.w * x0, s.h * y0, PAL.white, 0.9)
+  }
+  s.speck(4, 8, s.w - 8, s.h - 14, PAL.toxicGlow, 0.06, 0.5)
+  for (let k = 0; k < 6; k++) rustStreak(s, 6 + k * 16, 10 + (k % 2) * 30, 12 + k, 0x830 + k)
+}
+
+/** 尼尔：辐射尘里的白色月之泪。 */
+function propLunarFlower(s) {
+  const g = s.h - 1
+  const cx = s.w / 2
+  ground(s, cx, 8, 0.28)
+  // 茎
+  s.thick(cx, g - 2, cx + 1, 10, 1.2, PAL.mossDead)
+  s.line(cx - 3, g - 8, cx + 2, g - 4, PAL.weed, 0.7)
+  // 花瓣
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * TAU
+    const x = cx + Math.cos(a) * 6
+    const y = 9 + Math.sin(a) * 5
+    s.ell(x, y, 4, 3, PAL.white, 0.95)
+    s.ell(x + 0.5, y + 0.5, 2.4, 1.6, PAL.paper, 0.9)
+  }
+  // 花心：蓝光
+  s.disc(cx, 9, 3, PAL.neonCold)
+  s.disc(cx, 9, 1.6, PAL.white)
+  s.speck(cx - 7, 3, 14, 12, PAL.neonCold, 0.1, 0.5)
+}
+
+/** 地铁：只剩半个字母的站牌。 */
+function propMetroSign(s) {
+  const g = s.h - 1
+  const cx = s.w / 2
+  ground(s, cx, 12, 0.3)
+  // 立柱
+  s.rect(cx - 2, 6, 4, s.h - 8, PAL.steelDark)
+  s.rect(cx - 1, 6, 2, s.h - 8, PAL.steel)
+  // 站牌
+  s.rect(4, 4, s.w - 8, 26, PAL.steelDark)
+  s.rect(6, 6, s.w - 12, 22, PAL.rust)
+  s.rect(8, 8, s.w - 16, 18, mix(PAL.rust, PAL.black || PAL.void, 0.35))
+  // 字母：M E T R O（缺一半）
+  const letters = [8, 18, 26, 34, 42]
+  for (let k = 0; k < letters.length; k++) {
+    const x = letters[k]
+    if (k > 2 && k !== 4) continue
+    s.rect(x, 12, 2, 10, PAL.neonWarm, 0.9)
+    if (k < 2) s.rect(x, 12, 6, 2, PAL.neonWarm, 0.9)
+    if (k === 4) s.rect(x, 20, 5, 2, PAL.neonWarm, 0.9)
+  }
+  // 下方线路图
+  s.rect(6, 34, s.w - 12, 18, PAL.paper, 0.75)
+  s.line(10, 42, s.w - 10, 42, PAL.rustDark, 0.8)
+  s.px(14, 42, PAL.neonRed)
+  s.px(s.w - 14, 42, PAL.neonRed)
+  // 锈
+  for (let k = 0; k < 6; k++) rustStreak(s, 8 + k * 8, 30, 10 + k, 0x840 + k)
+  rubble(s, 4, g, s.w - 8, 5, 0x841)
+}
+
+/** 阿基拉：瓦砾里的赤色摩托。 */
+function propAkiraBike(s) {
+  const g = s.h - 1
+  const cx = s.w / 2
+  ground(s, cx, 40, 0.36)
+  // 车轮
+  s.disc(cx - 28, g - 12, 11, PAL.ink)
+  s.disc(cx - 28, g - 12, 7, PAL.steelDark)
+  s.disc(cx - 28, g - 12, 2, PAL.steelLight)
+  s.disc(cx + 30, g - 12, 11, PAL.ink)
+  s.disc(cx + 30, g - 12, 7, PAL.steelDark)
+  s.disc(cx + 30, g - 12, 2, PAL.steelLight)
+  // 车架
+  s.poly(
+    [
+      [cx - 24, g - 18],
+      [cx + 24, g - 22],
+      [cx + 20, g - 32],
+      [cx - 20, g - 30],
+    ],
+    PAL.neonRed
+  )
+  s.rect(cx - 20, g - 34, 38, 10, mix(PAL.neonRed, PAL.rust, 0.3))
+  s.rect(cx - 22, g - 36, 10, 6, PAL.steelDark)
+  // 油箱
+  s.ell(cx - 2, g - 34, 14, 7, mix(PAL.neonRed, PAL.white, 0.15))
+  s.line(cx - 12, g - 36, cx + 10, g - 34, PAL.white, 0.5)
+  // 座垫
+  s.rect(cx - 18, g - 38, 14, 5, PAL.ink)
+  // 车灯
+  s.disc(cx + 24, g - 26, 4, PAL.steelDark)
+  s.disc(cx + 24, g - 26, 2.4, PAL.neonWarm)
+  s.speck(cx + 18, g - 34, 16, 12, PAL.neonWarm, 0.1, 0.5)
+  // 车身上的字
+  s.rect(cx - 6, g - 27, 12, 3, PAL.white, 0.8)
+  s.px(cx - 5, g - 26, PAL.neonRed)
+  s.px(cx + 3, g - 26, PAL.neonRed)
+  // 锈 / 瓦砾
+  for (let k = 0; k < 5; k++) rustStreak(s, cx - 20 + k * 10, g - 30, 6 + k, 0x850 + k)
+  rubble(s, 4, g, s.w - 8, 6, 0x851)
+}
+
+/** 赛博朋克：只剩一句口号的霓虹海报。 */
+function propNeonPoster(s) {
+  const g = s.h - 1
+  // 墙面背板
+  s.rect(2, 2, s.w - 4, s.h - 4, PAL.steelDark)
+  s.rect(4, 6, s.w - 8, s.h - 12, mix(PAL.ash, PAL.steel, 0.5))
+  // 撕烂的海报纸
+  s.poly(
+    [
+      [6, 8],
+      [s.w - 6, 10],
+      [s.w - 8, s.h - 16],
+      [10, s.h - 12],
+    ],
+    PAL.paper,
+    0.85
+  )
+  s.poly(
+    [
+      [s.w - 6, 10],
+      [s.w - 14, 18],
+      [s.w - 10, s.h - 17],
+      [s.w - 8, s.h - 16],
+    ],
+    PAL.steelDark,
+    0.95
+  )
+  // 人物剪影
+  s.ell(s.w / 2, 26, 6, 8, PAL.ink)
+  s.poly(
+    [
+      [s.w / 2 - 8, s.h - 16],
+      [s.w / 2 - 5, 34],
+      [s.w / 2 + 5, 34],
+      [s.w / 2 + 8, s.h - 16],
+    ],
+    PAL.ink
+  )
+  // 霓虹字
+  for (let k = 0; k < 4; k++) {
+    s.rect(10, 14 + k * 5, 3, 2, k % 2 ? PAL.neonRed : PAL.neon, 0.9)
+    s.rect(15, 14 + k * 5, 8, 1, PAL.neon, 0.75)
+  }
+  s.line(9, s.h - 12, s.w - 12, s.h - 14, PAL.neonRed, 0.7)
+  s.speck(6, 6, s.w - 12, s.h - 12, PAL.neon, 0.06, 0.4)
+  // 贴纸边缘的锈
+  for (let k = 0; k < 4; k++) rustStreak(s, 8 + k * 8, s.h - 18, 6 + k, 0x860 + k)
+}
+
+/** 尼尔：垃圾场尽头的白色巨鲸骨架。 */
+function propNierWhale(s) {
+  const g = s.h - 1
+  const cx = s.w / 2
+  ground(s, cx, 74, 0.34)
+  const boneCol = mix(PAL.bone, PAL.white, 0.5)
+  const boneDim = mix(PAL.boneDark, PAL.steel, 0.25)
+  // 脊椎：一条向上的弧
+  const spine = []
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12
+    const x = 16 + t * (s.w - 32)
+    const y = g - 18 - Math.sin(t * Math.PI) * 40
+    spine.push([x, y])
+  }
+  for (let i = 0; i < spine.length - 1; i++) {
+    s.thick(spine[i][0], spine[i][1], spine[i + 1][0], spine[i + 1][1], 4, boneDim)
+    s.thick(spine[i][0], spine[i][1] - 1, spine[i + 1][0], spine[i + 1][1] - 1, 2, boneCol)
+  }
+  // 肋骨
+  for (let i = 2; i < spine.length - 2; i += 1) {
+    const [x, y] = spine[i]
+    const span = 26 + Math.sin((i / 12) * Math.PI) * 18
+    s.thick(x, y, x - span * 0.2, y + span, 2, boneDim)
+    s.thick(x, y, x + span * 0.2, y + span, 2, boneDim)
+  }
+  // 头骨
+  const hx = s.w - 26
+  const hy = g - 34
+  s.ell(hx, hy, 16, 12, boneDim)
+  s.ell(hx + 1, hy - 1, 13, 9, boneCol)
+  s.ell(hx + 6, hy - 2, 3, 2, PAL.void)
+  s.line(hx + 6, hy + 4, hx + 14, hy + 3, PAL.void, 0.7)
+  // 尾骨
+  s.thick(16, g - 18, 4, g - 8, 3, boneDim)
+  // 灰尘 / 苔
+  s.speck(8, g - 60, s.w - 16, 56, PAL.dust, 0.06, 0.4)
+  s.speck(8, g - 16, s.w - 16, 12, PAL.mossDead, 0.08, 0.4)
+}
+
+/* ============================================================================
  * 4. 表：kind → 尺寸 / 绘制函数
  * ========================================================================== */
 
@@ -2735,6 +2990,13 @@ const DEFS = {
   cargo_net: { w: 64, h: 28, fn: propCargoNet, seed: 0x6f1 },
   hull_plate: { w: 72, h: 30, fn: propHullPlate, seed: 0x701 },
   beacon: { w: 48, h: 110, fn: propBeacon, seed: 0x711 },
+  vault_door: { w: 96, h: 128, fn: propVaultDoor, seed: 0x901 },
+  word_wall: { w: 104, h: 72, fn: propWordWall, seed: 0x902 },
+  lunar_flower: { w: 26, h: 30, fn: propLunarFlower, seed: 0x903 },
+  metro_sign: { w: 56, h: 66, fn: propMetroSign, seed: 0x904 },
+  akira_bike: { w: 104, h: 58, fn: propAkiraBike, seed: 0x905 },
+  neon_poster: { w: 44, h: 58, fn: propNeonPoster, seed: 0x906 },
+  nier_whale: { w: 184, h: 92, fn: propNierWhale, seed: 0x907 },
 }
 
 export const PROP_ART_KINDS = Object.keys(DEFS)

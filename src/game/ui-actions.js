@@ -70,6 +70,13 @@ export const A = {
     safe(() => g.craft(recipeId))
   },
 
+  // —— 成长 ——
+  spendGrowth(key) {
+    const g = game()
+    if (!g) return
+    safe(() => g.spendGrowth(key))
+  },
+
   // —— 任务/档案 ——
   selectQuest(id) {
     G.ui.selectedQuest = id

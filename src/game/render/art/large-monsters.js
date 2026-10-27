@@ -596,6 +596,227 @@ function drawSwarmCore(s, F) {
 }
 
 /* ============================================================================
+ * 4.5 新增 BOSS：裂爪暴君 / 赛博精神病暴走体 / 超能暴走体
+ * ========================================================================== */
+
+/** 裂爪暴君：半生物半工程机的巨躯，右臂是一只夸张的骨爪。 */
+function drawClawTyrant(s, F) {
+  const g = s.h - 1
+  const i = F.i || 0
+  const atk = F.anim === 'attack'
+  const cx = 74
+  const hipY = g - 44
+  const flesh = mix(PAL.rustDark, PAL.boneDark, 0.35)
+  const fleshL = mix(flesh, PAL.bone, 0.35)
+  const fleshD = mix(PAL.void, flesh, 0.5)
+  const steel = mix(PAL.steel, PAL.rust, 0.25)
+  s.shadow(cx, g - 1, 56, 5, 0.4)
+  // 液压腿
+  for (const side of [-1, 1]) {
+    const lx = cx + side * 22
+    s.thick(lx, hipY, lx + side * 10, g - 30, 10, steel)
+    s.thick(lx + side * 10, g - 30, lx + side * 18, g - 2, 8, mix(PAL.steel, PAL.void, 0.3))
+    s.rect(lx + side * 6 - 5, g - 34, 10, 12, PAL.steelDark)
+    s.line(lx, hipY - 6, lx + side * 10, g - 34, PAL.steelLight, 0.5)
+  }
+  // 躯干：缝合的肉与钢板
+  s.ell(cx, hipY - 22, 34, 30, fleshD)
+  s.ell(cx + 2, hipY - 24, 30, 26, flesh)
+  scrapPlate(s, cx - 26, hipY - 52, 26, 22, steel, 0x501)
+  scrapPlate(s, cx + 6, hipY - 46, 22, 18, mix(steel, PAL.rust, 0.4), 0x502)
+  // 肋缝 / 管线
+  for (let k = 0; k < 4; k++) s.line(cx - 20 + k * 11, hipY - 30, cx - 16 + k * 11, hipY - 6, fleshD, 0.7)
+  s.thick(cx - 12, hipY - 18, cx + 18, hipY - 34, 3, PAL.copper || PAL.rustLight)
+  // 左臂（细小、挡在胸前）
+  s.thick(cx - 28, hipY - 40, cx - 40, hipY - 8, 7, flesh)
+  s.disc(cx - 42, hipY - 6, 6, fleshD)
+  // 右臂：巨爪（攻击帧前伸）
+  const sx = cx + 26
+  const sy = hipY - 44
+  const ex = atk ? cx + 86 : cx + 54
+  const ey = atk ? hipY - 26 : hipY - 10
+  s.thick(sx, sy, ex - 6, ey - 8, 12, steel)
+  s.thick(sx, sy - 2, ex - 8, ey - 10, 8, mix(steel, PAL.bone, 0.4))
+  // 爪的三根骨刃
+  for (let k = 0; k < 3; k++) {
+    const a = -0.5 + k * 0.5
+    const len = atk ? 40 : 30
+    s.poly(
+      [
+        [ex, ey - 4],
+        [ex + Math.cos(a) * len, ey - 6 + Math.sin(a) * len],
+        [ex + 2, ey + 4],
+      ],
+      mix(PAL.bone, PAL.rust, 0.35)
+    )
+    s.line(ex, ey - 2, ex + Math.cos(a) * (len - 4), ey - 4 + Math.sin(a) * (len - 4), PAL.white, 0.55)
+  }
+  s.disc(ex - 2, ey - 4, 7, fleshD)
+  // 头：埋在肩里的小脑袋
+  const hx = cx + 8
+  const hy = hipY - 54
+  s.ell(hx, hy, 12, 10, fleshD)
+  s.ell(hx + 1, hy, 10, 8, fleshL)
+  s.px(hx + 6, hy - 2, PAL.neonRed)
+  s.disc(hx + 6, hy - 2, 3, PAL.neonRed, 1)
+  F.g.push({ x: hx + 6, y: hy - 2, r: 12, c: PAL.neonRed, p: 0.6 })
+  // 背脊外露的发光核心
+  s.disc(cx - 10, hipY - 40, 6, PAL.void)
+  s.disc(cx - 10, hipY - 40, 4, PAL.neonWarm)
+  F.g.push({ x: cx - 10, y: hipY - 40, r: 22, c: PAL.neonWarm, p: 0.7 })
+  if (atk) {
+    for (let k = 0; k < 8; k++) s.px(cx + 70 + s.r() * 30, g - 2 - s.r() * 8, PAL.dust, 0.5)
+    F.g.push({ x: ex + 18, y: ey - 2, r: 20, c: PAL.neonWarm, p: 0.5 })
+  }
+  s.speck(cx - 34, hipY - 56, 70, 60, PAL.rustDark, 0.08, 0.6)
+}
+
+/** 赛博精神病暴走体：被植入体吞掉的人形，手臂就是枪。 */
+function drawCyberPsychoBoss(s, F) {
+  const g = s.h - 1
+  const i = F.i || 0
+  const atk = F.anim === 'attack'
+  const cx = 44
+  const hipY = g - 34
+  const coat = mix(PAL.steel, PAL.neonRed, 0.18)
+  const coatD = mix(PAL.void, coat, 0.55)
+  const skin = mix(PAL.boneDark, PAL.rust, 0.3)
+  s.shadow(cx, g - 1, 24, 3, 0.36)
+  // 腿
+  for (const side of [-1, 1]) {
+    s.thick(cx + side * 6, hipY, cx + side * 9, g - 12, 6, coatD)
+    s.thick(cx + side * 9, g - 12, cx + side * 11, g - 2, 5, PAL.ink)
+  }
+  // 躯干 + 风衣
+  s.poly(
+    [
+      [cx - 14, hipY - 40],
+      [cx + 14, hipY - 40],
+      [cx + 18, g - 8],
+      [cx - 18, g - 8],
+    ],
+    coatD
+  )
+  s.poly(
+    [
+      [cx - 11, hipY - 38],
+      [cx + 11, hipY - 38],
+      [cx + 14, g - 12],
+      [cx - 14, g - 12],
+    ],
+    coat
+  )
+  s.line(cx - 11, hipY - 36, cx - 12, g - 14, PAL.neon, 0.7)
+  s.line(cx + 11, hipY - 36, cx + 12, g - 14, PAL.neonRed, 0.6)
+  s.px(cx, hipY - 26, PAL.neonWarm, 1)
+  // 左臂：正常
+  s.thick(cx - 12, hipY - 34, cx - 18, hipY - 6, 5, coatD)
+  // 右臂：义体炮（攻击时抬平）
+  const sy = hipY - 34
+  const gx = atk ? cx + 34 : cx + 24
+  const gy = atk ? sy - 4 : sy + 10
+  s.thick(cx + 12, sy, gx - 4, gy, 7, mix(PAL.steel, PAL.neonRed, 0.25))
+  s.rect(gx - 5, gy - 4, 14, 8, PAL.steelDark)
+  s.rect(gx - 2, gy - 2, 8, 3, PAL.steelLight)
+  s.px(gx + 5, gy - 1, PAL.neonRed)
+  // 头 + 莫西干 + 面罩管
+  const hy = hipY - 50
+  s.ell(cx, hy, 9, 11, skin)
+  s.ell(cx + 1, hy - 1, 7.5, 9, mix(skin, PAL.bone, 0.3))
+  for (let k = 0; k < 5; k++) {
+    s.poly(
+      [
+        [cx - 3 + k * 2, hy - 9],
+        [cx - 1.5 + k * 2, hy - 19 - (k % 2) * 3],
+        [cx + 0.5 + k * 2, hy - 9],
+      ],
+      k % 2 ? PAL.neonRed : PAL.neonWarm
+    )
+  }
+  s.rect(cx + 1, hy - 3, 6, 3, PAL.void)
+  s.px(cx + 4, hy - 2, PAL.neonRed)
+  F.g.push({ x: cx + 4, y: hy - 2, r: 12, c: PAL.neonRed, p: 0.6 })
+  s.thick(cx + 4, hy + 2, cx + 10, hipY - 30, 2, PAL.steel)
+  if (atk) {
+    s.poly(
+      [
+        [gx + 9, gy - 4],
+        [gx + 22, gy],
+        [gx + 9, gy + 4],
+      ],
+      PAL.neonWarm
+    )
+    F.g.push({ x: gx + 14, y: gy, r: 22, c: PAL.neonWarm, p: 0.8 })
+  }
+  // 全身霓虹描边
+  F.g.push({ x: cx, y: hipY - 10, r: 40, c: PAL.neonRed, p: 0.2 })
+  s.speck(cx - 20, hipY - 40, 44, 62, PAL.rustDark, 0.06, 0.5)
+}
+
+/** 超能暴走体：没有皮肤的能量人形，光带从胸腔里长出来。 */
+function drawEsperBerserk(s, F) {
+  const g = s.h - 1
+  const i = F.i || 0
+  const atk = F.anim === 'attack'
+  const cx = 60
+  const hipY = g - 30
+  const aura = 0x9fd3e0
+  const auraL = PAL.white
+  const auraD = mix(PAL.void, PAL.toxicDark, 0.45)
+  s.shadow(cx, g - 1, 34, 4, 0.3)
+  // 不稳定的双腿：粒子化的轮廓
+  for (let k = 0; k < 2; k++) {
+    const side = k ? 1 : -1
+    const wob = Math.sin(i * 0.9 + k) * 3
+    s.thick(cx + side * 8, hipY, cx + side * 12 + wob, g - 2, 7, auraD)
+    s.thick(cx + side * 8, hipY - 2, cx + side * 11 + wob, g - 4, 4, aura)
+  }
+  // 躯干
+  s.ell(cx, hipY - 30, 30, 28, auraD)
+  s.ell(cx, hipY - 32, 26, 24, mix(PAL.ash, aura, 0.35))
+  // 胸腔核心
+  s.disc(cx, hipY - 32, 14, PAL.void)
+  s.disc(cx, hipY - 32, 11, aura)
+  s.disc(cx, hipY - 32, 6, auraL)
+  F.g.push({ x: cx, y: hipY - 32, r: 40, c: aura, p: 1 })
+  // 能量触须
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * TAU + Math.sin(i * 0.6 + k) * 0.2
+    const len = 34 + Math.sin(i + k) * 6
+    const ex = cx + Math.cos(a) * len
+    const ey = hipY - 32 + Math.sin(a) * len * 0.8
+    s.thick(cx + Math.cos(a) * 12, hipY - 32 + Math.sin(a) * 12, ex, ey, 2, aura)
+    s.px(ex, ey, auraL, 0.9)
+  }
+  // 头：模糊的人形轮廓 + 两只亮眼
+  const hy = hipY - 62
+  s.ell(cx, hy, 13, 14, auraD)
+  s.ell(cx, hy - 1, 11, 12, mix(PAL.ash, aura, 0.3))
+  s.ell(cx - 5, hy - 2, 3, 2, PAL.void)
+  s.ell(cx + 5, hy - 2, 3, 2, PAL.void)
+  s.disc(cx - 5, hy - 2, 2, auraL)
+  s.disc(cx + 5, hy - 2, 2, auraL)
+  F.g.push({ x: cx - 5, y: hy - 2, r: 8, c: aura, p: 0.8 })
+  F.g.push({ x: cx + 5, y: hy - 2, r: 8, c: aura, p: 0.8 })
+  // 放射的能量弧
+  for (let k = 0; k < 5; k++) {
+    const r = 44 + k * 9 + Math.sin(i + k) * 3
+    for (let q = 0; q < 8; q++) {
+      const a = (q / 8) * TAU + (k * 0.3)
+      s.px(cx + Math.cos(a) * r, hipY - 32 + Math.sin(a) * r * 0.8, aura, 0.35)
+    }
+  }
+  if (atk) {
+    // 施法：双掌抬起 + 光弹
+    s.thick(cx - 14, hipY - 46, cx - 28, hipY - 62, 4, aura)
+    s.thick(cx + 14, hipY - 46, cx + 28, hipY - 62, 4, aura)
+    s.disc(cx - 30, hipY - 64, 5, auraL)
+    s.disc(cx + 30, hipY - 64, 5, auraL)
+    F.g.push({ x: cx, y: hipY - 70, r: 34, c: aura, p: 0.7 })
+  }
+}
+
+/* ============================================================================
  * 5. 帧合成
  * ========================================================================== */
 
@@ -604,6 +825,9 @@ const LARGE_DEFS = {
   sky_warden: { w: 180, h: 120, draw: drawSkyWarden, seed: 0x2a2 },
   mimic_beast: { w: 140, h: 100, draw: drawMimicBeast, seed: 0x2a3 },
   swarm_core: { w: 150, h: 110, draw: drawSwarmCore, seed: 0x2a4 },
+  claw_tyrant: { w: 170, h: 196, draw: drawClawTyrant, seed: 0x2a5 },
+  cyberpsycho_boss: { w: 90, h: 140, draw: drawCyberPsychoBoss, seed: 0x2a6 },
+  esper_berserk: { w: 120, h: 170, draw: drawEsperBerserk, seed: 0x2a7 },
 }
 
 export const LARGE_MONSTER_IDS = Object.keys(LARGE_DEFS)
@@ -613,6 +837,9 @@ const LARGE_OUTLINE = {
   sky_warden: mix(PAL.void, PAL.steel, 0.24),
   mimic_beast: mix(PAL.void, PAL.rustDark, 0.22),
   swarm_core: mix(PAL.void, PAL.toxicDark, 0.26),
+  claw_tyrant: mix(PAL.void, PAL.rustDark, 0.24),
+  cyberpsycho_boss: mix(PAL.void, PAL.neonRed, 0.2),
+  esper_berserk: mix(PAL.void, PAL.toxicDark, 0.24),
 }
 
 const LARGE_WARM = {
@@ -620,6 +847,9 @@ const LARGE_WARM = {
   sky_warden: PAL.steelBlue,
   mimic_beast: PAL.dust,
   swarm_core: PAL.toxicDark,
+  claw_tyrant: PAL.rustDark,
+  cyberpsycho_boss: PAL.neonRed,
+  esper_berserk: PAL.toxicDark,
 }
 
 function largeFrame(id, P) {

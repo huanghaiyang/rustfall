@@ -39,6 +39,8 @@ import { ModLoader, setModEnabled as persistModEnabled, getModEnabledMap } from 
 import { DayNightSystem } from './systems/daynight.js'
 import { WEATHERS, DAY_PARTS } from './config.js'
 import { bindGame } from './ui-actions.js'
+import { addXp, initGrowth, spendGrowth as applyGrowthPoint } from './systems/growth.js'
+import { injectEasterEggs, handleEgg } from './world/easter-eggs.js'
 import { clamp, damp } from './utils.js'
 
 const SFX_MAP = {
@@ -322,6 +324,11 @@ export class Game {
     } catch (e) {
       console.warn('[rustfall] 地形装饰失败', e)
     }
+    try {
+      injectEasterEggs(gen, regionId, roomId)
+    } catch (e) {
+      console.warn('[rustfall] 彩蛋注入失败', e)
+    }
     const edits = this.terrainEdits[key]
     if (edits) {
       for (const [tile, type] of Object.entries(edits)) {
@@ -393,6 +400,12 @@ export class Game {
     Events.emit(EV.ROOM_ENTER, { regionId, roomId })
     if (!opts.preview) {
       G.stats.roomsExplored = (G.stats.roomsExplored || 0) + 1
+      // 首次进入某房间给探索经验
+      const vk = `visited:${regionId}:${roomId}`
+      if (!G.flags[vk]) {
+        G.flags[vk] = true
+        addXp(12)
+      }
       if (this.quests) this.quests.notify('reach', { roomId, regionId })
       this.saveGame()
       if (this.room.data.cages?.length) toast('这一带有求救信号', 'info', 2.6)
@@ -592,6 +605,9 @@ export class Game {
     this.time += dt
     G.hurt = Math.max(0, G.hurt - dt * 2)
     G.flash = Math.max(0, G.flash - dt * 2.6)
+    // 手柄 UI 导航（面板 / 暂停 / 标题 / 对话选项），由 gamepad-ui 注入。
+    // 先于全局按键处理，便于在对话中标记「当前焦点在选项上」。
+    this.padUi?.(this.input, dt)
     this.handleGlobalKeys()
     const phase = G.phase
     const v = this.viewSize()
@@ -660,6 +676,7 @@ export class Game {
     }
     this.ecosystem?.update?.(dt)
     this.updateWeatherCycle(dt)
+    this.updateBuffs(dt)
     this.updateProjectiles(dt)
     this.interactTarget = this.findInteractable()
     this.updateInteractHint()
@@ -671,6 +688,42 @@ export class Game {
     this.updateScanFx(dt)
     if (this.quests) this.quests.update?.(dt)
     if (this.rescue) this.rescue.atShelter?.(G.roomId)
+  }
+
+  updateBuffs(dt) {
+    const list = G.buffs
+    if (!list || !list.length) return
+    let changed = false
+    for (let i = list.length - 1; i >= 0; i--) {
+      const b = list[i]
+      if (!b) continue
+      b.t -= dt
+      if (b.t <= 0) {
+        list.splice(i, 1)
+        changed = true
+        if (b.name) notify(`状态结束：${b.name}`, 'info', 2)
+      }
+    }
+    if (changed) this.robot?.refreshStats()
+  }
+
+  /** 施加一个限时增益（同名覆盖） */
+  addBuff(key, name, dur, stats = {}) {
+    if (!key || !(dur > 0)) return null
+    const list = G.buffs || (G.buffs = [])
+    let b = list.find((x) => x.key === key)
+    if (!b) {
+      b = { key, name: name || key, t: dur, dur, stats }
+      list.push(b)
+    } else {
+      b.t = dur
+      b.dur = dur
+      b.name = name || b.name
+      b.stats = stats
+    }
+    notify(`状态：${b.name}（${Math.round(dur)}s）`, 'good', 2)
+    this.robot?.refreshStats()
+    return b
   }
 
   updateFps(dt) {
@@ -685,6 +738,8 @@ export class Game {
 
   handleGlobalKeys() {
     const input = this.input
+    // 记录本帧开始时的面板状态：避免“开面板”与“同键收面板”在同一帧互相抵消
+    const panelBefore = G.ui.panel
     if (input.wasPressed('mute')) this.toggleMute()
     if (input.wasPressed('help')) {
       G.ui.panel = G.ui.panel === 'help' ? null : 'help'
@@ -709,14 +764,29 @@ export class Game {
       if (input.wasPressed('archive')) this.togglePanel('archive')
       if (input.wasPressed('companions')) this.togglePanel('companions')
       if (input.wasPressed('mods')) this.togglePanel('mods')
+      if (input.wasPressed('growth')) this.togglePanel('growth')
       if (input.wasPressed('tool1')) this.switchTool('shovel')
       if (input.wasPressed('tool2')) this.switchTool('pickaxe')
       if (input.wasPressed('tool3')) this.switchTool('welder')
       if (input.wasPressed('tool4')) this.switchTool('scanner')
+      if (input.wasPressed('toolPrev')) this.cycleTool(-1)
+      if (input.wasPressed('toolNext')) this.cycleTool(1)
+      if (input.wasPressed('weaponPrev')) this.switchWeapon(-1)
+      if (input.wasPressed('weaponNext')) this.switchWeapon(1)
       if (input.wasPressed('chassis')) this.cycleChassis()
     }
+    // 面板打开时，用与打开面板相同的键收回（手柄/键盘都适用）
+    if (G.ui.panel && G.ui.panel === panelBefore && !G.dialogue.active) {
+      const keyOfPanel = { inventory: 'inventory', quests: 'quests', archive: 'archive', companions: 'companions', mods: 'mods', growth: 'growth' }
+      const key = keyOfPanel[G.ui.panel]
+      if (key && input.wasPressed(key)) {
+        closePanel()
+        this.sfx('uiClick')
+      }
+    }
     if (G.phase === 'playing' && G.dialogue.active) {
-      if (input.wasPressed('interact') || input.wasPressed('jump')) this.dialogue.advance()
+      // 手柄焦点落在选项按钮上时，A 由 UI 点击处理，不再重复推进文本
+      if (!this._padUiFocus && (input.wasPressed('interact') || input.wasPressed('jump'))) this.dialogue.advance()
       if (input.wasPressed('Digit1')) this.dialogue.choose(0)
       if (input.wasPressed('Digit2')) this.dialogue.choose(1)
       if (input.wasPressed('Digit3')) this.dialogue.choose(2)
@@ -964,6 +1034,7 @@ export class Game {
       const d = Math.hypot(dx, dy)
       const range = it.radius || INTERACT_RANGE
       if (d > range) continue
+      if (it.kind === 'loot' && it.drop?.picked) continue
       if (Math.abs(dx) > 14 && Math.sign(dx) !== r.facing) continue
       const score = d + (it.kind === 'npc' ? 4 : 0)
       if (score < bestScore) {
@@ -1006,16 +1077,19 @@ export class Game {
         sub = it.drop?.buried ? '需要工兵铲' : it.label || ''
         break
       case 'destructible':
-        label = '砸开'
+        label = it.hp > 0 ? '砸开' : '已破坏'
         break
       case 'prop':
-        label =
-          it.propKind === 'workbench'
+        label = it.def?.egg
+          ? `调查 · ${it.def.name || '异常物件'}`
+          : it.propKind === 'workbench'
             ? '使用工作台'
             : it.propKind === 'terminal'
               ? '读取终端'
               : it.def?.loot
-                ? '搜索'
+                ? it.opened
+                  ? '已搜查'
+                  : '搜索'
                 : '查看'
         break
       default:
@@ -1066,11 +1140,13 @@ export class Game {
       return
     }
     if (it.kind === 'destructible') {
+      if (it.hp <= 0) return toast('这里已经空了', 'info', 1.4)
       it.hp = (it.hp || 2) - 1
       this.sfx('land', { vol: 0.5 })
       this.particles.emitMany('dust', it.x, it.y - 10, 8)
       if (it.hp <= 0) {
         it.mesh.visible = false
+        if (it.flagKey) G.flags[it.flagKey] = true
         const drops = rollLoot(tableFor(this.room.data.biome, it.propKind), Math.random)
         for (const d of drops) this.dropLoot(d.id, it.x, it.y, { n: d.n })
         toast('箱子被砸开了', 'good', 1.6)
@@ -1109,6 +1185,10 @@ export class Game {
 
   interactProp(it) {
     const def = it.def || {}
+    if (def.egg) {
+      handleEgg(this, it, def)
+      return
+    }
     if (def.interact === 'rescue') {
       if (this.rescue) {
         const res = this.rescue.interact(it.propKind || 'cage')
@@ -1116,8 +1196,32 @@ export class Game {
       }
       return
     }
+    // 工具门槛：拆焊/挖掘需要对应工具握在手上（工作台保持随时可用）
+    const TOOL_GATE = { welder: 1, pickaxe: 1, shovel: 1 }
+    if (
+      def.interact &&
+      def.interact !== 'rescue' &&
+      def.interact !== 'rest' &&
+      TOOL_GATE[def.interact] &&
+      it.propKind !== 'workbench' &&
+      G.toolId !== def.interact
+    ) {
+      const toolDef = Content.get(KIND.ITEM, def.interact)
+      return toast(`需要装备${toolDef?.name || def.interact}`, 'warn', 2.2)
+    }
+    if (it.propKind === 'campfire') {
+      this.addBuff('warmth', '余温', 60, { armor: 0.04 })
+      this.robot.heal(10)
+      this.particles.emitMany('spark', it.x, it.y - 6, 10)
+      return toast('在火边烤了一会儿，机体暖和起来。', 'good', 2.4)
+    }
+    // 用工具拆/挖时给机械臂一个动作 + 粒子
+    if (def.interact === 'welder' || def.interact === 'pickaxe' || def.interact === 'shovel') {
+      this.robot?.playUse?.(def.interact === 'welder' ? 'repair' : 'dig')
+    }
     if (def.loot && !it.opened) {
       it.opened = true
+      if (it.flagKey) G.flags[it.flagKey] = true
       if (it.mesh) it.mesh.material.opacity = 0.55
       const drops = rollLoot(def.loot, Math.random)
       for (const d of drops.length ? drops : [{ id: 'scrap_plate', n: 1 }]) {
@@ -1146,10 +1250,12 @@ export class Game {
       return
     }
     if (it.propKind === 'grave') {
+      if (it.opened) return toast('墓碑前已经搜过了。', 'info', 1.6)
       const drops = rollLoot(tableFor(this.room.data.biome, 'grave'), Math.random)
       for (const d of drops) this.dropLoot(d.id, it.x, it.y - 20, { n: d.n })
       toast('墓碑前放着几样东西。', 'info', 2.4)
       it.opened = true
+      if (it.flagKey) G.flags[it.flagKey] = true
       return
     }
     toast('没什么可做的。', 'info', 1.4)
@@ -1177,8 +1283,7 @@ export class Game {
       if (!def) continue
       const flag = `weapon:${this.roomId}:${w.id}:${Math.round(w.x)}:${Math.round(w.y)}`
       if (G.flags[flag]) continue
-      G.flags[flag] = true
-      const drop = new LootDrop(this, w.id, w.x, w.y, {})
+      const drop = new LootDrop(this, w.id, w.x, w.y, { flagKey: flag })
       this.room.lootDrops.push(drop)
       this.room.group.add(drop.group)
       this.room.interactables.push({
@@ -1198,7 +1303,9 @@ export class Game {
             ? 'ammo_scrap'
             : 'ammo_9mm'
       if (Content.get(KIND.ITEM, ammoId)) {
-        const ammo = new LootDrop(this, ammoId, w.x + 18, w.y, {})
+        const ammo = new LootDrop(this, ammoId, w.x + 18, w.y, {
+          flagKey: `ammo:${this.roomId}:${ammoId}:${Math.round(w.x)}:${Math.round(w.y)}`,
+        })
         this.room.lootDrops.push(ammo)
         this.room.group.add(ammo.group)
       }
@@ -1301,6 +1408,10 @@ export class Game {
     G.stats.looted++
     this.quests?.notify('collect', { itemId, n: 1 })
     if (def?.lore) this.addArchive(itemId, def)
+    // 稀有度换算经验：越难找的东西越值经验
+    const RARITY_XP = { 0: 2, 1: 3, 2: 5, 3: 9, 4: 16, 5: 26 }
+    const rarity = Number(def?.rarity ?? 0)
+    addXp(RARITY_XP[rarity] ?? 3)
     this.sfx('pickup', { vol: 0.5, rate: 1.1 + Math.random() * 0.2 })
     notify(`拾取 ${def?.name || itemId}`, 'loot', 2)
   }
@@ -1318,12 +1429,29 @@ export class Game {
     G.bestiary[monster.id] = (G.bestiary[monster.id] || 0) + 1
     this.quests?.notify('kill', { monsterId: monster.id, n: 1 })
     this.particles.emitMany('blood', monster.px, monster.py, 14)
+    // 经验：定义里的 xp 优先，否则按体型/精英估算
+    const baseXp = Number(monster.def?.xp)
+    const fallback = monster.boss ? 90 : monster.large || monster.isLarge ? 35 : 8
+    addXp(Number.isFinite(baseXp) && baseXp > 0 ? baseXp : fallback)
     // director 需要自己移除尸体/计数
     try {
       this.director?.onMonsterKilled?.(monster)
     } catch (e) {
       /* ignore */
     }
+  }
+
+  /** 成长面板加点（A.spendGrowth 门面调用） */
+  spendGrowth(key) {
+    const res = applyGrowthPoint(key)
+    if (res.ok) {
+      this.robot?.refreshStats()
+      this.sfx('servo', { vol: 0.45 })
+      this.saveGame()
+    } else if (res.reason === 'max' || res.reason === 'points') {
+      this.sfx('uiClick', { vol: 0.4 })
+    }
+    return res
   }
 
   // ================================================================ 道具 / 机体
@@ -1352,31 +1480,55 @@ export class Game {
       return
     }
     let acted = false
+    let useKind = 'use'
     if (effect.energy) {
       G.power = Math.min(G.powerMax, G.power + effect.energy)
       G.energy = Math.min(G.energyMax, G.energy + effect.energy * 20)
       notify(`+${effect.energy} 电量`, 'good', 2)
       acted = true
+      useKind = 'energy'
     }
     if (effect.heal) {
       this.robot.heal(effect.heal)
       notify(`修复 ${effect.heal} 点结构`, 'good', 2)
       acted = true
+      useKind = 'heal'
     }
     if (effect.repair) {
       this.robot.heal(effect.repair)
       notify(`维修包修复了 ${effect.repair} 点结构`, 'good', 2)
       acted = true
+      useKind = 'repair'
     }
     if (effect.scan) {
       this.scanPulseFx(this.robot.centerX, this.robot.centerY)
       acted = true
+      useKind = 'scan'
     }
     if (effect.cleanse) {
       G.toxicity = 0
       toast('酸中和剂生效了', 'good', 1.8)
       acted = true
+      useKind = 'bubble'
     }
+    if (effect.radClear) {
+      G.toxicity = Math.max(0, G.toxicity - 60)
+      G.exposed = Math.max(0, G.exposed - 40)
+      this.addBuff('radshield', '抗辐射涂层', 45, { armor: 0.06 })
+      acted = true
+      useKind = 'bubble'
+    }
+    if (effect.light) {
+      this.addBuff('flare', '照明信号', 25, {})
+      acted = true
+      useKind = 'spark'
+    }
+    if (effect.buff && typeof effect.buff === 'object') {
+      const b = effect.buff
+      this.addBuff(b.key || itemId, b.name || def.name, b.dur || 20, b.stats || {})
+      acted = true
+    }
+    if (acted) this.robot?.playUse?.(useKind)
     if (!acted) {
       toast('用了，但好像没什么用。', 'info', 1.6)
     }
@@ -1514,6 +1666,45 @@ export class Game {
     this.sfx('uiClick', { vol: 0.5 })
     toast(`工具：${getTool(id).name}`, 'info', 1.2)
     Events.emit(EV.TOOL_SWITCH, { toolId: id })
+  }
+
+  /** 按顺序循环切换工具（手柄 LB/RB） */
+  cycleTool(dir = 1) {
+    if (!TOOLS.length) return
+    const idx = TOOLS.findIndex((t) => t.id === G.toolId)
+    const next = TOOLS[(idx + (dir > 0 ? 1 : TOOLS.length - 1)) % TOOLS.length]
+    if (next) this.switchTool(next.id)
+  }
+
+  /** 在背包中的武器之间循环（手柄十字键左右） */
+  switchWeapon(dir = 1) {
+    if (!this.weapons) return
+    const slots = this.inventory?.slots || []
+    const ids = []
+    const names = {}
+    for (const s of slots) {
+      if (!s || !s.item) continue
+      if (s.item.category !== 'weapon') continue
+      if (!ids.includes(s.id)) {
+        ids.push(s.id)
+        names[s.id] = s.item.name || s.id
+      }
+    }
+    if (ids.length === 0) {
+      toast('背包里没有可切换的武器', 'info', 1.6)
+      return
+    }
+    if (ids.length === 1) {
+      this.weapons.equip(ids[0])
+      toast(`武器：${names[ids[0]]}`, 'info', 1.4)
+      return
+    }
+    const cur = this.weapons.weaponId
+    let idx = ids.indexOf(cur)
+    idx = idx < 0 ? 0 : (idx + (dir > 0 ? 1 : ids.length - 1)) % ids.length
+    const res = this.weapons.equip(ids[idx])
+    if (res?.ok) toast(`武器：${names[ids[idx]]}`, 'info', 1.4)
+    else toast(res?.reason || '无法切换武器', 'warn', 1.8)
   }
 
   // ================================================================ 门 / 转场
@@ -1755,6 +1946,7 @@ export class Game {
     this.audioUnlock()
     resetState()
     clearToast()
+    initGrowth()
     G.chassisId = chassisId
     G.chassisUnlocked = this.computeUnlockedChassis()
     G.phase = 'playing'
@@ -1830,6 +2022,16 @@ export class Game {
     G.flags = save.flags || {}
     G.bestiary = save.bestiary || {}
     G.stats = save.stats || G.stats
+    initGrowth()
+    if (save.growth && typeof save.growth === 'object') {
+      for (const k of Object.keys(save.growth)) {
+        if (k === 'perks') G.growth.perks = { ...(G.growth.perks || {}), ...(save.growth.perks || {}) }
+        else if (k in G.growth) G.growth[k] = save.growth[k]
+      }
+    }
+    G.buffs = Array.isArray(save.buffs)
+      ? save.buffs.filter((b) => b && b.key && Number(b.t) > 0).map((b) => ({ ...b }))
+      : []
     G.timeLeft = save.timeLeft ?? CYCLE_TIME
     G.cycleTotal = CYCLE_TIME
     if (save.settings) Object.assign(G.settings, save.settings)
@@ -1958,6 +2160,8 @@ export class Game {
       flags: G.flags,
       bestiary: G.bestiary,
       stats: G.stats,
+      growth: JSON.parse(JSON.stringify(G.growth || {})),
+      buffs: (G.buffs || []).map((b) => ({ ...b })),
       rescue: this.rescue?.serialize?.() || {},
       dayNight: this.dayNight?.serialize?.() || null,
       settings: { ...G.settings },

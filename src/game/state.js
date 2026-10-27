@@ -99,9 +99,22 @@ export const G = reactive({
   inventory: { slots: [], weight: 0, capacityWeight: BASE_CARRY_WEIGHT, slotsMax: INVENTORY_SLOTS },
   equipped: { joint: null, cpu: null, power: null, armor: null, sensor: null, utility: null },
 
+  // 成长：等级 / 经验 / 属性点 / 加点
+  growth: {
+    level: 1,
+    xp: 0,
+    xpNext: 60,
+    totalXp: 0,
+    points: 0,
+    perks: { hull: 0, power: 0, servo: 0, armor: 0, cargo: 0, optics: 0 },
+    levelsGained: 0,
+  },
+  // 临时增益（消耗品/道具触发，按秒衰减）
+  buffs: [],
+
   // UI
   ui: {
-    panel: null, // inventory | quests | archive | mods | help | chassis | map
+    panel: null, // inventory | quests | archive | mods | help | chassis | map | growth
     inventoryTab: 'all',
     selectedItem: null,
     selectedQuest: null,
@@ -266,5 +279,15 @@ export function resetState() {
   G.inventory.slots = []
   G.inventory.weight = 0
   G.equipped = { joint: null, cpu: null, power: null, armor: null, sensor: null, utility: null }
+  G.growth = {
+    level: 1,
+    xp: 0,
+    xpNext: 60,
+    totalXp: 0,
+    points: 0,
+    perks: { hull: 0, power: 0, servo: 0, armor: 0, cargo: 0, optics: 0 },
+    levelsGained: 0,
+  }
+  G.buffs = []
 }
 

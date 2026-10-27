@@ -826,6 +826,282 @@ function drawHulkbot(s, F) {
 }
 
 /* ============================================================================
+ * 3.5 新增种群：辐尸 / 隧道猎犬 / 义体螳螂 / 赛博精神病
+ * ========================================================================== */
+
+/** 辐尸：佝偻的人形，皮包骨，一只发光的眼睛。 */
+function drawGhoulHusk(s, F) {
+  const g = s.h - 1
+  const i = F.i || 0
+  const atk = F.anim === 'attack'
+  const step = Math.sin((i / 3) * TAU) * 2
+  const cx = 17
+  const hipY = g - 9
+  const skin = mix(PAL.boneDark, PAL.rustDark, 0.45)
+  const skinL = mix(skin, PAL.bone, 0.35)
+  const skinD = mix(PAL.void, skin, 0.55)
+  s.shadow(cx, g - 0.5, 10, 1.4, 0.3)
+  // 腿：一前一后
+  s.thick(cx - 3, hipY, cx - 5 + step, g - 1, 2.4, skinD)
+  s.thick(cx + 3, hipY, cx + 5 - step, g - 1, 2.4, skin)
+  s.px(cx - 5 + step, g - 1, PAL.bone, 0.7)
+  s.px(cx + 5 - step, g - 1, PAL.bone, 0.7)
+  // 躯干：肋骨外露
+  s.ell(cx, hipY - 7, 7, 9, skinD)
+  s.ell(cx + 1, hipY - 7, 6, 8, skin)
+  for (let k = 0; k < 4; k++) {
+    s.line(cx - 4, hipY - 12 + k * 2.2, cx + 4, hipY - 11 + k * 2.2, skinL, 0.55)
+  }
+  // 破布
+  s.rect(cx - 6, hipY - 2, 12, 3, mix(PAL.rust, PAL.ash, 0.4), 0.85)
+  // 手臂：晃荡 / 扑击时抬起
+  const armY = atk ? hipY - 16 : hipY - 4
+  s.thick(cx + 5, hipY - 11, cx + 11, armY, 2.2, skin)
+  s.thick(cx - 5, hipY - 11, cx - 8, armY + 3, 2.2, skinD)
+  s.px(cx + 12, armY, PAL.bone, 0.8)
+  s.px(cx - 9, armY + 4, PAL.bone, 0.7)
+  // 头：前倾
+  const hx = cx + 5
+  const hy = hipY - 17
+  s.ell(hx, hy, 5.5, 5, skinD)
+  s.ell(hx + 0.5, hy, 4.6, 4, skinL)
+  // 一只眼 + 眼窝
+  s.ell(hx + 2, hy - 1, 2.4, 2, PAL.void)
+  s.px(hx + 2, hy - 1, PAL.toxicGlow)
+  F.g.push({ x: hx + 2, y: hy - 1, r: 6, c: PAL.toxicGlow, p: 0.45 })
+  if (atk) {
+    // 张嘴 / 嘶叫
+    s.rect(hx + 1, hy + 2, 4, 3, PAL.void)
+    s.px(hx + 2, hy + 2, PAL.bone, 0.8)
+    s.px(hx + 3, hy + 4, PAL.bone, 0.8)
+  } else {
+    s.line(hx, hy + 3, hx + 5, hy + 3, PAL.ink, 0.7)
+  }
+  // 烂皮 / 渗液
+  s.speck(cx - 8, hipY - 14, 16, 20, PAL.rustDark, 0.12, 0.5)
+  s.px(cx + 1, hipY - 3, PAL.toxicDark, 0.35)
+}
+
+/** 隧道猎犬：无眼、四足、脊背息肉，嘴咧到耳根。 */
+function drawTunnelHound(s, F) {
+  const g = s.h - 1
+  const i = F.i || 0
+  const atk = F.anim === 'attack'
+  const cy = 12
+  const cx = 22
+  const hide = mix(PAL.ash, PAL.rustDark, 0.35)
+  const hideL = mix(hide, PAL.boneDark, 0.3)
+  const hideD = mix(PAL.void, hide, 0.5)
+  s.shadow(cx, g - 0.5, 16, 1.6, 0.3)
+  // 四条腿：对角步态
+  const legs = [
+    [-10, -1],
+    [-7, 1],
+    [8, 1],
+    [11, -1],
+  ]
+  for (let k = 0; k < legs.length; k++) {
+    const [ox, side] = legs[k]
+    const ph = (i / 2) * TAU + (k % 2 ? Math.PI : 0)
+    const lift = Math.max(0, Math.cos(ph)) * 2.6
+    const fx = cx + ox + Math.sin(ph) * 3
+    s.thick(cx + ox, cy + 4, cx + ox + side * 2, g - 3, 1.8, hideD)
+    s.thick(cx + ox + side * 2, g - 3, fx, g - 1 - lift, 2, hide)
+    s.px(fx, g - 1 - lift, PAL.ink)
+  }
+  // 躯干 + 脊背息肉
+  s.ell(cx, cy + 2, 17, 6, hideD)
+  s.ell(cx, cy + 1, 16, 5.2, hide)
+  s.ell(cx + 2, cy - 1, 13, 4, hideL)
+  for (let k = 0; k < 5; k++) {
+    const bx = cx - 10 + k * 5
+    s.poly(
+      [
+        [bx, cy - 4],
+        [bx + 1.5, cy - 8 - (k % 2)],
+        [bx + 3, cy - 4],
+      ],
+      hideD
+    )
+  }
+  // 头：无眼，长吻
+  const hx = cx + 15
+  const hy = cy + 1
+  s.ell(hx, hy, 7, 5, hideD)
+  s.ell(hx + 1, hy, 6, 4, hideL)
+  s.poly(
+    [
+      [hx + 4, hy - 2],
+      [hx + 11, hy - 1],
+      [hx + 11, hy + 3],
+      [hx + 4, hy + 3],
+    ],
+    hideD
+  )
+  // 牙
+  for (let k = 0; k < 4; k++) {
+    s.px(hx + 6 + k * 1.6, hy + 3, PAL.bone, 0.9)
+  }
+  if (atk) {
+    s.rect(hx + 5, hy + 1, 6, 3, PAL.void)
+    s.px(hx + 6, hy, PAL.bone)
+    s.px(hx + 9, hy, PAL.bone)
+    s.px(hx + 9, hy + 3, PAL.bloodDark, 0.8)
+  }
+  // 耳朵：贴着头
+  s.poly(
+    [
+      [hx - 3, hy - 4],
+      [hx - 1, hy - 9],
+      [hx + 1, hy - 4],
+    ],
+    hideD
+  )
+  s.speck(cx - 16, cy - 4, 32, 12, PAL.rustDark, 0.1, 0.5)
+}
+
+/** 义体螳螂：铬合金镰臂，霓虹接缝。 */
+function drawCyberMantis(s, F) {
+  const g = s.h - 1
+  const i = F.i || 0
+  const atk = F.anim === 'attack'
+  const cy = 16
+  const cx = 24
+  const chrome = mix(PAL.steel, PAL.toxic, 0.25)
+  const chromeL = mix(chrome, PAL.white, 0.4)
+  const chromeD = mix(PAL.void, chrome, 0.55)
+  s.shadow(cx, g - 0.5, 15, 1.6, 0.32)
+  // 细长的四条支撑腿
+  for (let k = 0; k < 4; k++) {
+    const ox = -10 + k * 7
+    const ph = (i / 3) * TAU + k
+    const lift = Math.max(0, Math.cos(ph)) * 2.4
+    s.thick(cx + ox, cy + 4, cx + ox - 3, cy + 10, 1.2, chromeD)
+    s.thick(cx + ox - 3, cy + 10, cx + ox + Math.sin(ph) * 3, g - 1 - lift, 1, chrome)
+    s.px(cx + ox + Math.sin(ph) * 3, g - 1 - lift, PAL.ink)
+  }
+  // 腹部：分节甲壳
+  s.ell(cx - 6, cy + 3, 12, 5, chromeD)
+  s.ell(cx - 6, cy + 2, 11, 4, chrome)
+  for (let k = 0; k < 3; k++) s.line(cx - 14 + k * 6, cy - 2, cx - 15 + k * 6, cy + 5, chromeD, 0.8)
+  // 颈部 / 胸部
+  s.thick(cx + 4, cy + 1, cx + 11, cy - 2, 3.4, chromeD)
+  s.thick(cx + 4, cy, cx + 11, cy - 3, 2.4, chromeL)
+  // 镰臂：折叠 / 展开
+  for (const side of [-1, 1]) {
+    const sy = cy - 4 + side * 2
+    const ex = cx + 12 + (atk ? 10 : 4)
+    const ey = atk ? cy - 12 + side * 6 : cy - 8 + side * 5
+    s.thick(cx + 6, sy, ex, ey, 2, chromeD)
+    s.thick(cx + 6, sy - 1, ex, ey - 1, 1.2, chromeL)
+    // 刀刃
+    s.poly(
+      [
+        [ex, ey - 2],
+        [ex + (atk ? 15 : 10), ey + (atk ? -4 : 3)],
+        [ex + 2, ey + 2],
+      ],
+      mix(chromeL, PAL.white, 0.5)
+    )
+    s.line(ex, ey, ex + (atk ? 14 : 9), ey + (atk ? -3 : 2), PAL.neon, 0.7)
+  }
+  // 头：三角，复眼
+  const hx = cx + 14
+  const hy = cy - 3
+  s.poly(
+    [
+      [hx - 4, hy - 3],
+      [hx + 6, hy],
+      [hx - 4, hy + 4],
+    ],
+    chromeD
+  )
+  s.poly(
+    [
+      [hx - 3, hy - 2],
+      [hx + 4, hy],
+      [hx - 3, hy + 3],
+    ],
+    chromeL
+  )
+  s.px(hx + 1, hy - 1, PAL.neonWarm)
+  s.px(hx + 2, hy + 1, PAL.neonWarm)
+  F.g.push({ x: hx + 1, y: hy, r: 7, c: PAL.neonWarm, p: 0.4 })
+  // 霓虹接缝
+  F.g.push({ x: cx - 4, y: cy, r: 12, c: PAL.neon, p: 0.25 })
+  s.line(cx - 12, cy, cx + 2, cy, PAL.neon, 0.35)
+  s.speck(cx - 16, cy - 8, 32, 16, PAL.rustDark, 0.05, 0.4)
+}
+
+/** 赛博精神病：霓虹夹克、莫西干头、义体手臂上的手枪。 */
+function drawPsychoPunk(s, F) {
+  const g = s.h - 1
+  const i = F.i || 0
+  const atk = F.anim === 'attack'
+  const step = Math.sin((i / 3) * TAU) * 2
+  const cx = 18
+  const hipY = g - 18
+  const jacket = mix(PAL.steel, PAL.neonRed, 0.16)
+  const jacketD = mix(PAL.void, jacket, 0.55)
+  const skin = mix(PAL.boneDark, PAL.rust, 0.25)
+  const skinL = mix(skin, PAL.bone, 0.4)
+  s.shadow(cx, g - 0.5, 9, 1.4, 0.32)
+  // 腿（工装裤 + 靴）
+  s.thick(cx - 3, hipY, cx - 4 + step, g - 4, 3, jacketD)
+  s.thick(cx - 4 + step, g - 4, cx - 5 + step, g - 1, 3, PAL.ink)
+  s.thick(cx + 3, hipY, cx + 4 - step, g - 4, 3, jacket)
+  s.thick(cx + 4 - step, g - 4, cx + 5 - step, g - 1, 3, PAL.ink)
+  // 躯干 + 夹克领
+  s.rect(cx - 6, hipY - 16, 12, 17, jacketD)
+  s.rect(cx - 5, hipY - 16, 10, 15, jacket)
+  s.line(cx - 5, hipY - 14, cx - 5, hipY - 2, PAL.neon, 0.6)
+  s.line(cx + 5, hipY - 14, cx + 5, hipY - 2, PAL.neonRed, 0.5)
+  s.px(cx, hipY - 13, PAL.neonWarm, 0.9)
+  // 左臂（自然下垂）
+  s.thick(cx - 6, hipY - 14, cx - 9, hipY - 4, 2.6, jacketD)
+  s.px(cx - 9, hipY - 3, skin, 0.9)
+  // 右臂 + 枪：射击时平举
+  const sy = hipY - 14
+  const gx = atk ? cx + 17 : cx + 10
+  const gy = atk ? sy - 2 : sy + 5
+  s.thick(cx + 6, sy, gx - 3, gy, 2.8, mix(PAL.steel, PAL.neonRed, 0.2))
+  s.rect(gx - 3, gy - 2, 7, 3, PAL.steelDark)
+  s.rect(gx - 1, gy - 1, 4, 1.4, PAL.steelLight)
+  if (atk) {
+    s.poly(
+      [
+        [gx + 4, gy - 2],
+        [gx + 10, gy],
+        [gx + 4, gy + 2],
+      ],
+      PAL.neonWarm
+    )
+    F.g.push({ x: gx + 6, y: gy, r: 12, c: PAL.neonWarm, p: 0.6 })
+  }
+  // 头 + 莫西干
+  const hy = hipY - 22
+  s.ell(cx, hy, 5, 6, skin)
+  s.ell(cx + 0.5, hy - 0.5, 4.2, 5, skinL)
+  for (let k = 0; k < 4; k++) {
+    s.poly(
+      [
+        [cx - 1 + k * 1.6, hy - 6],
+        [cx + 0.4 + k * 1.6, hy - 12 - (k % 2) * 2],
+        [cx + 1.8 + k * 1.6, hy - 6],
+      ],
+      k % 2 ? PAL.neonRed : PAL.neonWarm
+    )
+  }
+  // 义眼
+  s.rect(cx + 1, hy - 2, 3, 2, PAL.void)
+  s.px(cx + 2, hy - 1, PAL.neonRed)
+  F.g.push({ x: cx + 2, y: hy - 1, r: 6, c: PAL.neonRed, p: 0.45 })
+  // 面罩 / 纹路
+  s.line(cx - 4, hy + 2, cx + 4, hy + 2, PAL.steelDark, 0.8)
+  s.speck(cx - 7, hipY - 22, 14, 22, PAL.rustDark, 0.05, 0.4)
+}
+
+/* ============================================================================
  * 4. 帧合成 + 收尾管线
  * ========================================================================== */
 
@@ -838,6 +1114,10 @@ const DEFS = {
   scrapper: { w: 52, h: 40, draw: drawScrapper, seed: 0x106, run: 4, attack: 1 },
   drone: { w: 40, h: 28, draw: drawDrone, seed: 0x107, run: 2, attack: 1 },
   hulkbot: { w: 88, h: 64, draw: drawHulkbot, seed: 0x108, run: 3, attack: 1 },
+  ghoul_husk: { w: 38, h: 40, draw: drawGhoulHusk, seed: 0x109, run: 3, attack: 2 },
+  tunnel_hound: { w: 46, h: 28, draw: drawTunnelHound, seed: 0x10a, run: 2, attack: 1 },
+  cyber_mantis: { w: 52, h: 38, draw: drawCyberMantis, seed: 0x10b, run: 3, attack: 2 },
+  psycho_punk: { w: 38, h: 56, draw: drawPsychoPunk, seed: 0x10c, run: 3, attack: 1 },
 }
 
 const OUTLINE_COL = {
@@ -849,6 +1129,10 @@ const OUTLINE_COL = {
   scrapper: mix(PAL.void, PAL.steel, 0.24),
   drone: mix(PAL.void, PAL.steel, 0.22),
   hulkbot: mix(PAL.void, PAL.steel, 0.22),
+  ghoul_husk: mix(PAL.void, PAL.rustDark, 0.24),
+  tunnel_hound: mix(PAL.void, PAL.ash, 0.3),
+  cyber_mantis: mix(PAL.void, PAL.toxic, 0.2),
+  psycho_punk: mix(PAL.void, PAL.neonRed, 0.2),
 }
 
 const WARM = {
@@ -860,6 +1144,10 @@ const WARM = {
   scrapper: PAL.steel,
   drone: PAL.steel,
   hulkbot: PAL.steel,
+  ghoul_husk: PAL.rustDark,
+  tunnel_hound: PAL.ash,
+  cyber_mantis: PAL.toxic,
+  psycho_punk: PAL.neonRed,
 }
 
 function renderFrame(id, P) {

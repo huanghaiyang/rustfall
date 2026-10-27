@@ -8,9 +8,18 @@ import { JunkGolem } from './junk_golem.js'
 import { SkyWarden } from './sky_warden.js'
 import { MimicBeast } from './mimic_beast.js'
 import { SwarmCore } from './swarm_core.js'
+import { ClawTyrant, CyberPsychoBoss, EsperBerserk } from './tyrants.js'
 
 /** 全部大型敌人 id（顺序稳定） */
-export const LARGE_IDS = ['junk_golem', 'sky_warden', 'mimic_beast', 'swarm_core']
+export const LARGE_IDS = [
+  'junk_golem',
+  'sky_warden',
+  'mimic_beast',
+  'swarm_core',
+  'claw_tyrant',
+  'cyberpsycho_boss',
+  'esper_berserk',
+]
 
 /** 大型敌人 id → 类 */
 const LARGE_CLASS_MAP = new Map([
@@ -18,6 +27,9 @@ const LARGE_CLASS_MAP = new Map([
   ['sky_warden', SkyWarden],
   ['mimic_beast', MimicBeast],
   ['swarm_core', SwarmCore],
+  ['claw_tyrant', ClawTyrant],
+  ['cyberpsycho_boss', CyberPsychoBoss],
+  ['esper_berserk', EsperBerserk],
 ])
 
 export { LARGE_CLASS_MAP }

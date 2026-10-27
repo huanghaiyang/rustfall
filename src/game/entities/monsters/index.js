@@ -13,6 +13,7 @@ import { Sentry } from './sentry.js'
 import { Scrapper } from './scrapper.js'
 import { Drone } from './drone.js'
 import { Hulkbot } from './hulkbot.js'
+import { GhoulHusk, TunnelHound, CyberMantis, PsychoPunk } from './breeds.js'
 
 /** 全部怪物 id（顺序稳定，UI/任务/图鉴可直接用） */
 export const MONSTER_IDS = [
@@ -24,6 +25,10 @@ export const MONSTER_IDS = [
   'scrapper',
   'drone',
   'hulkbot',
+  'ghoul_husk',
+  'tunnel_hound',
+  'cyber_mantis',
+  'psycho_punk',
 ]
 
 /** id → 类。index 只负责映射；实例化走 createMonster。 */
@@ -36,6 +41,10 @@ const CLASS_MAP = new Map([
   ['scrapper', Scrapper],
   ['drone', Drone],
   ['hulkbot', Hulkbot],
+  ['ghoul_husk', GhoulHusk],
+  ['tunnel_hound', TunnelHound],
+  ['cyber_mantis', CyberMantis],
+  ['psycho_punk', PsychoPunk],
 ])
 
 export { CLASS_MAP }

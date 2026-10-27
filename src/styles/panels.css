@@ -8,6 +8,14 @@
    变量全部带 fallback，即使 palette.js 的 CSS_VARS 尚未注入也能正常显示。
    ========================================================================== */
 
+/* Xbox 手柄焦点：由 gamepad-ui.js 动态添加，键盘焦点不显示该样式 */
+.pad-focus {
+  outline: 2px solid var(--c-neon, #6ff0d0) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px rgba(111, 240, 208, 0.18), 0 0 16px rgba(111, 240, 208, 0.35) !important;
+  border-radius: 3px;
+}
+
 :root {
   /* —— 废土色板（与 src/game/render/palette.js 同步） —— */
   --c-rust: #8a4b26;

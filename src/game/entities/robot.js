@@ -2,6 +2,8 @@ import * as THREE from 'three'
 import { spriteMaterial } from '../render/materials.js'
 import { getGlowTexture } from '../render/textures.js'
 import { getWeaponArt, getWeaponHoldArt } from '../render/art/weapons.js'
+import { getToolArt } from '../render/art/tools.js'
+import { getItemArt } from '../render/art/items.js'
 import {
   PLAYER,
   TS,
@@ -15,6 +17,7 @@ import { makeBody, moveBody } from '../world/tilemap.js'
 import { getChassisArt } from '../render/art/chassis.js'
 import { computeStats, getChassis } from '../chassis/index.js'
 import { getTool, editTerrain, scanArea } from '../tools/index.js'
+import { growthTotals } from '../systems/growth.js'
 import { Events, EV } from '../core/events.js'
 import { G, toast, notify } from '../state.js'
 import { approach, clamp } from '../utils.js'
@@ -52,6 +55,12 @@ export class Robot {
     this.deadT = 0
     this.heldWeapon = null
     this.weaponMesh = null
+    this.heldTool = null
+    this.toolMesh = null
+    this.equippedKey = ''
+    this.moduleMesh = null
+    this.useT = 0
+    this.useKind = ''
     this.switchCd = 0
     this.dead = false
     this.invuln = 1.2
@@ -154,7 +163,16 @@ export class Robot {
   }
 
   refreshStats() {
-    this.stats = computeStats(this.chassisId, G.equipped, this.game.inventory?.totals())
+    // 装备加成 + 成长加成合并后再计算机体属性
+    const bonus = { ...(this.game.inventory?.totals() || {}) }
+    const grow = growthTotals()
+    for (const k in grow) bonus[k] = (bonus[k] || 0) + grow[k]
+    // 限时增益（药物、信号棒、临时伺服超频等）
+    for (const buf of G.buffs || []) {
+      if (!buf || !buf.stats) continue
+      for (const k in buf.stats) bonus[k] = (bonus[k] || 0) + buf.stats[k]
+    }
+    this.stats = computeStats(this.chassisId, G.equipped, bonus)
     G.hpMax = this.stats.hp
     G.energyMax = this.stats.energyMax
     G.hp = Math.min(G.hp, G.hpMax)
@@ -209,8 +227,14 @@ export class Robot {
     this.shootT = Math.max(0, this.shootT - dt)
     this.hurtT = Math.max(0, this.hurtT - dt)
     if (this.dead) this.deadT += dt
+    this.useT = Math.max(0, this.useT - dt)
     const wid = this.game.weapons ? this.game.weapons.weaponId : null
     if (wid !== this.heldWeapon) this.setHeldWeapon(wid)
+    // 没有武器时，把手里的工具真正画出来；同时同步肩部模块
+    const tid = wid ? null : G.toolId
+    if (tid !== this.heldTool) this.setHeldTool(tid)
+    const eqKey = `${G.equipped.sensor || ''}|${G.equipped.utility || ''}`
+    if (eqKey !== this.equippedKey) this.refreshModule()
     G.hurt = Math.max(0, G.hurt - dt * 2)
 
     // 能量缓慢回复
@@ -473,6 +497,85 @@ export class Robot {
     this.group.add(this.weaponMesh)
   }
 
+  /** 无武器时把当前工具真实握在手上 */
+  setHeldTool(id) {
+    this.heldTool = id || null
+    if (this.toolMesh) {
+      this.group.remove(this.toolMesh)
+      this.toolMesh.geometry.dispose()
+      this.toolMesh.material.dispose()
+      this.toolMesh = null
+    }
+    if (!id) return
+    let tex = null
+    try {
+      tex = getToolArt(id)
+    } catch (e) {
+      tex = null
+    }
+    if (!tex) return
+    const mat = spriteMaterial(tex)
+    const size = 20
+    this.toolMesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat)
+    this.toolMesh.position.z = 3.2
+    this.toolMesh.renderOrder = 6
+    this.group.add(this.toolMesh)
+  }
+
+  /** 装备的传感器/功能模块挂在肩甲（上臂）外侧 */
+  refreshModule() {
+    const sensor = G.equipped.sensor
+    const utility = G.equipped.utility
+    const key = `${sensor || ''}|${utility || ''}`
+    if (key === this.equippedKey) return
+    this.equippedKey = key
+    if (this.moduleMesh) {
+      this.group.remove(this.moduleMesh)
+      this.moduleMesh.geometry.dispose()
+      this.moduleMesh.material.dispose()
+      this.moduleMesh = null
+    }
+    const itemId = utility || sensor
+    if (!itemId) return
+    let tex = null
+    try {
+      tex = getItemArt(itemId)
+    } catch (e) {
+      tex = null
+    }
+    if (!tex) return
+    const mat = spriteMaterial(tex)
+    this.moduleMesh = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), mat)
+    this.moduleMesh.position.z = 3.4
+    this.moduleMesh.renderOrder = 7
+    this.group.add(this.moduleMesh)
+  }
+
+  /** 使用道具时的机体动作与手部特效 */
+  playUse(kind = 'use') {
+    this.useT = 0.45
+    this.useKind = kind
+    const types = {
+      heal: 'food',
+      energy: 'spark',
+      repair: 'spark',
+      radClear: 'bubble',
+      light: 'spark',
+      scan: 'spark',
+      use: 'dust',
+    }
+    this.game.particles?.emitMany?.(types[kind] || 'dust', this.frontX, this.frontY, 8)
+    const sounds = {
+      heal: 'pickup',
+      energy: 'pickup',
+      repair: 'weld',
+      radClear: 'splash',
+      light: 'flare',
+      scan: 'scan',
+    }
+    this.game.sfx?.(sounds[kind] || 'pickup', { vol: 0.45 })
+  }
+
   attack() {
     const tool = this.tool
     if (!tool) return
@@ -653,6 +756,20 @@ export class Robot {
       this.weaponMesh.rotation.z = this.facing * (this.shootT > 0 ? 0.16 : 0)
       this.weaponMesh.visible = !this.dead
     }
+    if (this.toolMesh) {
+      this.toolMesh.position.x = b.x + b.w / 2 + this.facing * (b.w * 0.34)
+      this.toolMesh.position.y = -(b.y + b.h * 0.58)
+      this.toolMesh.scale.x = this.facing
+      this.toolMesh.rotation.z = this.facing * (this.swingT > 0 ? Math.sin((0.26 - this.swingT) / 0.26 * Math.PI) * 0.7 : 0)
+      this.toolMesh.visible = !this.dead
+    }
+    if (this.moduleMesh) {
+      // 挂在肩甲/上臂外侧，随朝向翻转
+      this.moduleMesh.position.x = b.x + b.w / 2 - this.facing * (b.w * 0.18)
+      this.moduleMesh.position.y = -(b.y + b.h * 0.86)
+      this.moduleMesh.scale.x = this.facing
+      this.moduleMesh.visible = !this.dead
+    }
     if (this.glow) {
       this.glow.position.x = b.x + b.w / 2
       this.glow.position.y = -(b.y + b.h / 2)
@@ -663,7 +780,7 @@ export class Robot {
   }
 
   dispose() {
-    for (const o of [this.artMesh, this.glow]) {
+    for (const o of [this.artMesh, this.glow, this.weaponMesh, this.toolMesh, this.moduleMesh]) {
       if (!o) continue
       o.geometry?.dispose()
       o.material?.dispose()

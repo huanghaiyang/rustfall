@@ -54,6 +54,7 @@ export class Room {
     this.buildTiles()
     this.buildDoors()
     this.buildProps()
+    this.buildScenery()
     this.buildLandmarks()
     this.buildCages()
     this.buildLoot()
@@ -594,12 +595,122 @@ export class Room {
     glow.position.set(s.x, -s.y + 60, -1.5)
     this.group.add(glow)
     this.shelterGlow = glow
+
+    // —— 建筑结构：屋顶 / 立柱 / 雨棚 / 吊灯 / 招牌 ——
+    // 酸雨只会落在屋顶上；inShelter() 的判定范围与屋顶投影一致。
+    const addPanel = (w, h, ox, oy, color, z = -1.7, opacity = 1, rot = 0) => {
+      const m = new THREE.MeshBasicMaterial({
+        color,
+        transparent: opacity < 1,
+        opacity,
+        depthWrite: false,
+        toneMapped: false,
+      })
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m)
+      p.position.set(s.x + ox, -s.y + oy, z)
+      p.rotation.z = rot
+      this.group.add(p)
+      return p
+    }
+    // 屋檐下的暗部：让避难所从背景里“凹”进去，读起来像一处入口
+    addPanel(244, 132, 0, 66, 0x05080b, -2.05, 0.42)
+    // 主屋顶：厚钢板 + 上层锈迹压边（提高明度，避免与远景糊在一起）
+    addPanel(268, 22, 0, 146, 0x596a75, -1.72)
+    addPanel(278, 7, 0, 159, 0x9fb2bd, -1.71)
+    addPanel(268, 5, 0, 134, 0xa85c2c, -1.70)
+    // 屋顶的横向桁架 + 两道纵向压筋
+    for (let k = -2; k <= 2; k++) addPanel(4, 18, k * 52, 147, 0x93a8b2, -1.69, 0.85)
+    addPanel(264, 3, 0, 141, 0x8ea2ad, -1.71, 0.9)
+    addPanel(264, 2, 0, 152, 0x6f8792, -1.71, 0.9)
+    // 前后立柱（支撑屋顶）+ 斜撑
+    addPanel(12, 136, -126, 68, 0x4e5b64, -1.68)
+    addPanel(12, 136, 126, 68, 0x4e5b64, -1.68)
+    addPanel(4, 132, -126, 68, 0x71838d, -1.675, 0.8)
+    addPanel(4, 132, 126, 68, 0x71838d, -1.675, 0.8)
+    addPanel(34, 5, -108, 128, 0x5d6d77, -1.66, 0.95, 0.55)
+    addPanel(34, 5, 108, 128, 0x5d6d77, -1.66, 0.95, -0.55)
+    addPanel(12, 6, -126, 4, 0xa85c2c, -1.67)
+    addPanel(12, 6, 126, 4, 0xa85c2c, -1.67)
+    // 前沿雨棚：稍微外挑并向下倾斜，酸雨顺着流到两侧
+    addPanel(300, 10, 0, 132, 0x4a565f, -1.66, 1, -0.035)
+    addPanel(300, 3, 0, 128, 0x6ff0d0, -1.65, 0.45, -0.035)
+    // 吊灯：灯罩 + 暖光
+    addPanel(22, 7, 0, 128, 0x1b2125, -1.64)
+    const lampMat = new THREE.MeshBasicMaterial({
+      map: getGlowTexture(),
+      color: 0xf2b34a,
+      transparent: true,
+      opacity: 0.55,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
+    })
+    const lamp = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), lampMat)
+    lamp.position.set(s.x, -s.y + 124, -1.63)
+    this.group.add(lamp)
+    this.shelterLampMat = lampMat
+    // 招牌：挂在门楣上
+    addPanel(64, 18, 0, 112, 0x4a2a18, -1.62)
+    addPanel(58, 12, 0, 112, 0x8a4b26, -1.61)
+    addPanel(40, 3, 0, 112, 0x6ff0d0, -1.60, 0.65)
+    // 两侧的固定沙袋 / 配重
+    addPanel(16, 10, -92, 5, 0x5a5548, -1.59)
+    addPanel(16, 10, 92, 5, 0x5a5548, -1.59)
+  }
+
+  // ---------------------------------------------------------------- 远景装饰
+  /** 在可玩层后面铺一层剪影建筑/残骸，增加纵深与群系辨识度。 */
+  buildScenery() {
+    const KINDS = {
+      city: ['building_facade', 'streetlight', 'car_wreck', 'bus_wreck', 'streetlight', 'house_facade'],
+      factory: ['factory_pipe', 'generator', 'container_small', 'crane_hook', 'antenna', 'factory_pipe'],
+      dump: ['junk_heap', 'tree_dead', 'tire_pile', 'container_small', 'junk_heap', 'tree_dead'],
+      shore: ['life_ring', 'hull_plate', 'cargo_net', 'beacon', 'container_small', 'life_ring'],
+    }
+    const biome = this.data.biome || 'city'
+    const kinds = KINDS[biome] || KINDS.city
+    const worldW = this.data.worldW || 2000
+    const floorY = typeof this.data.floorY === 'number' ? this.data.floorY : 0
+    const count = Math.max(3, Math.min(7, Math.round(worldW / 520)))
+    for (let i = 0; i < count; i++) {
+      const kind = kinds[i % kinds.length]
+      let tex = null
+      try {
+        tex = getPropArt(kind)
+      } catch (e) {
+        tex = null
+      }
+      if (!tex) continue
+      const w = tex.image?.width || 48
+      const h = tex.image?.height || 48
+      const seed = hash2(Math.round(this.data.worldW || 0), i * 37 + biome.length)
+      const rnd = (seed % 1000) / 1000
+      const x = 180 + ((i + 0.5) / count) * (worldW - 360) + (rnd - 0.5) * 120
+      const scale = 1.1 + ((seed >> 8) % 70) / 100
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 0.5,
+        color: 0x5c6670,
+        depthWrite: false,
+        toneMapped: false,
+      })
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat)
+      mesh.scale.set(scale * ((seed & 1) ? -1 : 1), scale, 1)
+      mesh.position.set(x, -floorY + (h * scale) / 2, Z.backProps - i * 0.05)
+      mesh.renderOrder = -1
+      this.group.add(mesh)
+      this.sceneryMeshes = this.sceneryMeshes || []
+      this.sceneryMeshes.push({ mesh, mat })
+    }
   }
 
   // ---------------------------------------------------------------- 道具
   buildProps() {
     this.propMeshes = []
-    for (const p of this.data.props || []) {
+    const roomId = this.data.roomId
+    ;(this.data.props || []).forEach((p, idx) => {
+      const flagKey = `prop:${roomId}:${idx}`
       const def = getProp(p.kind) || PROPS[p.kind] || { solid: false }
       let tex = null
       try {
@@ -625,6 +736,11 @@ export class Room {
       this.group.add(mesh)
       this.propMeshes.push({ mesh, def, prop: p })
       if (def.interact || def.loot || def.destructible) {
+        const opened = !!G.flags[flagKey]
+        if (opened) {
+          if (def.destructible) mesh.visible = false
+          else mat.opacity = 0.5
+        }
         this.interactables.push({
           kind: def.destructible ? 'destructible' : 'prop',
           propKind: p.kind,
@@ -633,12 +749,13 @@ export class Room {
           radius: 50,
           def,
           mesh,
-          opened: false,
-          hp: def.destructible ? 2 : 0,
+          flagKey,
+          opened,
+          hp: opened && def.destructible ? 0 : def.destructible ? 2 : 0,
           questTarget: def.questTarget || null,
         })
       }
-    }
+    })
   }
 
   // ---------------------------------------------------------------- 地标
@@ -786,11 +903,13 @@ export class Room {
   // ---------------------------------------------------------------- 战利品
   buildLoot() {
     for (const l of this.data.loot || []) {
-      if (G.flags[`taken:${this.data.roomId}:${l.lid ?? l.id}:${Math.round(l.x)}`]) continue
+      const flagKey = `taken:${this.data.roomId}:${l.lid ?? l.id}:${Math.round(l.x)}`
+      if (G.flags[flagKey]) continue
       const drop = new LootDrop(this.game, l.id, l.x, l.y, {
         hidden: !!l.hidden,
         buried: !!l.buried,
         questItem: !!l.questItem,
+        flagKey,
       })
       this.lootDrops.push(drop)
       this.group.add(drop.group)
@@ -897,6 +1016,11 @@ export class Room {
     if (this.shelterGlowMat) {
       this.shelterGlowMat.opacity = 0.14 + Math.sin(this.time * 1.5) * 0.05 + (G.weatherPhase === 'storm' ? 0.08 : 0)
     }
+    if (this.shelterLampMat) {
+      // 酸雨夜里吊灯会更亮一些，像在招呼人进来躲雨
+      const tired = Math.sin(this.time * 7.3) > 0.96 ? 0.72 : 1
+      this.shelterLampMat.opacity = (G.weatherPhase === 'storm' ? 0.7 : 0.55) * tired
+    }
     if (this.cloudLayers) {
       for (const cl of this.cloudLayers) {
         cl.tex.offset.x = (cl.tex.offset.x + 0.0035 * cl.speed * dt) % 1
@@ -927,7 +1051,8 @@ export class Room {
   inShelter(px, py) {
     const s = this.data.shelter
     if (!s) return false
-    return Math.abs(px - s.x) < 78 && py > s.y - 190 && py <= s.y + 10
+    // 判定与屋顶投影一致：横向 ±136，纵向从地面向上 190
+    return Math.abs(px - s.x) < 136 && py > s.y - 190 && py <= s.y + 10
   }
 
   dispose() {

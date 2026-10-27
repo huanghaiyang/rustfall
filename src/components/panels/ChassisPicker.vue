@@ -324,8 +324,11 @@ onMounted(() => {
           v-for="c in list"
           :key="c.id"
           class="card"
+          data-pad
+          tabindex="0"
           :class="{ locked: !isUnlocked(c), sel: selectedId === c.id, cur: c.id === currentId && !isStart }"
           @click="select(c.id)"
+          @keydown.enter.prevent="select(c.id)"
         >
           <header class="c-head">
             <span class="c-name">{{ c.name || c.id }}</span>

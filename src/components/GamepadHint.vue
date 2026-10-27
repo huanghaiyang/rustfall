@@ -13,12 +13,15 @@ const visible = ref(false)
 let timer = null
 
 const BINDINGS = [
-  { keys: ['A'], label: '跳跃' },
+  { keys: ['A'], label: '跳跃/确认' },
   { keys: ['X'], label: '攻击' },
-  { keys: ['B'], label: '交互' },
+  { keys: ['B'], label: '交互/返回' },
   { keys: ['Y'], label: '切机体' },
   { keys: ['LB', 'RB'], label: '切工具' },
+  { keys: ['Stick'], label: '切武器' },
+  { keys: ['Back'], label: '背包' },
   { keys: ['Start'], label: '暂停' },
+  { keys: ['RB'], label: '面板切页' },
 ]
 
 function artUrl(tex) {
@@ -31,7 +34,7 @@ function artUrl(tex) {
 }
 
 const ICONS = {}
-for (const key of ['A', 'B', 'X', 'Y', 'LB', 'RB', 'Start']) {
+for (const key of ['A', 'B', 'X', 'Y', 'LB', 'RB', 'Start', 'Back', 'Stick']) {
   ICONS[key] = artUrl(getGamepadIcon(key))
 }
 const bindings = BINDINGS.map((b) => ({

@@ -15,9 +15,12 @@ const ACTIONS = {
   tool2: ['Digit2'],
   tool3: ['Digit3'],
   tool4: ['Digit4'],
+  toolPrev: ['KeyZ'],
+  toolNext: ['KeyX'],
   weaponPrev: ['BracketLeft'],
   weaponNext: ['BracketRight'],
   chassis: ['KeyQ'],
+  growth: ['KeyG'],
   inventory: ['KeyI', 'Tab'],
   quests: ['KeyL'],
   archive: ['KeyC'],
@@ -48,8 +51,8 @@ const PAD_BUTTONS = {
   1: 'interact', // B
   2: 'attack', // X
   3: 'chassis', // Y
-  4: 'weaponPrev', // LB
-  5: 'weaponNext', // RB
+  4: 'toolPrev', // LB
+  5: 'toolNext', // RB
   6: 'reload', // LT 也当攻击辅助（下面按扳机值处理）
   7: 'attack', // RT
   8: 'inventory', // Back / View

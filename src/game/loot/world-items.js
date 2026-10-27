@@ -8,6 +8,7 @@ import { getItemArt } from '../render/art/items.js'
 import { getWeaponArt } from '../render/art/weapons.js'
 import { getGlowArt } from '../render/art/atmosphere.js'
 import { dist2 } from '../utils.js'
+import { G } from '../state.js'
 
 const RARITY_GLOW = { 1: 0x8a8a72, 2: 0xa9b6bc, 3: 0x8fe8ff, 4: 0xf2b34a, 5: 0xff5644 }
 
@@ -23,6 +24,7 @@ export class LootDrop {
     this.hidden = !!opts.hidden
     this.buried = !!opts.buried
     this.questItem = !!opts.questItem
+    this.flagKey = opts.flagKey || null
     this.picked = false
     this.bob = Math.random() * Math.PI * 2
     this.t = 0
@@ -158,6 +160,7 @@ export class LootDrop {
     if (added > 0) {
       this.picked = true
       this.group.visible = false
+      if (this.flagKey) G.flags[this.flagKey] = true
       this.game.onLootPicked?.(this.itemId, this.def)
       this.game.particles?.emitMany?.('spark', this.x, this.y, 5)
     }

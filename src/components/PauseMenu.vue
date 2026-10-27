@@ -1,7 +1,20 @@
 <script setup>
 import { G } from '../game/state.js'
 import { getChassis } from '../game/chassis/index.js'
-defineEmits(['resume', 'help', 'mods', 'settings', 'restart', 'title', 'mute', 'volume'])
+defineEmits([
+  'resume',
+  'help',
+  'mods',
+  'settings',
+  'restart',
+  'title',
+  'mute',
+  'volume',
+  'quests',
+  'archive',
+  'companions',
+  'growth',
+])
 </script>
 
 <template>
@@ -12,6 +25,8 @@ defineEmits(['resume', 'help', 'mods', 'settings', 'restart', 'title', 'mute', '
 
       <div class="panel-rows">
         <div class="panel-row"><span>机体</span><span class="val">{{ getChassis(G.chassisId)?.name || G.chassisId }}</span></div>
+        <div class="panel-row"><span>等级 / 经验</span><span class="val">Lv.{{ G.growth?.level || 1 }} · {{ G.growth?.xp || 0 }}/{{ G.growth?.xpNext || 60 }}</span></div>
+        <div class="panel-row"><span>可分配点数</span><span class="val">{{ G.growth?.points || 0 }}</span></div>
         <div class="panel-row"><span>结构 / 能量</span><span class="val">{{ Math.ceil(G.hp) }} / {{ Math.ceil(G.energy) }}</span></div>
         <div class="panel-row"><span>电量 / 信号</span><span class="val">{{ G.power }} / {{ G.signal }}</span></div>
         <div class="panel-row"><span>本循环剩余</span><span class="val">{{ Math.ceil(G.timeLeft) }} 秒</span></div>
@@ -36,6 +51,10 @@ defineEmits(['resume', 'help', 'mods', 'settings', 'restart', 'title', 'mute', '
 
       <div class="btn-row">
         <button class="btn primary" @click="$emit('resume')">继 续</button>
+        <button class="btn" @click="$emit('quests')">任 务</button>
+        <button class="btn" @click="$emit('archive')">档 案</button>
+        <button class="btn" @click="$emit('companions')">同 伴</button>
+        <button class="btn" @click="$emit('growth')">成 长</button>
         <button class="btn" @click="$emit('help')">操 作</button>
         <button class="btn" @click="$emit('mods')">模 组</button>
         <button class="btn" @click="$emit('settings')">设 置</button>

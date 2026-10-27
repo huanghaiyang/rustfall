@@ -29,7 +29,7 @@ const TABS = [
   { id: 'artifact', label: '遗物' },
   { id: 'data', label: '数据' },
   { id: 'rare', label: '稀有' },
-  { id: 'quest', label: '任务' },,
+  { id: 'quest', label: '任务' },
   { id: 'weapon', label: '武器' },
   { id: 'ammo', label: '弹药' },
 ]
@@ -45,6 +45,8 @@ const CATEGORY = {
   data: '数据',
   rare: '稀有件',
   quest: '任务物品',
+  weapon: '武器',
+  ammo: '弹药',
 }
 
 const BONUS = {
@@ -193,6 +195,44 @@ const bonusList = computed(() => {
   })
 })
 
+const EFFECT_LABEL = {
+  energy: '补充电量',
+  heal: '修复结构',
+  repair: '维修机体',
+  scan: '脉冲扫描',
+  cleanse: '中和酸液',
+  radClear: '清除辐射',
+  light: '临时照明',
+  buff: '施加临时增益',
+}
+
+const selPurpose = computed(() => {
+  const d = selDef.value
+  if (!d) return ''
+  const parts = []
+  const cat = d.category || 'material'
+  if (cat === 'weapon') parts.push('装备到武器栏（十字键左右 / 数字键切换），攻击时消耗能量与弹药。')
+  else if (cat === 'ammo') {
+    const forIds = Array.isArray(d.ammoFor) ? d.ammoFor : d.ammoFor ? [d.ammoFor] : []
+    parts.push(forIds.length ? `为 ${forIds.join(' / ')} 供弹。` : '为对应武器供弹。')
+  } else if (cat === 'consumable') parts.push('一次性消耗品：使用后从背包移除。')
+  else if (cat === 'tool') parts.push('工具：装备后握在机械臂上，用于采集、维修或切割。')
+  else if (cat === 'artifact') parts.push('遗物：可收藏、可交易，部分会解锁档案条目。')
+  else if (cat === 'data') parts.push('数据载体：可在终端读取，解锁档案与研究条目。')
+  else if (cat === 'quest') parts.push('任务相关物品：不要随便丢弃。')
+  if (d.slot) {
+    const f = SLOTS.find((x) => x.id === d.slot)
+    parts.push(`安装到「${f ? f.label : d.slot}」槽位，提供持续被动加成。`)
+  }
+  if (d.use && typeof d.use === 'object') {
+    const keys = Object.keys(d.use).filter((k) => EFFECT_LABEL[k]).map((k) => EFFECT_LABEL[k])
+    if (keys.length) parts.push(`使用效果：${keys.join('、')}。`)
+  }
+  if (!parts.length) parts.push('基础物资：可拆解为零件，或卖给避难所换取废料券。')
+  return parts.join(' ')
+})
+
+
 const canUse = computed(() => !!(selDef.value && selDef.value.use))
 const canEquip = computed(() => !!(selDef.value && selDef.value.slot))
 const canDrop = computed(() => !!selEntry.value)
@@ -340,6 +380,11 @@ function unequip(slot) {
             </div>
 
             <p class="desc">{{ selDef.desc || '（没有留下任何说明。）' }}</p>
+
+            <div class="purpose">
+              <div class="lore-title">用途</div>
+              <p class="rp-prose">{{ selPurpose }}</p>
+            </div>
 
             <div v-if="bonusList.length" class="bonus">
               <div class="bonus-title">组件加成</div>
@@ -631,10 +676,16 @@ function unequip(slot) {
   background: rgba(201, 176, 133, 0.05);
   border-left: 2px solid var(--c-ochre);
 }
-.lore .rp-prose {
+.lore .rp-prose,
+.purpose .rp-prose {
   font-size: 11px;
   line-height: 1.7;
   margin: 0;
+}
+.purpose {
+  padding: 6px 8px;
+  background: rgba(111, 240, 208, 0.05);
+  border-left: 2px solid var(--c-neon);
 }
 
 .actions {

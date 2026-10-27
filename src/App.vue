@@ -23,10 +23,13 @@ import ArchivePanel from './components/panels/ArchivePanel.vue'
 import ToolBelt from './components/panels/ToolBelt.vue'
 import NotificationFeed from './components/panels/NotificationFeed.vue'
 import CompanionPanel from './components/panels/CompanionPanel.vue'
+import GrowthPanel from './components/panels/GrowthPanel.vue'
+import { installGamepadUi } from './game/gamepad-ui.js'
 
 const host = ref(null)
 const ready = ref(false)
 let game = null
+let disposePadUi = null
 
 const showChassisPicker = ref(false)
 const showHud = computed(() => G.showHud && G.phase !== 'title' && G.phase !== 'dead')
@@ -78,6 +81,7 @@ function onKey(e) {
 onMounted(async () => {
   game = new Game(host.value)
   window.__rustfall = game
+  disposePadUi = installGamepadUi(game)
   try {
     await game.bootPromise
   } catch (e) {
@@ -88,6 +92,8 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)
+  disposePadUi?.()
+  disposePadUi = null
   game?.dispose()
   game = null
 })
@@ -138,6 +144,9 @@ if (import.meta.hot) {
     <div v-if="G.ui.panel === 'companions'" class="overlay z-panel">
       <CompanionPanel />
     </div>
+    <div v-if="G.ui.panel === 'growth'" class="overlay z-panel">
+      <GrowthPanel />
+    </div>
     <div v-if="G.ui.panel === 'settings'" class="overlay z-panel">
       <SettingsPanel @close="A.closePanel()" />
     </div>
@@ -167,6 +176,11 @@ if (import.meta.hot) {
       @resume="A.resume"
       @help="A.openPanel('help')"
       @mods="A.openPanel('mods')"
+      @settings="A.openPanel('settings')"
+      @quests="A.openPanel('quests')"
+      @archive="A.openPanel('archive')"
+      @companions="A.openPanel('companions')"
+      @growth="A.openPanel('growth')"
       @restart="A.restartRun"
       @title="onTitle"
       @mute="A.toggleMute"
