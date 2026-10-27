@@ -23,7 +23,7 @@ export const WEAPON_DROP_CHANCE = Object.freeze({
  * 每个 biome 的武器权重表。
  * 数值是相对权重，不必是整数；同一个 biome 里所有武器都在表里出现（保证任意 biome 都不会缺某把）。
  */
-export const WEAPON_LOOT_TABLES = Object.freeze({
+const BASE_TABLES = {
   city: [
     { id: 'iron_pipe', weight: 300, min: 1, max: 1 },
     { id: 'semi_pistol', weight: 160, min: 1, max: 1 },
@@ -104,7 +104,23 @@ export const WEAPON_LOOT_TABLES = Object.freeze({
     { id: 'laser_rifle', weight: 2, min: 1, max: 1 },
     { id: 'rail_spike', weight: 1, min: 1, max: 1 },
   ],
-})
+}
+
+/** 致敬向独特武器：四张 biome 表 + shelter + default 全部追加，权重压到最低档 */
+const RARE_ADDITIONS = Object.freeze([
+  { id: 'chainblade', weight: 10, min: 1, max: 1 },
+  { id: 'smart_rifle', weight: 8, min: 1, max: 1 },
+  { id: 'tesla_arc', weight: 6, min: 1, max: 1 },
+  { id: 'gravity_emitter', weight: 2, min: 1, max: 1 },
+  { id: 'plasma_cannon', weight: 2, min: 1, max: 1 },
+  { id: 'fatman', weight: 1, min: 1, max: 1 },
+])
+
+export const WEAPON_LOOT_TABLES = Object.freeze(
+  Object.fromEntries(
+    Object.entries(BASE_TABLES).map(([key, list]) => [key, Object.freeze([...list, ...RARE_ADDITIONS])]),
+  ),
+)
 
 /**
  * 建议并入 loot-tables.js 的条目（本文件不修改那个文件）。
@@ -180,6 +196,11 @@ export const WEAPON_AMMO_BUNDLES = Object.freeze({
   nailgun: { id: 'ammo_nail', min: 10, max: 24 },
   scrap_launcher: { id: 'ammo_scrap', min: 2, max: 6 },
   arc_emitter: { id: 'ammo_arc', min: 2, max: 6 },
+  gravity_emitter: { id: 'ammo_core', min: 2, max: 5 },
+  tesla_arc: { id: 'ammo_tesla', min: 4, max: 10 },
+  plasma_cannon: { id: 'ammo_plasma', min: 1, max: 3 },
+  fatman: { id: 'ammo_nuke', min: 1, max: 1 },
+  smart_rifle: { id: 'ammo_9mm', min: 4, max: 10 },
 })
 
 // ---------------------------------------------------------------------------

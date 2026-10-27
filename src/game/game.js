@@ -43,6 +43,7 @@ import { addXp, initGrowth, spendGrowth as applyGrowthPoint } from './systems/gr
 import { injectEasterEggs, handleEgg } from './world/easter-eggs.js'
 import { getTheme } from './world/themes.js'
 import { createChaosAI } from './systems/chaos-ai.js'
+import { createLighting } from './systems/lighting.js'
 import { clamp, damp } from './utils.js'
 
 const SFX_MAP = {
@@ -270,6 +271,7 @@ export class Game {
     if (this.DialogueClass) this.dialogue = new this.DialogueClass(this)
     if (this.RescueClass) this.rescue = new this.RescueClass(this)
     if (!this.chaos) this.chaos = createChaosAI(this)
+    if (!this.lighting) this.lighting = createLighting(this)
     this.syncInventoryState()
   }
 
@@ -384,6 +386,7 @@ export class Game {
     }
     const data = this.getRoomData(regionId, roomId)
     this.room = new Room(this, data)
+    this.lighting?.buildForRoom?.(this.room)
     this.roomId = roomId
     this.regionId = regionId
     G.regionId = regionId
@@ -698,6 +701,7 @@ export class Game {
     this.room.update(dt)
     if (this.director) this.director.update(dt)
     this.chaos?.update?.(dt)
+    this.lighting?.update?.(dt)
     if (this.weapons) {
       this.weapons.setHolding?.(this.input.isDown('attack'))
       if (this.input.wasPressed('reload')) this.weapons.reload?.()
@@ -988,7 +992,8 @@ export class Game {
       wx = null
     }
     pf?.setUniforms?.({
-      ambient: params.amb,
+      // 闪电：整屏瞬时提亮（daynight 每 0.1s apply 一次，闪电在 ~0.4s 内衰减）
+      ambient: clamp(params.amb + (params.lightning || 0) * 0.85, 0, 1.35),
       night: params.night,
       weatherTint: wx?.tint || params.tint,
       fog: Math.max(params.fog, wx?.fog || 0),
@@ -1347,6 +1352,11 @@ export class Game {
   }
 
   // ================================================================ 战斗 / 掉落
+  /** 触发一次瞬时点光（枪口 / 弹着 / 爆炸），池化在 lighting 里 */
+  lightBurst(x, y, radius = 160, color = 0xffd08a, life = 0.18, intensity = 0.9) {
+    this.lighting?.flash?.(x, y, radius, color, life, intensity)
+  }
+
   spawnProjectile(opts = {}) {
     const {
       x,
@@ -1361,6 +1371,7 @@ export class Game {
       onHit = null,
       onLand = null,
     } = opts
+    this.lightBurst(x, y, 70 + radius * 5, color, 0.1, 0.7)
     const mat = new THREE.MeshBasicMaterial({
       color,
       transparent: true,

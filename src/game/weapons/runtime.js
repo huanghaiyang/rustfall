@@ -504,6 +504,13 @@ export class WeaponSystem {
       splashed: false,
       done: false,
       hitIds: new Set(),
+      // 独特机制（见下方 _steerShot / _auraTick / _chainShot / _vortex）
+      chain: proj.chain || null,
+      homing: proj.homing || null,
+      vortex: proj.vortex || null,
+      aura: proj.aura || null,
+      nuke: !!proj.nuke,
+      tickT: 0,
     })
 
     this.cooldown = cooldownOf(def.id)
@@ -701,6 +708,10 @@ export class WeaponSystem {
 
       // 引擎已回收（life 归零 / 从场景移除 / 从 projectiles 数组消失）
       const gone = !p || p.life <= 0 || (p.mesh && p.mesh.parent === null)
+      if (!gone) {
+        this._steerShot(shot, dt)
+        this._auraTick(shot, dt, list)
+      }
       if (!gone && list && list.length) {
         for (const m of list) {
           if (!isAlive(m)) continue
@@ -722,6 +733,8 @@ export class WeaponSystem {
             /* ignore */
           }
           shot.hitIds.add(m)
+          // 特斯拉：命中后向附近目标跳电
+          if (shot.chain) this._chainShot(shot, { x: p.x, y: p.y }, m)
           if (!shot.pierce || !shot.p.damage) {
             if (!shot.pierce) {
               shot.done = true
@@ -733,8 +746,204 @@ export class WeaponSystem {
 
       if (shot.done || gone) {
         if (!shot.splashed) this._splash(shot)
+        this._vortex(shot)
         this._shots.splice(i, 1)
       }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 独特机制
+  // ---------------------------------------------------------------------------
+
+  /** 追踪弹：在半径内找最近的活怪，按 turn（弧度/秒）把速度方向拐过去 */
+  _steerShot(shot, dt) {
+    const cfg = shot.homing
+    const p = shot.p
+    if (!cfg || !p) return
+    const list = this.game.director && Array.isArray(this.game.director.list) ? this.game.director.list : null
+    if (!list || !list.length) return
+    const radius = num(cfg.radius, 420)
+    let best = null
+    let bestD = radius * radius
+    for (const m of list) {
+      if (!isAlive(m)) continue
+      const dx = entityX(m) - p.x
+      const dy = entityY(m) - p.y
+      const d2 = dx * dx + dy * dy
+      if (d2 > 1 && d2 < bestD) {
+        bestD = d2
+        best = m
+      }
+    }
+    if (!best) return
+    const dx = entityX(best) - p.x
+    const dy = entityY(best) - p.y
+    const len = Math.hypot(dx, dy) || 1
+    const sp = Math.hypot(num(p.vx, 0), num(p.vy, 0)) || 600
+    const t = clamp(num(cfg.turn, 4) * dt, 0, 1)
+    const nx = (num(p.vx, 0) / sp) * (1 - t) + (dx / len) * t
+    const ny = (num(p.vy, 0) / sp) * (1 - t) + (dy / len) * t
+    const nl = Math.hypot(nx, ny) || 1
+    p.vx = (nx / nl) * sp
+    p.vy = (ny / nl) * sp
+  }
+
+  /** 等离子光环：弹丸飞行时按 interval 对周围持续造成伤害 */
+  _auraTick(shot, dt, list) {
+    const cfg = shot.aura
+    const p = shot.p
+    if (!cfg || !p || !list || !list.length) return
+    shot.tickT = (shot.tickT || 0) - dt
+    if (shot.tickT > 0) return
+    const interval = Math.max(0.1, num(cfg.interval, 0.25))
+    shot.tickT += interval
+    const r = num(cfg.radius, 90)
+    const dmg = Math.max(1, Math.round(num(cfg.dps, 18) * interval))
+    for (const m of list) {
+      if (!isAlive(m)) continue
+      const dx = entityX(m) - p.x
+      const dy = entityY(m) - p.y
+      if (dx * dx + dy * dy > r * r) continue
+      try {
+        if (typeof m.takeDamage === 'function') m.takeDamage(dmg, p.x)
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    try {
+      this.game.particles && this.game.particles.emitMany('spark', p.x, p.y, 3, { color: num(p.color, 0x7bff8a) })
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  /** 连锁闪电：从命中点向最近的未命中的怪跳 count 次，伤害逐级 falloff */
+  _chainShot(shot, from, firstHit) {
+    const cfg = shot.chain
+    if (!cfg) return
+    const list = this.game.director && Array.isArray(this.game.director.list) ? this.game.director.list : null
+    if (!list || !list.length) return
+    const radius = num(cfg.radius, 220)
+    const falloff = clamp(num(cfg.falloff, 0.6), 0.1, 1)
+    const jumps = Math.max(1, Math.round(num(cfg.count, 2)))
+    const hit = new Set(firstHit ? [firstHit] : [])
+    let fx = num(from?.x, 0)
+    let fy = num(from?.y, 0)
+    for (let i = 0; i < jumps; i++) {
+      let best = null
+      let bestD = radius * radius
+      for (const m of list) {
+        if (!isAlive(m) || hit.has(m)) continue
+        const dx = entityX(m) - fx
+        const dy = entityY(m) - fy
+        const d2 = dx * dx + dy * dy
+        if (d2 < bestD) {
+          bestD = d2
+          best = m
+        }
+      }
+      if (!best) break
+      hit.add(best)
+      const dmg = Math.max(1, Math.round(shot.damage * Math.pow(falloff, i + 1)))
+      const bx = entityX(best)
+      const by = entityY(best)
+      try {
+        if (typeof best.takeDamage === 'function') best.takeDamage(dmg, fx)
+      } catch (e) {
+        /* ignore */
+      }
+      this._lightningFx(fx, fy, bx, by, num(shot.p?.color, 0x9fe8ff))
+      fx = bx
+      fy = by
+    }
+  }
+
+  /** 沿一段直线撒火花 + 落点亮光（连锁闪电的可视化） */
+  _lightningFx(x1, y1, x2, y2, color = 0x9fe8ff) {
+    const parts = this.game.particles
+    const n = 7
+    for (let i = 0; i <= n; i++) {
+      const t = i / n
+      const jx = (Math.random() - 0.5) * 12
+      const jy = (Math.random() - 0.5) * 12
+      try {
+        parts && parts.emitMany('spark', x1 + (x2 - x1) * t + jx, y1 + (y2 - y1) * t + jy, 1, { color })
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    try {
+      this.game.lightBurst && this.game.lightBurst(x2, y2, 110, color, 0.14, 0.7)
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  /** 引力漩涡：弹丸消失时把附近怪物拽向落点，并造成少量伤害 */
+  _vortex(shot) {
+    const cfg = shot.vortex
+    const p = shot.p
+    if (!cfg || !p) return
+    const list = this.game.director && Array.isArray(this.game.director.list) ? this.game.director.list : null
+    const radius = num(cfg.radius, 300)
+    const pull = num(cfg.pull, 480)
+    const dmg = Math.max(1, Math.round(num(cfg.damage, 8)))
+    if (list) {
+      for (const m of list) {
+        if (!isAlive(m)) continue
+        const cx = entityX(m)
+        const cy = entityY(m)
+        const dx = p.x - cx
+        const dy = p.y - cy
+        const d = Math.hypot(dx, dy) || 1
+        if (d > radius) continue
+        const k = 1 - d / radius
+        const b = m.body
+        if (b) {
+          b.vx = num(b.vx, 0) + (dx / d) * pull * k
+          b.vy = Math.min(-30, num(b.vy, 0) - 70 * k)
+        }
+        try {
+          m.stunT = Math.max(num(m.stunT, 0), 0.35 * k)
+        } catch (e) {
+          /* ignore */
+        }
+        try {
+          if (typeof m.takeDamage === 'function') m.takeDamage(dmg, p.x)
+        } catch (e) {
+          /* ignore */
+        }
+      }
+    }
+    const parts = this.game.particles
+    for (let i = 0; i < 20; i++) {
+      const a = Math.random() * Math.PI * 2
+      const d = radius * (0.6 + Math.random() * 0.5)
+      try {
+        parts && parts.emitMany('dust', p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 1, {
+          vx: -Math.cos(a) * 260,
+          vy: -Math.sin(a) * 260,
+          color: 0xa6c8ff,
+        })
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    try {
+      this.game.lightBurst && this.game.lightBurst(p.x, p.y, 260, 0xa6c8ff, 0.5, 0.85)
+    } catch (e) {
+      /* ignore */
+    }
+    try {
+      if (typeof this.game.cameraShake === 'function') this.game.cameraShake(0.18)
+    } catch (e) {
+      /* ignore */
+    }
+    try {
+      this.game.sfx && this.game.sfx('explosion', { vol: 0.35, rate: 0.7 })
+    } catch (e) {
+      /* ignore */
     }
   }
 
@@ -772,6 +981,29 @@ export class WeaponSystem {
       if (typeof this.game.shake === 'function') this.game.shake(0.18)
     } catch (e) {
       /* ignore */
+    }
+    // 微型核弹：爆炸范围大、光照强，画面要"白一下"
+    if (shot.nuke) {
+      try {
+        this.game.particles && this.game.particles.emitMany('explosion', p.x, p.y, 26)
+      } catch (e) {
+        /* ignore */
+      }
+      try {
+        this.game.lightBurst && this.game.lightBurst(p.x, p.y, 460, 0xffe0a0, 0.55, 1.15)
+      } catch (e) {
+        /* ignore */
+      }
+      try {
+        if (typeof this.game.cameraShake === 'function') this.game.cameraShake(0.55)
+      } catch (e) {
+        /* ignore */
+      }
+      try {
+        this.game.sfx && this.game.sfx('explosion', { vol: 0.95, rate: 0.65 })
+      } catch (e) {
+        /* ignore */
+      }
     }
   }
 

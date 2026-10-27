@@ -96,8 +96,17 @@ const WEAPON_LIST = [
   'arc_emitter',
   'rail_spike',
   'wrench_heavy',
+  'gravity_emitter',
+  'tesla_arc',
+  'plasma_cannon',
+  'fatman',
+  'smart_rifle',
+  'chainblade',
 ]
-const AMMO_LIST = ['ammo_9mm', 'ammo_laser', 'ammo_nail', 'ammo_scrap', 'ammo_arc', 'ammo_rail']
+const AMMO_LIST = [
+  'ammo_9mm', 'ammo_laser', 'ammo_nail', 'ammo_scrap', 'ammo_arc', 'ammo_rail',
+  'ammo_core', 'ammo_tesla', 'ammo_plasma', 'ammo_nuke',
+]
 const CHASSIS_LIST = ['unit7', 'tesla', 'agibot', 'atlas', 'spider', 'mule', 'ghost', 'hulk']
 
 // ---------------------------------------------------------------------------
@@ -225,8 +234,8 @@ check('validateWeaponData() 通过', () => {
   assert(v.ok, `errors: ${v.errors.slice(0, 8).join(' | ')}`)
 })
 
-check('12 把武器全部注册且 category/slot/stack 正确', () => {
-  assertEq(allWeapons().length, 12, 'weapon count')
+check('18 把武器全部注册且 category/slot/stack 正确', () => {
+  assertEq(allWeapons().length, 18, 'weapon count')
   for (const id of WEAPON_LIST) {
     const def = getWeapon(id)
     assert(def, `missing weapon ${id}`)
@@ -238,9 +247,9 @@ check('12 把武器全部注册且 category/slot/stack 正确', () => {
   }
 })
 
-check('6 种弹药全部注册且 stack=60', () => {
-  assertEq(allAmmo().length, 6, 'ammo count')
-  assertEq(AMMO_IDS.length, 6, 'AMMO_IDS length')
+check('10 种弹药全部注册且 stack=60', () => {
+  assertEq(allAmmo().length, 10, 'ammo count')
+  assertEq(AMMO_IDS.length, 10, 'AMMO_IDS length')
   for (const id of AMMO_LIST) {
     const def = getAmmo(id)
     assert(def, `missing ammo ${id}`)
@@ -302,9 +311,9 @@ check('武器辅助函数（cooldown/reload/art/class）', () => {
 // ===========================================================================
 group('2 机体兼容')
 
-check('compatMatrix 覆盖 12×8，且不兼容时给出中文 reason', () => {
+check('compatMatrix 覆盖 18×8，且不兼容时给出中文 reason', () => {
   const m = compatMatrix()
-  assertEq(Object.keys(m).length, 12, 'weapon rows')
+  assertEq(Object.keys(m).length, 18, 'weapon rows')
   for (const id of WEAPON_LIST) {
     assert(m[id], `missing row ${id}`)
     assertEq(Object.keys(m[id]).length, 8, `${id} chassis cols`)
@@ -814,7 +823,7 @@ check('validateWeaponLoot() 通过', () => {
   assert(v.ok, `errors: ${v.errors.slice(0, 8).join(' | ')}`)
 })
 
-check('四个 biome 表齐全，权重正，覆盖全部 12 把武器', () => {
+check('四个 biome 表齐全，权重正，覆盖全部 18 把武器', () => {
   for (const biome of ['city', 'village', 'factory', 'dump']) {
     const entries = WEAPON_LOOT_TABLES[biome]
     assert(Array.isArray(entries) && entries.length, `${biome} table`)

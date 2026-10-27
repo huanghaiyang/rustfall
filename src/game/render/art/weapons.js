@@ -32,6 +32,12 @@ const GLOW = {
   nailgun: PAL.neonWarm,
   scrap_launcher: PAL.rustHot,
   semi_pistol: PAL.neonWarm,
+  gravity_emitter: PAL.neonCold,
+  tesla_arc: PAL.signal,
+  plasma_cannon: PAL.toxicGlow,
+  fatman: PAL.warn,
+  smart_rifle: PAL.neonWarm,
+  chainblade: PAL.warn,
 }
 
 /** 握把（斜向下）。 */
@@ -334,6 +340,119 @@ function weaponBody(s, id, ox, oy) {
       s.px(X(6), Y(-2), PAL.neonWarm)
       break
     }
+    case 'gravity_emitter': {
+      // 引力投射器：厚重的线圈机体 + 前端引力球
+      s.rect(X(2), Y(-5), 12, 10, steelD)
+      s.rect(X(3), Y(-4), 10, 8, PAL.steelBlue)
+      // 三道线圈
+      for (let k = 0; k < 3; k++) {
+        s.rect(X(5 + k * 3), Y(-6), 2, 12, PAL.steelDark)
+        s.rect(X(5 + k * 3), Y(-6), 2, 1, steelL)
+      }
+      s.rect(X(14), Y(-6), 4, 12, PAL.steelDark)
+      s.rect(X(15), Y(-5), 4, 10, PAL.void)
+      // 引力球
+      s.disc(X(18), Y(0), 4, PAL.neonCold)
+      s.disc(X(18), Y(0), 2.4, PAL.white)
+      s.px(X(20), Y(-3), PAL.white)
+      grip(s, X(5), Y(5), 4, 5, PAL.dust, steelD)
+      magazine(s, X(9), Y(5), 4, 4, PAL.steelLight, steelD)
+      break
+    }
+    case 'tesla_arc': {
+      // 特斯拉连发器：变压器 + 铜线圈 + 双电极
+      s.rect(X(2), Y(-4), 9, 8, PAL.steelDark)
+      s.rect(X(3), Y(-3), 7, 6, mix(PAL.steel, PAL.rust, 0.45))
+      for (let k = 0; k < 3; k++) s.rect(X(3 + k * 2), Y(-4), 1, 8, PAL.neonWarm)
+      s.rect(X(11), Y(-3), 7, 6, steelD)
+      s.rect(X(12), Y(-2), 6, 4, steel)
+      // 双电极
+      s.line(X(18), Y(-2), X(23), Y(-4), steelL)
+      s.line(X(18), Y(2), X(23), Y(4), steelL)
+      s.px(X(23), Y(-4), PAL.white)
+      s.px(X(23), Y(4), PAL.white)
+      // 电弧
+      s.line(X(20), Y(-3), X(21), Y(-1), PAL.signal)
+      s.line(X(21), Y(-1), X(20), Y(1), PAL.signal)
+      s.line(X(20), Y(1), X(21), Y(3), PAL.signal)
+      grip(s, X(6), Y(4), 3, 5, PAL.dust, steelD)
+      break
+    }
+    case 'plasma_cannon': {
+      // 等离子重炮：上下双导轨 + 中间悬着的绿色等离子团
+      s.rect(X(1), Y(-6), 15, 3, steelD)
+      s.rect(X(1), Y(3), 15, 3, steelD)
+      s.rect(X(1), Y(-5), 15, 1, steelL)
+      s.rect(X(1), Y(4), 15, 1, steelL)
+      for (let k = 0; k < 3; k++) {
+        s.rect(X(4 + k * 4), Y(-7), 1, 2, PAL.toxicGlow)
+        s.rect(X(4 + k * 4), Y(5), 1, 2, PAL.toxicGlow)
+      }
+      s.rect(X(14), Y(-6), 4, 12, PAL.steelDark)
+      s.rect(X(15), Y(-5), 3, 10, PAL.void)
+      // 等离子团
+      s.disc(X(18), Y(0), 4, PAL.toxic)
+      s.disc(X(18), Y(0), 2.2, PAL.toxicGlow)
+      s.px(X(20), Y(-1), PAL.white)
+      grip(s, X(4), Y(4), 4, 5, PAL.dust, steelD)
+      magazine(s, X(8), Y(5), 5, 4, PAL.steelLight, steelD)
+      break
+    }
+    case 'fatman': {
+      // 微型核弹发射器：粗短炮管 + 侧开的装填口 + 橄榄弹头
+      s.rect(X(1), Y(-6), 17, 12, steelD)
+      s.rect(X(2), Y(-5), 15, 10, mix(PAL.rust, PAL.steel, 0.5))
+      s.rect(X(2), Y(-5), 15, 1, PAL.rustLight)
+      s.rect(X(2), Y(4), 15, 1, PAL.rustDark)
+      // 管口
+      s.rect(X(16), Y(-7), 4, 14, PAL.steelDark)
+      s.rect(X(17), Y(-6), 3, 12, PAL.void)
+      // 弹头（露在管口）
+      s.disc(X(19), Y(0), 3, PAL.mossDead)
+      s.px(X(19), Y(-2), PAL.warn)
+      // 手摇托架
+      for (let k = 0; k < 3; k++) s.rect(X(4 + k * 4), Y(-8), 2, 2, PAL.steelDark)
+      grip(s, X(6), Y(6), 3, 5, PAL.dust, steelD)
+      s.rect(X(10), Y(6), 5, 3, PAL.steelDark)
+      s.line(X(4), Y(-6), X(4), Y(6), PAL.rustLight)
+      break
+    }
+    case 'smart_rifle': {
+      // 智能追踪步枪：细长枪身 + 前端镜组 + 侧挂弹匣
+      s.rect(X(2), Y(-3), 15, 5, steelD)
+      s.rect(X(2), Y(-2), 15, 3, steel)
+      s.line(X(3), Y(-2), X(16), Y(-2), steelL, 1)
+      barrel(s, X(16), Y(-1), 7, 2, steel, steelL, steelD)
+      // 前端镜组（追踪模块）
+      s.rect(X(17), Y(-6), 5, 5, PAL.steelDark)
+      s.disc(X(19), Y(-4), 2, PAL.void)
+      s.px(X(19), Y(-4), PAL.neonWarm)
+      s.rect(X(17), Y(-6), 5, 1, PAL.steelLight)
+      scope(s, X(6), Y(-5), 7, steelL, PAL.white)
+      grip(s, X(6), Y(2), 3, 5, PAL.dust, steelD)
+      magazine(s, X(10), Y(2), 4, 5, PAL.steelLight, steelD)
+      s.px(X(1), Y(-1), PAL.neonWarm)
+      break
+    }
+    case 'chainblade': {
+      // 链锯剑：角钢剑身 + 沿刃口转动的锯链 + 小马达
+      s.rect(X(2), Y(-2), 8, 4, PAL.steelDark)
+      s.rect(X(3), Y(-1), 7, 2, PAL.rustDark)
+      // 剑身
+      s.rect(X(9), Y(-3), 13, 2, steelD)
+      s.rect(X(9), Y(-2), 13, 1, steelL)
+      // 锯链齿
+      for (let k = 0; k < 6; k++) {
+        s.px(X(10 + k * 2), Y(-4), PAL.steelWhite)
+        s.px(X(10 + k * 2), Y(1), PAL.steelWhite)
+      }
+      s.px(X(22), Y(-3), PAL.white)
+      // 马达 + 握把
+      s.disc(X(6), Y(0), 3, PAL.steelDark)
+      s.disc(X(6), Y(0), 1.6, PAL.rustHot)
+      grip(s, X(3), Y(2), 4, 5, PAL.dust, steelD)
+      break
+    }
     default: {
       // 未知：按哈希退化成“铁管”，稳定不崩
       s.thick(X(1), Y(0), X(21), Y(0), 2, PAL.steelDark)
@@ -359,6 +478,12 @@ const KIND = {
   dagger: 'melee',
   hammer: 'melee',
   wrench_heavy: 'melee',
+  gravity_emitter: 'energy',
+  tesla_arc: 'energy',
+  plasma_cannon: 'energy',
+  fatman: 'gun',
+  smart_rifle: 'gun',
+  chainblade: 'melee',
 }
 
 const MUZZLE = {
@@ -370,6 +495,12 @@ const MUZZLE = {
   semi_pistol: PAL.neonWarm,
   nailgun: PAL.neonWarm,
   scrap_launcher: PAL.rustHot,
+  gravity_emitter: PAL.neonCold,
+  tesla_arc: PAL.signal,
+  plasma_cannon: PAL.toxicGlow,
+  fatman: PAL.warn,
+  smart_rifle: PAL.neonWarm,
+  chainblade: PAL.warn,
 }
 
 /* ============================================================================
