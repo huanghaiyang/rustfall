@@ -877,17 +877,20 @@ export class Game {
       this.cameraShake(0.04)
       if (!inShelter) {
         const hazard = this.dayNight?.hazard?.() ?? 1
-        G.exposed += dt * (0.6 + hazard * 0.8)
-        // 酸雨持续腐蚀：结构缓慢掉血，5 秒暴露直接报废
-        G.hp = Math.max(0, G.hp - dt * 4.2 * (0.5 + hazard))
-        G.hurt = Math.max(G.hurt, 0.28)
-        if (G.hp <= 0) {
-          this.die('被酸雨腐蚀殆尽')
-          return
-        }
-        if (G.exposed > RAIN_KILL_TIME) {
-          this.die('被酸雨腐蚀殆尽')
-          return
+        if (G.settings?.godMode) G.exposed = 0
+        else G.exposed += dt * (0.6 + hazard * 0.8)
+        // 酸雨持续腐蚀：结构缓慢掉血，5 秒暴露直接报废（测试选项：无敌时跳过）
+        if (!G.settings?.godMode) {
+          G.hp = Math.max(0, G.hp - dt * 4.2 * (0.5 + hazard))
+          G.hurt = Math.max(G.hurt, 0.28)
+          if (G.hp <= 0) {
+            this.die('被酸雨腐蚀殆尽')
+            return
+          }
+          if (G.exposed > RAIN_KILL_TIME) {
+            this.die('被酸雨腐蚀殆尽')
+            return
+          }
         }
         if (Math.random() < dt * 10) {
           this.particles.emit('rain', this.robot.centerX + (Math.random() - 0.5) * 60, this.robot.body.y, {
@@ -970,6 +973,17 @@ export class Game {
     saveSettings({ display: { ...G.settings }, version: 4 })
     if (key === 'gamepad' && !value) {
       G.gamepad.connected = false
+    }
+    // 测试选项：开启无敌时立刻回满
+    if (key === 'godMode') {
+      if (value) {
+        G.hp = G.hpMax
+        G.exposed = 0
+        if (this.robot) this.robot.dead = false
+      }
+      toast(value ? '测试模式：无敌已开启' : '测试模式：无敌已关闭', 'info', 2)
+    } else if (key === 'infiniteJump') {
+      toast(value ? '测试模式：无限跳已开启' : '测试模式：无限跳已关闭', 'info', 2)
     }
     return value
   }
@@ -1847,6 +1861,15 @@ export class Game {
   die(reason) {
     if (G.phase !== 'playing' && G.phase !== 'transition') return
     if (!this.robot) return
+    // 测试选项：无敌 —— 不死，回满血并送回出生点
+    if (G.settings?.godMode) {
+      G.hp = G.hpMax
+      G.exposed = 0
+      G.shelterProgress = 0
+      this.robot.invuln = 1
+      this.placeRobot?.()
+      return
+    }
     this.robot.dead = true
     G.phase = 'dead'
     G.deathReason = reason

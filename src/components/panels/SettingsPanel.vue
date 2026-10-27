@@ -23,6 +23,8 @@ const DEFAULTS = Object.freeze({
   deadzone: 0.24,
   rumble: true,
   showClock: true,
+  godMode: false,
+  infiniteJump: false,
 })
 const DEFAULT_VOLUME = 0.72
 
@@ -38,6 +40,12 @@ const VISUAL = [
 const INPUT_ROWS = [
   { key: 'gamepad', label: '手柄', en: 'GAMEPAD' },
   { key: 'rumble', label: '震动', en: 'RUMBLE' },
+]
+
+// 测试选项：仅用于游戏内调试
+const TEST_ROWS = [
+  { key: 'godMode', label: '无敌', en: 'GOD MODE' },
+  { key: 'infiniteJump', label: '无限跳', en: 'INFINITE JUMP' },
 ]
 
 const settings = computed(() => G.settings || {})
@@ -238,6 +246,32 @@ const ICONS = {
           </div>
           <span class="stg-dot" :class="{ on: padConnected }"></span>
         </div>
+      </section>
+
+      <!-- 测试 -->
+      <section class="stg-group stg-group-test">
+        <header class="stg-head">
+          <div class="stg-title"><b>测试</b><em>DEBUG</em></div>
+          <span class="rp-grow"></span>
+          <span class="stg-note">仅供游戏内调试</span>
+        </header>
+        <div class="stg-rows">
+          <div v-for="o in TEST_ROWS" :key="o.key" class="stg-row">
+            <div class="stg-label"><b>{{ o.label }}</b><em>{{ o.en }}</em></div>
+            <button
+              class="rp-switch"
+              :class="{ on: isOn(o.key) }"
+              type="button"
+              role="switch"
+              :aria-checked="isOn(o.key)"
+              :aria-label="o.label"
+              @click="toggle(o.key)"
+            >
+              <span class="stg-sr">{{ isOn(o.key) ? '开' : '关' }}</span>
+            </button>
+          </div>
+        </div>
+        <p class="stg-hint">无敌：免疫伤害与酸雨，死亡时回满并送回出生点。无限跳：空中可无限起跳，不消耗电量。</p>
       </section>
 
       <!-- 音频 -->

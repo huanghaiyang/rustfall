@@ -354,11 +354,14 @@ export class Robot {
           this.jumpsLeft = this.maxJumps - 1
           this.squash = 1.16
           this.game.sfx?.('jump', { vol: 0.6, rate: 0.9 + Math.random() * 0.1 })
-        } else if (this.jumpsLeft > 1 && G.energy >= 8) {
+        } else if ((this.jumpsLeft > 1 && G.energy >= 8) || G.settings?.infiniteJump) {
           b.vy = -jumpPower * 0.88
-          this.jumpsLeft--
+          // 测试选项：无限跳不消耗跳跃次数与电量
+          if (!G.settings?.infiniteJump) {
+            this.jumpsLeft--
+            G.energy -= 8
+          }
           this.jumpBuffer = 0
-          G.energy -= 8
           this.game.sfx?.('servo', { vol: 0.6 })
           this.game.particles?.emitMany?.('spark', this.centerX, this.body.y + b.h, 5)
         }
@@ -642,6 +645,8 @@ export class Robot {
 
   applyDamage(n, fromX = null, reason = null) {
     if (this.dead || this.invuln > 0) return
+    // 测试选项：无敌
+    if (G.settings?.godMode) return
     this.hurtT = 0.34
     const reduced = Math.max(1, Math.round(n * (1 - this.stats.armor)))
     G.hp = Math.max(0, G.hp - reduced)

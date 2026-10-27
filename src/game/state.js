@@ -85,6 +85,9 @@ export const G = reactive({
     deadzone: 0.24,
     rumble: true,
     showClock: true,
+    // 测试选项（游戏内调试用）：无敌 / 无限跳
+    godMode: false,
+    infiniteJump: false,
   },
   gamepad: { connected: false, id: '', axes: [0, 0], buttons: 0 },
   weatherIntensity: 0,
