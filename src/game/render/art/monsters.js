@@ -1105,6 +1105,237 @@ function drawPsychoPunk(s, F) {
  * 4. 帧合成 + 收尾管线
  * ========================================================================== */
 
+/** 服务器游魂：机柜残躯 + 显示器头颅 + 垂下的线缆（数据中心 / AI 实验室）。 */
+function drawServerWraith(s, F) {
+  const g = s.h - 1
+  const i = F.i || 0
+  const atk = F.anim === 'attack'
+  const hover = F.anim === 'run' && i % 2 ? 2 : 0
+  const cx = 22
+  const cy = 17 + hover
+  s.shadow(cx + 7, g - 0.5, 10, 1.5, 0.2)
+  // 垂下的线缆
+  for (let k = 0; k < 4; k++) {
+    const x = cx - 6 + k * 4
+    s.thick(x, cy + 7, x + (i % 2 ? 1 : -1), g - 5 - (k % 2) * 3, 0.9, PAL.oil)
+    s.px(x + (i % 2 ? 1 : -1), g - 4 - (k % 2) * 3, PAL.neon, 0.35)
+  }
+  // 机柜躯干
+  s.rect(cx - 8, cy - 5, 16, 13, PAL.steelDark)
+  s.rect(cx - 7, cy - 4, 14, 11, PAL.steel)
+  for (let k = 0; k < 3; k++) s.px(cx - 4 + k * 3, cy + 1, k % 2 ? PAL.neon : PAL.toxicDark, 0.8)
+  s.rect(cx - 2, cy + 4, 4, 3, PAL.void)
+  // 显示器头
+  s.rect(cx - 9, cy - 18, 18, 13, PAL.ashPale)
+  s.rect(cx - 8, cy - 17, 16, 11, PAL.steelDark)
+  s.rect(cx - 7, cy - 16, 14, 9, PAL.void)
+  if (atk) {
+    s.px(cx - 3, cy - 12, PAL.neonRed)
+    s.px(cx + 2, cy - 12, PAL.neonRed)
+    s.line(cx - 4, cy - 10, cx + 4, cy - 10, PAL.neonRed, 0.8)
+    F.g.push({ x: cx, y: cy - 12, r: 10, c: PAL.neonRed, p: 0.55 })
+  } else {
+    s.px(cx - 3, cy - 13, PAL.signal, 0.9)
+    s.px(cx + 3, cy - 13, PAL.signal, 0.9)
+    s.line(cx - 4, cy - 10, cx + 4, cy - 10, PAL.neonCold, 0.5)
+    F.g.push({ x: cx, y: cy - 13, r: 7, c: PAL.signal, p: 0.35 })
+  }
+  // 天线
+  s.thick(cx + 8, cy - 18, cx + 12, cy - 24, 0.9, PAL.steelLight)
+  s.px(cx + 12, cy - 25, PAL.neonWarm, 0.8)
+  // 侧臂
+  s.thick(cx - 8, cy - 1, cx - 13, cy + 5, 1.8, PAL.steel)
+  s.thick(cx + 8, cy - 1, cx + 13, cy + 5, 1.8, PAL.steel)
+  s.speck(cx - 9, cy - 18, 18, 26, PAL.rustDark, 0.08, 0.45)
+}
+
+/** 焊接壮汉：重型工装 + 面罩 + 焊枪（机器人工厂 / 军事基地）。 */
+function drawWeldBrute(s, F) {
+  const g = s.h - 1
+  const i = F.i || 0
+  const atk = F.anim === 'attack'
+  const step = F.anim === 'run' ? (i % 2 ? 2 : 0) : 0
+  const cx = 30
+  const hipY = 30
+  const metal = mix(PAL.steel, PAL.rustDark, 0.35)
+  const metalD = mix(metal, PAL.void, 0.4)
+  s.shadow(cx, g - 0.5, 17, 2.2, 0.32)
+  // 腿
+  s.thick(cx - 6, hipY, cx - 7 + step, g - 3, 4, metalD)
+  s.thick(cx + 5, hipY, cx + 6 - step, g - 3, 4, metalD)
+  s.rect(cx - 10 + step, g - 4, 8, 3, PAL.ink)
+  s.rect(cx + 3 - step, g - 4, 8, 3, PAL.ink)
+  // 躯干（工装围裙）
+  s.rect(cx - 12, hipY - 20, 24, 21, metalD)
+  s.rect(cx - 11, hipY - 19, 22, 19, metal)
+  s.rect(cx - 9, hipY - 12, 18, 10, PAL.ash)
+  // 背后气瓶
+  s.ell(cx - 13, hipY - 16, 4, 8, PAL.steelDark)
+  s.ell(cx - 13, hipY - 17, 3.2, 6.6, PAL.steelBlue)
+  s.px(cx - 13, hipY - 24, PAL.neonWarm, 0.8)
+  // 头 + 面罩
+  const hy = hipY - 26
+  s.ell(cx, hy, 7, 7.5, metalD)
+  s.ell(cx + 0.5, hy - 0.5, 6, 6.4, PAL.steel)
+  s.rect(cx - 5, hy - 2, 11, 5, PAL.void)
+  s.px(cx + 2, hy, PAL.neonRed, 0.9)
+  F.g.push({ x: cx + 2, y: hy, r: 5, c: PAL.neonRed, p: 0.4 })
+  s.rect(cx - 3, hy + 4, 6, 2, PAL.rustDark)
+  // 右臂 + 焊枪
+  const ay = hipY - 12
+  s.thick(cx + 9, ay, cx + 16, ay + (atk ? -4 : 4), 3.4, metalD)
+  const tx = atk ? cx + 26 : cx + 18
+  const ty = ay + (atk ? -5 : 4)
+  s.rect(tx - 3, ty - 2, 8, 4, PAL.steelLight)
+  if (atk) {
+    s.poly(
+      [
+        [tx + 5, ty - 2],
+        [tx + 15, ty - 6],
+        [tx + 15, ty + 6],
+        [tx + 5, ty + 2],
+      ],
+      PAL.neonWarm,
+    )
+    s.glow(tx + 11, ty, 9, PAL.neonWarm, 0.35)
+    F.g.push({ x: tx + 10, y: ty, r: 12, c: PAL.neonWarm, p: 0.5 })
+  } else {
+    s.px(tx + 5, ty, PAL.neonWarm, 0.6)
+  }
+  // 左臂
+  s.thick(cx - 9, ay, cx - 15, ay + 6, 3, metalD)
+  s.speck(cx - 12, hipY - 26, 24, 24, PAL.rustDark, 0.1, 0.5)
+}
+
+/** 狂信者：兜帽长袍 + 防毒面具 + 提炉（教堂 / 救助中心 / 战场）。 */
+function drawCultFanatic(s, F) {
+  const g = s.h - 1
+  const i = F.i || 0
+  const atk = F.anim === 'attack'
+  const step = F.anim === 'run' ? (i % 2 ? 2 : 0) : 0
+  const cx = 20
+  const robe = mix(PAL.rustDark, PAL.ash, 0.35)
+  const robeD = mix(robe, PAL.void, 0.35)
+  s.shadow(cx, g - 0.5, 12, 2, 0.3)
+  // 长袍下摆
+  s.poly(
+    [
+      [cx - 10, g - 2],
+      [cx - 7, 14],
+      [cx + 7, 14],
+      [cx + 10, g - 2],
+    ],
+    robeD,
+  )
+  s.poly(
+    [
+      [cx - 8, g - 4],
+      [cx - 6, 16],
+      [cx + 6, 16],
+      [cx + 8, g - 4],
+    ],
+    robe,
+  )
+  // 腰带与挂饰
+  s.rect(cx - 7, 26, 14, 2, PAL.rust)
+  s.px(cx, 30, PAL.neonWarm, 0.7)
+  // 兜帽头
+  s.poly(
+    [
+      [cx - 7, 16],
+      [cx - 5, 3],
+      [cx + 5, 3],
+      [cx + 7, 16],
+    ],
+    robeD,
+  )
+  s.ell(cx, 9, 5, 5, PAL.ash)
+  s.rect(cx - 4, 8, 8, 4, PAL.void)
+  s.px(cx - 2, 10, PAL.neonWarm, 0.8)
+  s.px(cx + 2, 10, PAL.neonWarm, 0.8)
+  s.rect(cx - 2, 13, 4, 2, PAL.steelDark)
+  // 手臂
+  s.thick(cx - 6, 20, cx - 10 - step, 30, 2.2, robe)
+  const hx = atk ? cx + 14 : cx + 8
+  const hy = atk ? 12 : 24
+  s.thick(cx + 6, 20, hx, hy, 2.2, robe)
+  // 提炉 / 投掷物
+  s.line(hx, hy, hx + 2, hy + 7, PAL.oilSheen)
+  s.ell(hx + 2, hy + 9, 3.4, 3.8, PAL.ochre)
+  if (atk) {
+    s.glow(hx + 2, hy + 9, 8, PAL.neonWarm, 0.4)
+    F.g.push({ x: hx + 2, y: hy + 9, r: 8, c: PAL.neonWarm, p: 0.5 })
+    s.poly(
+      [
+        [hx + 4, hy + 7],
+        [hx + 10, hy + 2],
+        [hx + 9, hy + 12],
+      ],
+      PAL.neonWarm,
+    )
+  } else {
+    s.px(hx + 2, hy + 9, PAL.neonWarm, 0.8)
+    F.g.push({ x: hx + 2, y: hy + 9, r: 4, c: PAL.neonWarm, p: 0.3 })
+  }
+  // 袍面污迹
+  s.speck(cx - 9, 16, 18, g - 20, PAL.bloodDark, 0.05, 0.45)
+}
+
+/** 外星浮球：光滑舱体 + 单眼 + 触须（外星人研究中心）。 */
+function drawAlienOrb(s, F) {
+  const g = s.h - 1
+  const i = F.i || 0
+  const atk = F.anim === 'attack'
+  const hover = F.anim === 'run' && i % 2 ? 2 : 0
+  const cx = 23
+  const cy = 15 + hover
+  s.shadow(cx, g - 0.5, 11, 1.6, 0.2)
+  // 触须
+  for (let k = 0; k < 5; k++) {
+    const a = -0.9 + k * 0.45
+    const len = 12 + (k % 2) * 4
+    s.thick(
+      cx + Math.sin(a) * 8,
+      cy + 7,
+      cx + Math.sin(a) * 14,
+      cy + 7 + len,
+      1.3,
+      mix(PAL.neonCold, PAL.void, 0.45),
+    )
+    s.px(cx + Math.sin(a) * 14, cy + 7 + len, PAL.neonCold, 0.5)
+  }
+  // 外壳
+  s.ell(cx, cy, 14, 13, mix(PAL.steelBlue, PAL.void, 0.35))
+  s.ell(cx, cy - 1, 12, 11, PAL.steelBlue)
+  s.ell(cx - 2, cy - 4, 8, 6, PAL.glass, 0.35)
+  // 单眼
+  s.disc(cx + 2, cy, 5.5, PAL.void)
+  s.disc(cx + 2, cy, 4, atk ? PAL.neonRed : PAL.neonCold)
+  s.px(cx + 1, cy - 1, PAL.white, 0.9)
+  F.g.push({ x: cx + 2, y: cy, r: atk ? 12 : 8, c: atk ? PAL.neonRed : PAL.neonCold, p: atk ? 0.6 : 0.4 })
+  // 外骨环
+  for (let k = 0; k < 3; k++) {
+    const y = cy - 6 + k * 6
+    s.thick(cx - 13, y, cx + 13, y - 1, 0.8, PAL.steelWhite, 0.4)
+  }
+  // 攻击：张开的花瓣
+  if (atk) {
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * TAU - Math.PI / 2
+      s.poly(
+        [
+          [cx + Math.cos(a) * 10, cy + Math.sin(a) * 10],
+          [cx + Math.cos(a + 0.25) * 19, cy + Math.sin(a + 0.25) * 19],
+          [cx + Math.cos(a - 0.25) * 19, cy + Math.sin(a - 0.25) * 19],
+        ],
+        PAL.neonRed,
+        0.55,
+      )
+    }
+  }
+  s.speck(cx - 13, cy - 11, 26, 22, PAL.rustDark, 0.05, 0.35)
+}
+
 const DEFS = {
   radboar: { w: 64, h: 42, draw: drawRadboar, seed: 0x101, run: 4, attack: 2 },
   crawler: { w: 40, h: 24, draw: drawCrawler, seed: 0x102, run: 4, attack: 2 },
@@ -1118,6 +1349,10 @@ const DEFS = {
   tunnel_hound: { w: 46, h: 28, draw: drawTunnelHound, seed: 0x10a, run: 2, attack: 1 },
   cyber_mantis: { w: 52, h: 38, draw: drawCyberMantis, seed: 0x10b, run: 3, attack: 2 },
   psycho_punk: { w: 38, h: 56, draw: drawPsychoPunk, seed: 0x10c, run: 3, attack: 1 },
+  server_wraith: { w: 44, h: 46, draw: drawServerWraith, seed: 0x10d, run: 2, attack: 1 },
+  weld_brute: { w: 58, h: 54, draw: drawWeldBrute, seed: 0x10e, run: 3, attack: 1 },
+  cult_fanatic: { w: 40, h: 58, draw: drawCultFanatic, seed: 0x10f, run: 3, attack: 1 },
+  alien_orb: { w: 46, h: 40, draw: drawAlienOrb, seed: 0x110, run: 2, attack: 1 },
 }
 
 const OUTLINE_COL = {
@@ -1133,6 +1368,10 @@ const OUTLINE_COL = {
   tunnel_hound: mix(PAL.void, PAL.ash, 0.3),
   cyber_mantis: mix(PAL.void, PAL.toxic, 0.2),
   psycho_punk: mix(PAL.void, PAL.neonRed, 0.2),
+  server_wraith: mix(PAL.void, PAL.neonCold, 0.24),
+  weld_brute: mix(PAL.void, PAL.neonWarm, 0.2),
+  cult_fanatic: mix(PAL.void, PAL.rustDark, 0.26),
+  alien_orb: mix(PAL.void, PAL.neonCold, 0.3),
 }
 
 const WARM = {
@@ -1148,6 +1387,10 @@ const WARM = {
   tunnel_hound: PAL.ash,
   cyber_mantis: PAL.toxic,
   psycho_punk: PAL.neonRed,
+  server_wraith: PAL.neonCold,
+  weld_brute: PAL.neonWarm,
+  cult_fanatic: PAL.rustDark,
+  alien_orb: PAL.neonCold,
 }
 
 function renderFrame(id, P) {

@@ -14,6 +14,7 @@ import { Scrapper } from './scrapper.js'
 import { Drone } from './drone.js'
 import { Hulkbot } from './hulkbot.js'
 import { GhoulHusk, TunnelHound, CyberMantis, PsychoPunk } from './breeds.js'
+import { ServerWraith, WeldBrute, CultFanatic, AlienOrb } from './theme-minions.js'
 
 /** 全部怪物 id（顺序稳定，UI/任务/图鉴可直接用） */
 export const MONSTER_IDS = [
@@ -29,6 +30,10 @@ export const MONSTER_IDS = [
   'tunnel_hound',
   'cyber_mantis',
   'psycho_punk',
+  'server_wraith',
+  'weld_brute',
+  'cult_fanatic',
+  'alien_orb',
 ]
 
 /** id → 类。index 只负责映射；实例化走 createMonster。 */
@@ -45,6 +50,10 @@ const CLASS_MAP = new Map([
   ['tunnel_hound', TunnelHound],
   ['cyber_mantis', CyberMantis],
   ['psycho_punk', PsychoPunk],
+  ['server_wraith', ServerWraith],
+  ['weld_brute', WeldBrute],
+  ['cult_fanatic', CultFanatic],
+  ['alien_orb', AlienOrb],
 ])
 
 export { CLASS_MAP }

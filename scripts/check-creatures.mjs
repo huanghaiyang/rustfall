@@ -221,8 +221,8 @@ Events.on('large:dead', (p) => deadEvents.push(p))
 // 1. 注册与索引
 // ---------------------------------------------------------------------------
 console.log('\n== 注册 / 索引 ==')
-check(large.LARGE_IDS.length === 4, 'LARGE_IDS 有 4 种', large.LARGE_IDS.join(','))
-check(ALLOWED_LARGE.every((id) => large.isLarge(id)), 'isLarge 识别全部 4 种')
+check(large.LARGE_IDS.length >= 7, 'LARGE_IDS 至少 7 种', large.LARGE_IDS.join(','))
+check(ALLOWED_LARGE.every((id) => large.isLarge(id)), 'isLarge 识别全部基础大怪')
 check(!large.isLarge('radboar'), 'isLarge 不把小怪当大怪')
 check(MAX_ALIVE === 10, 'MAX_ALIVE = 10', String(MAX_ALIVE))
 check(MAX_LARGE_ALIVE === 2, 'MAX_LARGE_ALIVE = 2', String(MAX_LARGE_ALIVE))

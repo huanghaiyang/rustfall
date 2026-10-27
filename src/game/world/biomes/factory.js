@@ -291,12 +291,19 @@ export function generateFactoryRoom(spec) {
     { kind: 'factory_pipe', count: rng.int(2, 5), r: 2 },
     { kind: 'barrel', count: rng.int(2, 4), r: 1 },
     { kind: 'crate', count: rng.int(1, 3), r: 1 },
-    { kind: 'junk_heap', count: rng.int(1, 3), r: 1 },
+    { kind: 'junk_heap', count: rng.int(0, 1), r: 1, scale: 0.8 },
+    { kind: 'junk_heap_scrap', count: rng.int(1, 2), r: 1, scale: 0.9 },
     { kind: 'workbench', count: rng.int(0, 2), r: 1 },
     { kind: 'corpse', count: rng.int(0, 2), r: 1 },
     { kind: 'skeleton_human', count: rng.int(0, 1), r: 1 },
     { kind: 'tire_pile', count: rng.int(0, 2), r: 1 },
     { kind: 'puddle_toxic', count: rng.int(1, 3), r: 1 },
+    // 车间机械：齿盘、传送带、伺服臂
+    { kind: 'gear_assembly', count: rng.int(1, 2), r: 2 },
+    { kind: 'conveyor_segment', count: rng.int(0, 1), r: 2 },
+    { kind: 'mech_servo_arm', count: rng.int(0, 1), r: 2 },
+    { kind: 'mech_piston', count: rng.int(0, 2), r: 1 },
+    { kind: 'mech_clamp', count: rng.int(0, 1), r: 1 },
   ]
   if (variant !== 'shelter') {
     common.push({ kind: 'terminal', count: rng.int(1, 2), r: 1 })

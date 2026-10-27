@@ -41,6 +41,8 @@ import { WEATHERS, DAY_PARTS } from './config.js'
 import { bindGame } from './ui-actions.js'
 import { addXp, initGrowth, spendGrowth as applyGrowthPoint } from './systems/growth.js'
 import { injectEasterEggs, handleEgg } from './world/easter-eggs.js'
+import { getTheme } from './world/themes.js'
+import { createChaosAI } from './systems/chaos-ai.js'
 import { clamp, damp } from './utils.js'
 
 const SFX_MAP = {
@@ -267,6 +269,7 @@ export class Game {
     if (this.QuestSystemClass) this.quests = new this.QuestSystemClass(this)
     if (this.DialogueClass) this.dialogue = new this.DialogueClass(this)
     if (this.RescueClass) this.rescue = new this.RescueClass(this)
+    if (!this.chaos) this.chaos = createChaosAI(this)
     this.syncInventoryState()
   }
 
@@ -319,6 +322,7 @@ export class Game {
     gen.roomId = roomId
     gen.biome = spec.biome || regionBiome
     gen.label = spec.label || roomId
+    this.applyThemeRoom(gen, spec)
     try {
       decorateTerrain(gen)
     } catch (e) {
@@ -338,6 +342,34 @@ export class Game {
     }
     this.roomCache.set(key, gen)
     return gen
+  }
+
+  /**
+   * 主题站点覆盖：边境残骸带的每个房间都用已有 biome 生成，这里再按 theme
+   * 换掉景物、怪池与 BOSS，让它读起来像一个独立地标。
+   */
+  applyThemeRoom(gen, spec) {
+    const theme = spec?.theme ? getTheme(spec.theme) : null
+    if (!theme) return
+    gen.themeId = theme.id
+    gen.themeName = theme.name
+    gen.themeEn = theme.en
+    gen.themeAccent = theme.accent
+    gen.sceneryKinds = theme.sceneryKinds
+
+    // 小怪：固定池按 monsterCount 铺开，避免 director 走 biome 兜底池
+    const pool = Array.isArray(theme.monsters) && theme.monsters.length ? theme.monsters : null
+    if (pool) {
+      const count = clamp(spec.monsterCount ?? 6, 4, 9)
+      gen.monsters = []
+      for (let i = 0; i < count; i++) gen.monsters.push(pool[i % pool.length])
+    }
+
+    // 大型敌人：站点 BOSS 唯一，落点偏右，玩家从左门进来
+    if (theme.boss) {
+      const w = gen.worldW || 2000
+      gen.largeEnemies = [{ id: theme.boss, x: Math.round(w * 0.68), y: 0 }]
+    }
   }
 
   loadRoom(regionId, roomId, entry = null, opts = {}) {
@@ -374,6 +406,7 @@ export class Game {
         console.warn('[rustfall] 刷怪失败', e)
       }
     }
+    this.chaos?.reset?.(data)
     if (this.rescue) {
       try {
         this.rescue.registerCages(data)
@@ -664,6 +697,7 @@ export class Game {
     r.update(dt)
     this.room.update(dt)
     if (this.director) this.director.update(dt)
+    this.chaos?.update?.(dt)
     if (this.weapons) {
       this.weapons.setHolding?.(this.input.isDown('attack'))
       if (this.input.wasPressed('reload')) this.weapons.reload?.()
@@ -1522,6 +1556,36 @@ export class Game {
       this.addBuff('flare', '照明信号', 25, {})
       acted = true
       useKind = 'spark'
+    }
+    // 进攻道具：以玩家为中心命中范围内所有敌人
+    if (effect.emp || effect.fire) {
+      const spec = effect.emp || effect.fire
+      const radius = spec.radius || 240
+      const dmg = spec.damage || 24
+      const cx = this.robot.centerX
+      const cy = this.robot.centerY
+      const list = this.director?.list || []
+      let hit = 0
+      for (const m of list) {
+        if (!m || m.dead || !m.alive) continue
+        const d = Math.hypot(m.px - cx, m.py - cy)
+        if (d > radius) continue
+        m.takeDamage?.(dmg, cx)
+        if (effect.emp && spec.stun) {
+          m.stunT = Math.max(m.stunT || 0, spec.stun)
+          m.__glitchT = Math.max(m.__glitchT || 0, spec.stun * 0.8)
+        }
+        hit++
+      }
+      const color = effect.emp ? 0x8fc4ff : 0xff7a3c
+      this.particles?.emitMany?.('spark', cx, cy, 26, { color, spread: 2.4, life: 0.6, size: 1.4 })
+      this.cameraShake?.(0.35)
+      this.sfx(effect.emp ? 'alarm' : 'explosion', { vol: 0.55 })
+      if (hit) notify(`${def.name}命中 ${hit} 个目标`, 'good', 2)
+      else toast('附近没有目标。', 'info', 1.6)
+      this.chaos?.boost?.(8)
+      acted = true
+      useKind = 'repair'
     }
     if (effect.buff && typeof effect.buff === 'object') {
       const b = effect.buff

@@ -350,11 +350,18 @@ export function generatePortRoom(spec) {
     { kind: 'hull_plate', count: rng.int(1, 3), r: 2 },
     { kind: 'cargo_net', count: rng.int(1, 3), r: 1 },
     { kind: 'silt_mound', count: rng.int(1, 3), r: 1 },
-    { kind: 'junk_heap', count: rng.int(2, 4), r: 1 },
+    { kind: 'junk_heap', count: rng.int(0, 1), r: 1, scale: 0.8 },
+    { kind: 'junk_heap_bags', count: rng.int(0, 1), r: 1, scale: 0.9 },
+    { kind: 'junk_heap_cans', count: rng.int(0, 2), r: 1, scale: 0.9 },
     { kind: 'fence', count: rng.int(1, 3), r: 1 },
     { kind: 'skeleton_animal', count: rng.int(0, 2), r: 1 },
     { kind: 'puddle_toxic', count: rng.int(1, 3), r: 1 },
     { kind: 'factory_pipe', count: rng.int(0, 2), r: 2 },
+    // 码头机械：涡轮、闸阀、卫星天线、桥架
+    { kind: 'mech_turbine', count: rng.int(0, 1), r: 2 },
+    { kind: 'mech_valve', count: rng.int(0, 2), r: 1 },
+    { kind: 'satellite_dish', count: rng.int(0, 1), r: 2 },
+    { kind: 'bridge_truss', count: rng.int(0, 1), r: 3 },
   ]
   if (variant === 'crane') common.push({ kind: 'crane_hook', count: rng.int(1, 2), r: 2 })
   if (variant === 'lighthouse') common.push({ kind: 'beacon', count: rng.int(0, 1), r: 1 })

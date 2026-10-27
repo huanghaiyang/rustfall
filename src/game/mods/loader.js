@@ -28,6 +28,14 @@ const JSON_KINDS = {
 
 const MODS_INDEX = '/mods/index.json'
 
+// 运行期动态 import 逃生口。
+// Vite 8 会改写源码里的 import(...)，即使写了 @vite-ignore 也会包成
+// __vite__injectQuery(url, 'import') 强行拼上 ?import；而 /mods/** 在 public 目录里，
+// dev server 收到「带 ?import 的 public 文件」会直接 500
+// （Failed to load url /mods/... : This file is in /public ...）。
+// 用 Function 构造的 import 不参与静态分析，URL 原样请求，静态文件才能正常执行。
+const runtimeImport = new Function('u', 'return import(u)')
+
 /**
  * Mod 加载器：
  *  - public/mods/index.json 列出 mod 目录
@@ -152,7 +160,7 @@ export class ModLoader {
       // 逻辑内容
       if (mod.main) {
         const url = `${mod.url}/${mod.main}`
-        const module = await import(/* @vite-ignore */ url)
+        const module = await runtimeImport(url)
         const init = module.default || module.register || module.init
         if (typeof init === 'function') await init(this.api)
       }

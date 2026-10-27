@@ -12,6 +12,8 @@
 //
 // 房间尺寸：w 96~160，h 44~68。门链由 order 数组自动生成，首尾相接。
 
+import { THEME_LIST } from './themes.js'
+
 /** 一行描述一间房（builder 会补 biome/region/exits/monsterCount/lootDensity） */
 function R(id, label, kind, variant, w, h, seed, extra = {}) {
   return { id, label, kind, variant, w, h, seed, ...extra }
@@ -250,6 +252,32 @@ const PORT_ROOMS = [
 ]
 
 // =====================================================================
+// 边境残骸带（22 = 1 间驿站 + 21 个主题站点）
+// 每间房用 spec.biome 复用已有生成器，spec.theme 让 game.getRoomData 注入
+// 主题景物 / 专属怪池 / 站点 BOSS。
+// =====================================================================
+
+const FRONTIER_ROOMS = [
+  R('frontier_shelter', '边境驿站', 'shelter', 'shelter', 118, 52, 0x8b01a1, {
+    shelterSide: 'left',
+    biome: 'city',
+    notes: '一截水泥涵洞改的驿站，洞口焊着挡雨的檐板。墙上钉满别人留下的标记。',
+  }),
+  ...THEME_LIST.map((t, i) =>
+    R(
+      `frontier_${t.id}`,
+      t.name,
+      i % 3 === 1 ? 'standard' : 'arena',
+      t.variant,
+      t.w,
+      t.h,
+      (0x8b0200 + i * 0x1d3) | 0,
+      { biome: t.biome, theme: t.id, notes: t.desc },
+    ),
+  ),
+]
+
+// =====================================================================
 // 组装
 // =====================================================================
 
@@ -310,6 +338,14 @@ const REGION_DEFS = [
     desc: '水退了，船搁在泥里。吊机还吊着半个集装箱，缆绳绷了二十年。',
     rooms: PORT_ROOMS,
   },
+  {
+    id: 'frontier',
+    name: '边境残骸带',
+    en: 'FRONTIER BELT',
+    sky: '#6e6a58',
+    desc: '港口再往外，地图上就没有标了。二十一处地标散在荒野里，每一处都住着人。',
+    rooms: FRONTIER_ROOMS,
+  },
 ]
 
 /** 确定性散列：给房间一个稳定的 monsterCount / lootDensity（不用 Math.random） */
@@ -329,7 +365,7 @@ function buildRegion(def) {
     const isShelter = spec.kind === 'shelter'
     rooms[spec.id] = {
       ...spec,
-      biome: def.id,
+      biome: spec.biome || def.id,
       region: def.id,
       regionName: def.name,
       // 怪物 5~9（shelter 恒为 0）
@@ -363,7 +399,7 @@ export const REGIONS = {}
 for (const def of REGION_DEFS) REGIONS[def.id] = buildRegion(def)
 
 /** 区域顺序（世界线） */
-export const REGION_ORDER = ['city', 'village', 'factory', 'dump', 'metro', 'hospital', 'port']
+export const REGION_ORDER = ['city', 'village', 'factory', 'dump', 'metro', 'hospital', 'port', 'frontier']
 
 // 1) 先连区内相邻房间（order[i] ⇄ order[i+1]）
 for (const rid of REGION_ORDER) {
@@ -383,9 +419,7 @@ for (let i = 0; i < REGION_ORDER.length; i++) {
   cur.next = next.id
   cur.prev = REGIONS[REGION_ORDER[(i - 1 + REGION_ORDER.length) % REGION_ORDER.length]].id
 }
-// 钉死闭合：port 的出口 → city 入口；city 入口的左门 → port 出口
-REGIONS.port.rooms[REGIONS.port.exitRoom].exits.right = REGIONS.city.entryRoom
-REGIONS.city.rooms[REGIONS.city.entryRoom].exits.left = REGIONS.port.exitRoom
+// 闭合由上面的跨区循环完成：… → port → frontier → city（无需额外钉死）
 
 // =====================================================================
 // 查询函数

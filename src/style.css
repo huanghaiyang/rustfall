@@ -310,6 +310,41 @@ body {
   color: var(--c-bone-dark);
 }
 
+/* 混乱度（混乱 AI） */
+.chaos-meter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8.5px;
+  letter-spacing: 0.18em;
+  color: var(--c-bone-dark);
+}
+.chaos-track {
+  width: 64px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.chaos-fill {
+  height: 100%;
+  background: #8fc4ff;
+  transition: width 0.25s linear;
+}
+.chaos-meter.drifting .chaos-fill {
+  background: #ffc24a;
+}
+.chaos-meter.unstable .chaos-fill {
+  background: #ff8a3c;
+}
+.chaos-meter.critical .chaos-fill {
+  background: #ff3b30;
+  box-shadow: 0 0 8px rgba(255, 59, 48, 0.8);
+}
+.chaos-meter.critical .chaos-state {
+  color: #ff3b30;
+}
+
 /* 天气计时 */
 .weather-hud {
   position: absolute;

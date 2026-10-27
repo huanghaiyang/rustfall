@@ -9,6 +9,7 @@ import { SkyWarden } from './sky_warden.js'
 import { MimicBeast } from './mimic_beast.js'
 import { SwarmCore } from './swarm_core.js'
 import { ClawTyrant, CyberPsychoBoss, EsperBerserk } from './tyrants.js'
+import { THEME_BOSS_CLASSES, THEME_BOSS_IDS } from './theme-bosses.js'
 
 /** 全部大型敌人 id（顺序稳定） */
 export const LARGE_IDS = [
@@ -19,6 +20,7 @@ export const LARGE_IDS = [
   'claw_tyrant',
   'cyberpsycho_boss',
   'esper_berserk',
+  ...THEME_BOSS_IDS,
 ]
 
 /** 大型敌人 id → 类 */
@@ -30,6 +32,7 @@ const LARGE_CLASS_MAP = new Map([
   ['claw_tyrant', ClawTyrant],
   ['cyberpsycho_boss', CyberPsychoBoss],
   ['esper_berserk', EsperBerserk],
+  ...THEME_BOSS_CLASSES,
 ])
 
 export { LARGE_CLASS_MAP }

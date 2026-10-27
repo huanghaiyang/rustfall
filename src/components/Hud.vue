@@ -13,6 +13,11 @@ const phaseText = computed(() =>
 )
 const exposedPct = computed(() => Math.min(100, (G.exposed / 5) * 100))
 const chassisName = computed(() => Content.get(KIND.CHASSIS, G.chassisId)?.name || '机身')
+const chaosPct = computed(() => Math.round(Math.max(0, Math.min(1, G.chaosLevel || 0)) * 100))
+const chaosText = computed(() => {
+  const s = G.chaosState || 'stable'
+  return s === 'critical' ? '失控' : s === 'unstable' ? '不稳定' : s === 'drifting' ? '漂移' : '平稳'
+})
 
 const tracked = computed(() => {
   const id = G.quests?.tracked || G.quests?.active?.[0]?.id
@@ -73,6 +78,11 @@ const interact = computed(() => G.interactHint || null)
           <span v-for="i in G.signalMax" :key="i" class="signal-rune" :class="{ on: i <= G.signal }"></span>
         </div>
         <div class="cycle-info">信号 {{ G.signal }}/{{ G.signalMax }}</div>
+        <div v-if="chaosPct > 2" class="chaos-meter" :class="G.chaosState">
+          <span class="chaos-label">混乱</span>
+          <div class="chaos-track"><div class="chaos-fill" :style="{ width: chaosPct + '%' }"></div></div>
+          <span class="chaos-state">{{ chaosText }}</span>
+        </div>
       </div>
     </div>
 

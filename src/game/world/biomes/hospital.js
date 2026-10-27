@@ -298,7 +298,9 @@ export function generateHospitalRoom(spec) {
     { kind: 'stretcher', count: rng.int(2, 5), r: 1 },
     { kind: 'gurney', count: rng.int(1, 4), r: 2 },
     { kind: 'hospital_bed', count: rng.int(2, 5), r: 2 },
-    { kind: 'junk_heap', count: rng.int(2, 5), r: 1 },
+    { kind: 'junk_heap', count: rng.int(0, 1), r: 1, scale: 0.8 },
+    { kind: 'junk_heap_appliance', count: rng.int(0, 1), r: 1, scale: 0.9 },
+    { kind: 'junk_heap_bags', count: rng.int(0, 1), r: 1, scale: 0.9 },
     { kind: 'ivy', count: rng.int(3, 8), r: 1 },
     { kind: 'moss_rock', count: rng.int(1, 3), r: 1 },
     { kind: 'crate', count: rng.int(1, 3), r: 1 },
@@ -308,6 +310,10 @@ export function generateHospitalRoom(spec) {
     { kind: 'duct', count: rng.int(0, 2), r: 2 },
     { kind: 'puddle_toxic', count: rng.int(1, 3), r: 1 },
     { kind: 'house_facade', count: rng.int(0, 2), r: 2, z: -2 },
+    // 医疗设备：监护台、培养罐、走线
+    { kind: 'mech_console', count: rng.int(0, 2), r: 1 },
+    { kind: 'lab_tank', count: rng.int(0, 1), r: 2 },
+    { kind: 'mech_cable_run', count: rng.int(0, 2), r: 1 },
   ]
   if (variant === 'morgue') common.push({ kind: 'grave', count: rng.int(1, 2), r: 1 })
   if (variant === 'gate') common.push({ kind: 'bus_wreck', count: 1, r: 3 })

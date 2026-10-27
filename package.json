@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
+    "restart": "node scripts/restart-dev.mjs",
     "build": "node scripts/build.mjs",
     "preview": "node scripts/preview.mjs"
   },

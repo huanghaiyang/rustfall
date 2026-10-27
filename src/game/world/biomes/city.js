@@ -300,7 +300,9 @@ export function generateCityRoom(spec) {
 
   // --- 街道垃圾 / 残骸 ---
   const common = [
-    { kind: 'junk_heap', count: rng.int(2, 4), r: 2 },
+    // 垃圾堆缩量 + 分形态：大堆最多一处，其余交给小形态
+    { kind: 'junk_heap', count: rng.int(0, 1), r: 2, scale: 0.8 },
+    { kind: 'junk_heap_bags', count: rng.int(1, 2), r: 1, scale: 0.9 },
     { kind: 'crate', count: rng.int(1, 3), r: 1 },
     { kind: 'barrel', count: rng.int(1, 3), r: 1 },
     { kind: 'tire_pile', count: rng.int(1, 2), r: 1 },
@@ -308,6 +310,10 @@ export function generateCityRoom(spec) {
     { kind: 'sofa', count: rng.int(0, 2), r: 1 },
     { kind: 'fence', count: rng.int(1, 3), r: 1 },
     { kind: 'puddle_toxic', count: rng.int(0, 2), r: 1 },
+    // 机械残件：旧城的管线和齿盘，散在街边
+    { kind: 'mech_cable_run', count: rng.int(1, 2), r: 1 },
+    { kind: 'gear_assembly', count: rng.int(0, 1), r: 2 },
+    { kind: 'mech_pipe_bundle', count: rng.int(0, 1), r: 1 },
   ]
   if (variant !== 'shelter') {
     common.push({ kind: 'car_wreck', count: rng.int(1, 2), r: 2 })

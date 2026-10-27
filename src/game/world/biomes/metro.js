@@ -306,7 +306,9 @@ export function generateMetroRoom(spec) {
 
   const common = [
     { kind: 'turnstile', count: rng.int(2, 5), r: 1 },
-    { kind: 'junk_heap', count: rng.int(3, 6), r: 1 },
+    { kind: 'junk_heap', count: rng.int(0, 1), r: 1, scale: 0.8 },
+    { kind: 'junk_heap_scrap', count: rng.int(1, 2), r: 1, scale: 0.9 },
+    { kind: 'junk_heap_plastic', count: rng.int(0, 1), r: 1, scale: 0.9 },
     { kind: 'crate', count: rng.int(1, 3), r: 1 },
     { kind: 'barrel', count: rng.int(1, 3), r: 1 },
     { kind: 'rebar_pile', count: rng.int(1, 3), r: 1 },
@@ -317,6 +319,11 @@ export function generateMetroRoom(spec) {
     { kind: 'puddle_toxic', count: rng.int(1, 3), r: 1 },
     { kind: 'streetlight', count: rng.int(1, 3), r: 1 },
     { kind: 'building_facade', count: rng.int(0, 1), r: 2, z: -2 },
+    // 站台设备：机柜、控制台、轨道与线缆
+    { kind: 'server_rack', count: rng.int(0, 2), r: 2 },
+    { kind: 'mech_console', count: rng.int(0, 2), r: 1 },
+    { kind: 'mech_cable_run', count: rng.int(1, 3), r: 1 },
+    { kind: 'mech_rail', count: rng.int(0, 1), r: 2 },
   ]
   if (variant === 'depot') common.push({ kind: 'container_small', count: 2, r: 2 })
   if (variant === 'flood') common.push({ kind: 'life_ring', count: rng.int(1, 2), r: 1 })

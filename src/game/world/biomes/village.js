@@ -308,12 +308,17 @@ export function generateVillageRoom(spec) {
     { kind: 'weed', count: rng.int(6, 12), r: 1 },
     { kind: 'tree_dead', count: rng.int(2, 4), r: 2 },
     { kind: 'fence', count: rng.int(3, 6), r: 1 },
-    { kind: 'junk_heap', count: rng.int(1, 3), r: 1 },
+    { kind: 'junk_heap', count: rng.int(0, 1), r: 1, scale: 0.8 },
+    { kind: 'junk_heap_cans', count: rng.int(0, 1), r: 1, scale: 0.9 },
     { kind: 'crate', count: rng.int(1, 2), r: 1 },
     { kind: 'barrel', count: rng.int(0, 2), r: 1 },
     { kind: 'skeleton_animal', count: rng.int(0, 2), r: 1 },
     { kind: 'puddle_toxic', count: rng.int(1, 3), r: 1 },
     { kind: 'grave', count: rng.int(0, 2), r: 1 },
+    // 农机残件：村里的水泵、拖拉机管路
+    { kind: 'mech_pipe_bundle', count: rng.int(0, 2), r: 1 },
+    { kind: 'mech_valve', count: rng.int(0, 1), r: 1 },
+    { kind: 'torn_flag', count: rng.int(0, 1), r: 1 },
   ]
   if (variant !== 'shelter') {
     common.push({ kind: 'house_facade', count: rng.int(1, 2), r: 2, z: -2 })

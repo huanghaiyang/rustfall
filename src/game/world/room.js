@@ -662,16 +662,23 @@ export class Room {
   /** 在可玩层后面铺一层剪影建筑/残骸，增加纵深与群系辨识度。 */
   buildScenery() {
     const KINDS = {
-      city: ['building_facade', 'streetlight', 'car_wreck', 'bus_wreck', 'streetlight', 'house_facade'],
-      factory: ['factory_pipe', 'generator', 'container_small', 'crane_hook', 'antenna', 'factory_pipe'],
-      dump: ['junk_heap', 'tree_dead', 'tire_pile', 'container_small', 'junk_heap', 'tree_dead'],
-      shore: ['life_ring', 'hull_plate', 'cargo_net', 'beacon', 'container_small', 'life_ring'],
+      city: ['building_facade', 'streetlight', 'car_wreck', 'mech_cable_run', 'streetlight', 'house_facade', 'bus_wreck'],
+      factory: ['factory_pipe', 'generator', 'gear_assembly', 'conveyor_segment', 'crane_hook', 'mech_turbine', 'antenna'],
+      dump: ['junk_heap_bags', 'tree_dead', 'junk_heap_scrap', 'mech_servo_arm', 'container_small', 'tree_dead', 'junk_heap_plastic'],
+      shore: ['life_ring', 'hull_plate', 'cargo_net', 'beacon', 'mech_cable_run', 'container_small', 'satellite_dish'],
+      village: ['house_facade', 'tree_dead', 'mech_pipe_bundle', 'farm_silo', 'weed', 'house_facade', 'torn_flag'],
+      metro: ['server_rack', 'metro_sign', 'mech_cable_run', 'mech_rail', 'mech_console', 'neon_poster', 'mech_rail'],
+      hospital: ['mech_console', 'lab_tank', 'gurney', 'mech_cable_run', 'hospital_bed', 'server_rack', 'lunar_flower'],
     }
     const biome = this.data.biome || 'city'
-    const kinds = KINDS[biome] || KINDS.city
+    const scenery = Array.isArray(this.data.sceneryKinds) && this.data.sceneryKinds.length
+      ? this.data.sceneryKinds
+      : KINDS[biome] || KINDS.city
+    const base = KINDS[biome] || KINDS.city
+    const kinds = [...scenery, ...base.slice(0, 2)]
     const worldW = this.data.worldW || 2000
     const floorY = typeof this.data.floorY === 'number' ? this.data.floorY : 0
-    const count = Math.max(3, Math.min(7, Math.round(worldW / 520)))
+    const count = Math.max(4, Math.min(9, Math.round(worldW / 430)))
     for (let i = 0; i < count; i++) {
       const kind = kinds[i % kinds.length]
       let tex = null

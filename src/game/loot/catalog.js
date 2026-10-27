@@ -957,6 +957,146 @@ item('stim_patch', {
 })
 
 // ---------------------------------------------------------------------------
+// consumable —— 第二批：防护 / 进攻 / 治疗
+// ---------------------------------------------------------------------------
+
+item('shield_plate', {
+  name: '磁力护盾板',
+  en: 'Mag Shield Plate',
+  category: 'consumable',
+  rarity: 3,
+  weight: 2.0,
+  value: 72,
+  stack: 5,
+  desc: '三块叠在一起的复合板，边角焊了磁吸卡扣。拍在后背上会「咔」一声吸住，撑开一层淡蓝色的场。',
+  tags: ['armor', 'shield', 'consume'],
+  use: { buff: { key: 'shield_plate', name: '磁力护盾', dur: 30, stats: { armor: 0.3 } } },
+  art: 'plate',
+})
+
+item('mirage_canister', {
+  name: '折射雾罐',
+  en: 'Mirage Canister',
+  category: 'consumable',
+  rarity: 2,
+  weight: 0.9,
+  value: 40,
+  stack: 6,
+  desc: '巴掌大的铝罐，拉开环会喷出一团折射微粒，贴着机体裹一层。雾里看你是重影，打你就容易打偏。',
+  tags: ['armor', 'smoke', 'consume'],
+  use: {
+    cleanse: 1,
+    buff: { key: 'mirage', name: '折射雾幕', dur: 18, stats: { armor: 0.16, speed: 0.1 } },
+  },
+  art: 'canister_small',
+})
+
+item('brace_kit', {
+  name: '加固支架',
+  en: 'Brace Kit',
+  category: 'consumable',
+  rarity: 2,
+  weight: 2.4,
+  value: 46,
+  stack: 6,
+  desc: '一套可调的斜撑，卡扣上刻着别家的编号。装上以后关节不再乱晃，挨打时也不容易散架。',
+  tags: ['armor', 'repair', 'consume'],
+  use: { heal: 8, buff: { key: 'brace', name: '加固支架', dur: 50, stats: { armor: 0.18 } } },
+  art: 'kit',
+})
+
+item('emp_charge', {
+  name: '电磁脉冲雷',
+  en: 'EMP Charge',
+  category: 'consumable',
+  rarity: 3,
+  weight: 1.2,
+  value: 88,
+  stack: 5,
+  desc: '罐头大小的线圈炸弹，外壳缠了铜带。引爆后周围所有机体会短暂断电，伺服线一根根软下去。',
+  tags: ['offense', 'emp', 'consume'],
+  use: { emp: { radius: 280, damage: 30, stun: 2.6 } },
+  art: 'charge',
+})
+
+item('firebomb', {
+  name: '燃烧瓶',
+  en: 'Firebomb',
+  category: 'consumable',
+  rarity: 2,
+  weight: 1.0,
+  value: 42,
+  stack: 6,
+  desc: '玻璃瓶装的稠油，瓶口塞着浸过油的布条。点着了往外扔，砸碎的地方会烧一阵子。',
+  tags: ['offense', 'fire', 'consume'],
+  use: { fire: { radius: 210, damage: 22 } },
+  art: 'bottle',
+})
+
+item('overdrive_amp', {
+  name: '超频放大器',
+  en: 'Overdrive Amp',
+  category: 'consumable',
+  rarity: 3,
+  weight: 1.3,
+  value: 95,
+  stack: 5,
+  desc: '把主母线电压顶到标称值之上的一块小板。接上去时机体快得不像话，代价是壳体会更脆。',
+  tags: ['offense', 'buff', 'consume'],
+  use: {
+    buff: {
+      key: 'overdrive',
+      name: '超频运转',
+      dur: 20,
+      stats: { attack: 4, speed: 0.18, armor: -0.06 },
+    },
+  },
+  art: 'amp',
+})
+
+item('nano_syringe', {
+  name: '纳米修复针',
+  en: 'Nano Syringe',
+  category: 'consumable',
+  rarity: 3,
+  weight: 0.2,
+  value: 110,
+  stack: 8,
+  desc: '一次性注射器，里面的不是药，是一管会自己找裂缝的灰色浆液。推进关节缝里，能听见细小的滋滋声。',
+  tags: ['med', 'heal', 'consume'],
+  use: { heal: 34, cleanse: 1 },
+  art: 'syringe',
+})
+
+item('med_gel', {
+  name: '医用凝胶',
+  en: 'Med Gel',
+  category: 'consumable',
+  rarity: 2,
+  weight: 0.6,
+  value: 36,
+  stack: 8,
+  desc: '管装的淡蓝色凝胶，管口挤出来是半透明的。抹在裂口上会自己流进去，然后慢慢变硬。',
+  tags: ['med', 'heal', 'consume'],
+  use: { heal: 24 },
+  art: 'gel',
+})
+
+item('regen_patch', {
+  name: '自愈贴片',
+  en: 'Regen Patch',
+  category: 'consumable',
+  rarity: 2,
+  weight: 0.1,
+  value: 58,
+  stack: 10,
+  desc: '贴着皮肤的一面长着细小的纤维，撕下来以后还在抽动。贴上去会持续往伤口里送材料。',
+  tags: ['med', 'heal', 'buff', 'consume'],
+  use: { heal: 8, buff: { key: 'regen_patch', name: '自愈贴片', dur: 30, stats: { regen: 2 } } },
+  art: 'patch',
+})
+
+// ---------------------------------------------------------------------------
 // rare —— 稀有件：反应堆、军用外壳、量子芯片、卫星陀螺
 // ---------------------------------------------------------------------------
 

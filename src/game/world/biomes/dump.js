@@ -317,12 +317,18 @@ export function generateDumpRoom(spec) {
   })
 
   const common = [
-    { kind: 'junk_heap', count: rng.int(5, 9), r: 1 },
-    { kind: 'tire_pile', count: rng.int(1, 3), r: 1 },
+    // 垃圾堆总量降下来，改成多种小形态，避免一片全是同一种大堆
+    { kind: 'junk_heap', count: rng.int(0, 1), r: 1, scale: 0.72 },
+    { kind: 'junk_heap_bags', count: rng.int(1, 3), r: 1, scale: 0.9 },
+    { kind: 'junk_heap_scrap', count: rng.int(1, 3), r: 1, scale: 0.9 },
+    { kind: 'junk_heap_appliance', count: rng.int(0, 2), r: 1, scale: 0.85 },
+    { kind: 'junk_heap_plastic', count: rng.int(0, 2), r: 1, scale: 0.9 },
+    { kind: 'junk_heap_cans', count: rng.int(0, 2), r: 1, scale: 0.9 },
+    { kind: 'tire_pile', count: rng.int(1, 2), r: 1, scale: 0.9 },
     { kind: 'barrel', count: rng.int(1, 3), r: 1 },
     { kind: 'crate', count: rng.int(1, 4), r: 1 },
     { kind: 'car_wreck', count: rng.int(0, 2), r: 2 },
-    { kind: 'bus_wreck', count: rng.chance(0.4) ? 1 : 0, r: 3 },
+    { kind: 'bus_wreck', count: rng.chance(0.35) ? 1 : 0, r: 3 },
     { kind: 'skeleton_animal', count: rng.int(0, 2), r: 1 },
     { kind: 'skeleton_human', count: rng.int(0, 2), r: 1 },
     { kind: 'corpse', count: rng.int(0, 2), r: 1 },
@@ -330,6 +336,15 @@ export function generateDumpRoom(spec) {
     { kind: 'ribcage', count: rng.int(0, 2), r: 1 },
     { kind: 'puddle_toxic', count: rng.int(2, 4), r: 1 },
     { kind: 'grave', count: rng.int(0, 2), r: 1 },
+    // 机械骨架：齿轮、压机、导轨、机械臂、涡轮
+    { kind: 'gear_assembly', count: rng.int(0, 2), r: 2 },
+    { kind: 'mech_rail', count: rng.int(0, 2), r: 2 },
+    { kind: 'mech_servo_arm', count: rng.int(0, 1), r: 2 },
+    { kind: 'hydraulic_press', count: rng.chance(0.3) ? 1 : 0, r: 2 },
+    { kind: 'mech_turbine', count: rng.chance(0.25) ? 1 : 0, r: 3 },
+    { kind: 'mech_piston', count: rng.int(0, 2), r: 1 },
+    { kind: 'robot_torso', count: rng.int(0, 2), r: 1 },
+    { kind: 'mech_pipe_bundle', count: rng.int(0, 2), r: 1 },
   ]
   if (variant !== 'shelter') {
     common.push({ kind: 'satellite', count: rng.int(0, 1), r: 2 })
@@ -353,7 +368,8 @@ export function generateDumpRoom(spec) {
   placeProps(ctx, {
     list: [
       { kind: 'crate', count: rng.int(1, 3), r: 1, where: 'platform' },
-      { kind: 'junk_heap', count: rng.int(1, 3), r: 1, where: 'platform' },
+      { kind: 'junk_heap_cans', count: rng.int(0, 2), r: 1, where: 'platform', scale: 0.9 },
+      { kind: 'junk_heap_scrap', count: rng.int(0, 1), r: 1, where: 'platform', scale: 0.85 },
       { kind: 'barrel', count: rng.int(0, 2), r: 1, where: 'platform' },
     ],
   })
