@@ -30,6 +30,7 @@ import {
   countChannels as countChannelsOf,
 } from './features.js'
 import { applyScene } from '../scene-terrain.js'
+import { ROOM_MINION_IDS_BY_ROOM, ROOM_COLLECTIBLE_IDS_BY_ROOM } from '../rooms/index.js'
 
 // 四个 biome 与自检脚本都从本模块取这些基础工具，这里统一再导出
 export { clamp }
@@ -1306,6 +1307,57 @@ export function placeLoot(ctx, cfg = {}) {
     ctx.loot.push({ id: rng.pick(rare), x: x * TS + TS / 2, y: row * TS, hidden: true })
     markTaken(ctx, x, row, 0)
   }
+
+  // 5) 每房 3 件专属收集品：地面 / 平台 / 壁龛各一件。
+  //    这些是「这间房才有的遗物」，优先占位，保证每关都能真正捡到。
+  const bag = ROOM_COLLECTIBLE_IDS_BY_ROOM[spec.id]
+  if (bag && bag.length) {
+    const ground = shuffle(
+      rng,
+      standSpots(ctx, {
+        headroom: 2,
+        ground: true,
+        only: (x, row) => !inShelter(ctx, x) && isFree(ctx, x, row, 1),
+      }),
+    )
+    const plats = shuffle(
+      rng,
+      platformSpots(ctx).filter((s) => !inShelter(ctx, s.x) && isFree(ctx, s.x, s.row, 0)),
+    )
+    const alcoves = ctx.notes.filter((a) => a.type === 'alcove')
+    let gi = 0
+    let pi = 0
+    for (let i = 0; i < bag.length; i++) {
+      let x = null
+      let row = null
+      if (i === 1 && plats.length) {
+        const s = plats[pi++ % plats.length]
+        if (s && isFree(ctx, s.x, s.row, 0)) {
+          x = s.x
+          row = s.row
+        }
+      }
+      if (x == null && i === 2 && alcoves.length) {
+        const a = alcoves[0]
+        const ax = Math.round((a.x0 + a.x1) / 2)
+        const ar = surfaceRow(ctx, ax)
+        if (ar >= 0 && isFree(ctx, ax, ar, 0)) {
+          x = ax
+          row = ar
+        }
+      }
+      while (x == null && gi < ground.length) {
+        const s = ground[gi++]
+        if (s && isFree(ctx, s.x, s.row, 0)) {
+          x = s.x
+          row = s.row
+        }
+      }
+      if (x == null) continue
+      ctx.loot.push({ id: bag[i], x: x * TS + TS / 2, y: row * TS, hidden: i === 2 })
+      markTaken(ctx, x, row, 0)
+    }
+  }
   return ctx.loot
 }
 
@@ -1314,7 +1366,10 @@ export function placeMonsters(ctx, cfg = {}) {
   const { rng, spec } = ctx
   const count = cfg.count ?? spec.monsterCount ?? MONSTER_COUNT[ctx.biome] ?? 6
   if (count <= 0) return ctx.monsters
-  const pool = cfg.pool || MONSTER_POOLS[ctx.biome] || MONSTER_POOLS.city
+  // 每间房优先用该房专属小怪池（3 种），按顺序轮询保证三种都出现；
+  // 没有专属数据时才退回 biome 通用池。
+  const roomPool = cfg.pool || ROOM_MINION_IDS_BY_ROOM[spec.id] || null
+  const pool = roomPool || MONSTER_POOLS[ctx.biome] || MONSTER_POOLS.city
   // 先把地面位排完，不够再上平台（保证 5~9 只怪一定刷得出来）
   const ground = shuffle(
     rng,
@@ -1332,7 +1387,11 @@ export function placeMonsters(ctx, cfg = {}) {
   for (const s of ground.concat(upper)) {
     if (n >= count) break
     if (!isFree(ctx, s.x, s.row, 1)) continue
-    ctx.monsters.push({ id: rng.pick(pool), x: s.x * TS + TS / 2, y: s.row * TS })
+    ctx.monsters.push({
+      id: roomPool ? roomPool[n % roomPool.length] : rng.pick(pool),
+      x: s.x * TS + TS / 2,
+      y: s.row * TS,
+    })
     markTaken(ctx, s.x, s.row, 1)
     n++
   }

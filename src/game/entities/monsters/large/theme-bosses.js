@@ -26,6 +26,7 @@ import {
   roomBounds,
 } from './common.js'
 import { BOSS_KIT_FACTORIES } from './theme-boss-kits.js'
+import { BOSS_SIGNATURES } from './boss-signatures.js'
 import { updateFx, clearFx } from './theme-boss-fx.js'
 
 /** 各站点 BOSS 的配置表。moves 即该 BOSS 独占的四招，按出招优先级排列。 */
@@ -856,8 +857,10 @@ class ThemeBoss extends BaseMonster {
     this.accent = cfg.accent
     this.baseSpeed = cfg.speed
     this.baseDamage = cfg.damage
-    // 每只 BOSS 独占的四招由对应 kit 工厂提供，moves 直接取 kit 的键
-    this.kit = BOSS_KIT_FACTORIES[cfg.id] ? BOSS_KIT_FACTORIES[cfg.id](this) : {}
+    // 每只 BOSS 的招式 = 原 kit 四招 + 两个专属签名招（共 6 招，其中 2 招 sig）
+    const baseKit = BOSS_KIT_FACTORIES[cfg.id] ? BOSS_KIT_FACTORIES[cfg.id](this) : {}
+    const sigKit = BOSS_SIGNATURES[cfg.id] ? BOSS_SIGNATURES[cfg.id](this) : {}
+    this.kit = Object.assign({}, baseKit, sigKit)
     this.moves = Object.keys(this.kit)
     this.moveCd = 1.1
     this.phase = 1
@@ -945,13 +948,6 @@ class ThemeBoss extends BaseMonster {
     })
   }
 
-  /** 招式距离区间是否覆盖当前水平距离 */
-  _inRange(spec, hd) {
-    const r = spec && spec.range
-    if (!r) return true
-    return hd >= r[0] && hd <= r[1]
-  }
-
   /** 冷却结束且距离合适的招式；距离带外只保留远程/全图招（近战不朝空气挥） */
   _readyMoves() {
     const hd = this._hd()
@@ -960,8 +956,18 @@ class ThemeBoss extends BaseMonster {
     for (const k of this.moves) {
       const spec = this.kit[k]
       if (!spec || (this.moveReady[k] || 0) > 0) continue
-      if (this._inRange(spec, hd)) inRange.push(k)
-      else if ((spec.range?.[1] ?? 0) >= 400) farOk.push(k)
+      const r = spec.range
+      if (!r) {
+        inRange.push(k)
+      } else if (hd >= r[0] && hd <= r[1]) {
+        inRange.push(k)
+      } else if (hd < r[0] && (r[1] ?? 0) >= 400) {
+        // 远程/范围招在贴身时也允许放：弹道/落点仍在近处，不会砍空气。
+        // （否则签名招的最小距离会把它锁死，玩家贴身时永远见不到）
+        inRange.push(k)
+      } else if ((r[1] ?? 0) >= 400) {
+        farOk.push(k)
+      }
     }
     return inRange.length ? inRange : farOk
   }
@@ -971,10 +977,11 @@ class ThemeBoss extends BaseMonster {
     if (!pool.length) return null
     // 不连续重名（有替代时）
     const rest = pool.length > 1 ? pool.filter((k) => k !== this.lastMove) : pool
-    // 二阶段更愿意主动放签名招
-    if (this.phase > 1) {
-      const sig = rest.find((k) => this.kit[k].sig)
-      if (sig && Math.random() < 0.5) return sig
+    // 签名招（每只 2 个）优先出场：一阶段也有 35% 概率，二阶段提到 55%，
+    // 保证玩家在一场战斗里能见到该 BOSS 的两种特色攻击，而不是只见到普招。
+    const sigs = rest.filter((k) => this.kit[k].sig)
+    if (sigs.length && Math.random() < (this.phase > 1 ? 0.55 : 0.35)) {
+      return sigs[(Math.random() * sigs.length) | 0]
     }
     // 连招中段优先短前摇招，衔接更顺
     if (this.comboCount > 0) {

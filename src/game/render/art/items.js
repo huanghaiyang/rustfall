@@ -22,6 +22,7 @@ import { PAL } from '../palette.js'
 import { mulberry32 } from '../rng.js'
 import { Content, KIND } from '../../core/registry.js'
 import { Surf, mix, shade, rgb, setArtModule, ALPHA_STATS } from './core.js'
+import { paintCollectibleIcon } from './collectible-icons.js'
 setArtModule('items')
 
 /* ============================================================================
@@ -1537,8 +1538,13 @@ function buildItem(id) {
   const s = new Surf(20, 20, seed)
   // 投影（极轻，贴底）
   s.shadow(10, 18, 7, 1.4, 0.28)
-  const fn = SHAPES[shape] || sScrap
-  fn(s, s.rng)
+  // 关卡专属收集品：用 iconSpec 画专属遗物，不再走通用造型池
+  if (def && def.iconSpec) {
+    paintCollectibleIcon(s, def.iconSpec, def)
+  } else {
+    const fn = SHAPES[shape] || sScrap
+    fn(s, s.rng)
+  }
   // 细节：锈 / 划痕（确定性）
   s.speck(2, 2, 16, 16, PAL.rustDark, 0.05 + ((seed >>> 8) % 5) * 0.01, 0.35)
   // 三层：上缘高光 / 下缘暗部 / 1px 描边

@@ -11,6 +11,8 @@
 //
 // 所有坐标都是「道具脚下」的世界坐标（y = 支撑面顶部），由生成器保证有支撑。
 
+import { ROOM_PROP_DEFS } from './rooms/index.js'
+
 export const PROPS = {
   // ---------------- 人 / 动物残骸：直接搜刮 ----------------
   skeleton_human: {
@@ -1111,6 +1113,10 @@ export const PROPS = {
     desc: '应力撕开的一道口子，边缘微微翘起。',
   },
 }
+
+// 190 间房的专属摆放物（rp_<roomId>_NN）：数据来自 rooms/index.js，
+// 与内置 kind 一样参与 solid / interact / loot / questTarget 判定。
+Object.assign(PROPS, ROOM_PROP_DEFS)
 
 /** 所有 kind（顺序稳定，便于校验 / 生成美术表） */
 export const PROP_KINDS = Object.keys(PROPS)

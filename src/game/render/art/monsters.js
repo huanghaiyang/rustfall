@@ -26,6 +26,7 @@ import * as THREE from 'three'
 import { PAL } from '../palette.js'
 import { mulberry32 } from '../rng.js'
 import { Surf, mix, shade, rgb, setArtModule, ALPHA_STATS } from './core.js'
+import { ROOM_MINION_ART_DEFS } from './room-minions.js'
 setArtModule('monsters')
 
 const TAU = Math.PI * 2
@@ -2562,6 +2563,9 @@ const DEFS = {
   bandit_scav: { w: 34, h: 42, draw: drawBanditScav, seed: 0x11d, run: 4, attack: 1 },
 }
 
+// 570 只关卡专属小怪（rm_<roomId>_NN）：每只一张按需生成贴图，自带 warm/outline。
+Object.assign(DEFS, ROOM_MINION_ART_DEFS)
+
 const OUTLINE_COL = {
   radboar: mix(PAL.void, PAL.rust, 0.2),
   crawler: mix(PAL.void, PAL.steelBlue, 0.2),
@@ -2634,9 +2638,11 @@ function renderFrame(id, P) {
   // 脏污 / 血迹（确定性）
   s.speck(0, 0, s.w, s.h, PAL.rustDark, 0.05, 0.4)
   s.speck(0, 0, s.w, s.h, PAL.dust, 0.03, 0.35)
-  // 三层关系
-  s.edges(mix(PAL.white, WARM[id], 0.5), PAL.void, 0.4, 0.45)
-  s.outline(OUTLINE_COL[id])
+  // 三层关系（关卡专属小怪没有全局色表，用 def 自带的 warm / outline）
+  const warm = WARM[id] || def.warm || PAL.rust
+  const outline = OUTLINE_COL[id] || def.outline || mix(PAL.void, warm, 0.2)
+  s.edges(mix(PAL.white, warm, 0.5), PAL.void, 0.4, 0.45)
+  s.outline(outline)
   if (P.hurt) {
     s.tint(PAL.neonRed, 0.24)
     const rnd = mulberry32(def.seed + 77)
@@ -2664,7 +2670,7 @@ function renderDead(id) {
   const g = s.h - 1
   const cx = def.w * 0.42
   s.shadow(cx, g - 0.5, def.w * 0.3, 2, 0.34)
-  const warm = WARM[id]
+  const warm = WARM[id] || def.warm || PAL.rust
   const bodyD = mix(PAL.ash, warm, 0.3)
   const body = mix(bodyD, PAL.ashPale, 0.3)
   // 一坨倒下的躯体 + 瘫开的肢体
@@ -2686,7 +2692,7 @@ function renderDead(id) {
   }
   s.speck(0, 0, s.w, s.h, PAL.rustDark, 0.06, 0.4)
   s.edges(mix(PAL.white, warm, 0.4), PAL.void, 0.3, 0.45)
-  s.outline(OUTLINE_COL[id])
+  s.outline(OUTLINE_COL[id] || def.outline || mix(PAL.void, warm, 0.2))
   s.tint(PAL.void, 0.22)
   // 一只还翘着的肢体（让尸体轮廓不至于是一团）
   s.thick(cx - def.w * 0.18, g - 5, cx - def.w * 0.3, g - 11, 2.2, bodyD)
@@ -2738,9 +2744,12 @@ export function getMonsterArt(id) {
   return art
 }
 
-/** 预载全部怪物。 */
+/** 预载内置怪物（570 只关卡专属小怪标了 lazy，进入房间时才画）。 */
 export function preloadArt() {
-  for (const id of MONSTER_ART_IDS) getMonsterArt(id)
+  for (const id of MONSTER_ART_IDS) {
+    if (DEFS[id]?.lazy) continue
+    getMonsterArt(id)
+  }
   return CACHE.size
 }
 

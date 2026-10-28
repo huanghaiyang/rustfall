@@ -17,6 +17,7 @@ import * as THREE from 'three'
 import { PAL } from '../palette.js'
 import { mulberry32 } from '../rng.js'
 import { Surf, mix, shade, rgb, setArtModule, ALPHA_STATS } from './core.js'
+import { ROOM_PROP_ART_DEFS } from './room-props.js'
 setArtModule('props')
 
 const TAU = Math.PI * 2
@@ -5095,6 +5096,9 @@ const DEFS = {
   matrix_phonebooth: { w: 50, h: 90, fn: propMatrixPhonebooth, seed: 0xd04 },
 }
 
+// 190 间房的专属摆放物：每件一张独立贴图，标记 lazy 的项按需生成（避免启动预载 1900 张）。
+Object.assign(DEFS, ROOM_PROP_ART_DEFS)
+
 export const PROP_ART_KINDS = Object.keys(DEFS)
 
 const CACHE = new Map()
@@ -5124,9 +5128,12 @@ export function getPropArt(kind) {
   return tex
 }
 
-/** 预载全部道具贴图。 */
+/** 预载全部道具贴图（lazy 的关卡专属件不预载，第一次进入房间时才画）。 */
 export function preloadArt() {
-  for (const k of PROP_ART_KINDS) getPropArt(k)
+  for (const k of PROP_ART_KINDS) {
+    if (DEFS[k]?.lazy) continue
+    getPropArt(k)
+  }
   return CACHE.size
 }
 

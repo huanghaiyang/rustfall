@@ -21,6 +21,7 @@ import {
 import { clamp } from '../utils.js'
 import { TS } from '../config.js'
 import { getRoomScene } from './scene-data.js'
+import { ROOM_PROP_SPECS_BY_ROOM } from './rooms/index.js'
 
 /** 房间可施工的横向范围（避开两侧门洞区） */
 function spanX(ctx) {
@@ -550,21 +551,54 @@ function dressProps(ctx, scene) {
   }
 }
 
+/**
+ * 每间房的 10 件专属摆放物（数据见 world/rooms/*.js）。
+ * 与通用场景件分开：这些是「这间房才有的东西」，主题房也照样追加，
+ * 只往空位里放、避开两侧门洞与牢笼，不替换任何旧道具。
+ */
+function dressRoomProps(ctx) {
+  const specs = ROOM_PROP_SPECS_BY_ROOM[ctx.spec?.id]
+  if (!specs || !specs.length) return
+  const cages = (ctx.cages || []).map((c) => Math.floor(c.x / TS))
+  const list = specs.map((p) => ({
+    kind: p.kind,
+    count: p.place?.count ?? 1,
+    r: p.solid ? 1 : 0,
+    where: p.place?.slot === 'platform' ? 'platform' : undefined,
+    avoidShelter: true,
+    scale: p.place?.scale,
+    flip: p.place?.flip,
+    only: (x) => {
+      if (x < ctx.doorInset + 3 || x > ctx.w - ctx.doorInset - 4) return false
+      if (cages.some((cx) => Math.abs(cx - x) <= 3)) return false
+      return true
+    },
+  }))
+  placeProps(ctx, { list })
+}
+
 /** 主入口：buildRoom 一开始调用 */
 export function applyScene(ctx) {
   const scene = getRoomScene(ctx.spec?.id)
-  if (!scene || ctx.spec?.theme) return
-  const fn = ARCH[scene.arch]
-  if (fn) {
+  if (scene && !ctx.spec?.theme) {
+    const fn = ARCH[scene.arch]
+    if (fn) {
+      try {
+        fn(ctx)
+      } catch (e) {
+        ctx.notes.push({ type: 'scene-error', arch: scene.arch, error: String(e && e.message ? e.message : e) })
+      }
+    }
     try {
-      fn(ctx)
+      dressProps(ctx, scene)
     } catch (e) {
-      ctx.notes.push({ type: 'scene-error', arch: scene.arch, error: String(e && e.message ? e.message : e) })
+      ctx.notes.push({ type: 'scene-props-error', error: String(e && e.message ? e.message : e) })
     }
   }
+  // 每房专属摆放物：主题房（自己的场景件已就位）也要追加
   try {
-    dressProps(ctx, scene)
+    dressRoomProps(ctx)
   } catch (e) {
-    ctx.notes.push({ type: 'scene-props-error', error: String(e && e.message ? e.message : e) })
+    ctx.notes.push({ type: 'scene-room-props-error', error: String(e && e.message ? e.message : e) })
   }
 }

@@ -14,6 +14,7 @@ import {
   planWingedDemon,
 } from './theme-boss-plans-c.js'
 import { planWalkerTurret } from './theme-boss-plans-d.js'
+import { UNIQUE_BOSS_PLANS } from './theme-boss-unique.js'
 
 const PLANS = {
   mech_titan: planMechTitan,
@@ -111,6 +112,12 @@ for (const [id, family, w, h, accent, plan, crest, weapon] of ROWS) {
     warm: pal.warm,
     outline: pal.outline,
     draw(s, P) {
+      // 51 只 BOSS 各自独占体型（form + 头 + 背饰 + 标志物），彻底避免换皮换色。
+      const unique = UNIQUE_BOSS_PLANS[id]
+      if (unique) {
+        unique(s, P, def, cfg, pal)
+        return
+      }
       const fn = PLANS[plan]
       if (fn) fn(s, P, def, cfg, pal)
     },

@@ -1971,3 +1971,6 @@ export function categoryCounts() {
   }
   return out
 }
+
+// 570 件关卡专属收集品（190 房 × 3）：放在文件末尾导入，注册在主目录之后。
+import './collectibles.js'

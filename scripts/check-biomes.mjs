@@ -62,6 +62,9 @@ const MONSTER_IDS = new Set([
   'dark_web_ghost', 'viral_wraith', 'nano_swarm',
   'bandit_lookout', 'bandit_looter', 'bandit_scav',
 ])
+// 570 只关卡专属小怪（rm_<roomId>_NN）来自 rooms 数据，直接并入 id 白名单。
+const { ROOM_MINION_DEFS } = await import('../src/game/world/rooms/index.js')
+for (const id of Object.keys(ROOM_MINION_DEFS)) MONSTER_IDS.add(id)
 const PROP_IDS = new Set(Object.keys(PROPS))
 const WEAPON_SET = new Set(WEAPON_IDS)
 const ECO_SET = new Set(ECOSYSTEM_KINDS)

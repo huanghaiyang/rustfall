@@ -31,6 +31,7 @@ import {
   ViralWraith,
   NanoSwarm,
 } from './theme-minions.js'
+import { ROOM_MINION_CLASSES, ROOM_MINION_IDS } from './room-minions.js'
 
 /** 全部怪物 id（顺序稳定，UI/任务/图鉴可直接用） */
 export const MONSTER_IDS = [
@@ -97,6 +98,12 @@ const CLASS_MAP = new Map([
   ['bandit_looter', BanditLooter],
   ['bandit_scav', BanditScav],
 ])
+
+// 570 只关卡专属小怪（rm_<roomId>_NN）：类与 id 都在 room-minions.js 里按数据生成。
+for (const id of ROOM_MINION_IDS) {
+  MONSTER_IDS.push(id)
+  CLASS_MAP.set(id, ROOM_MINION_CLASSES[id])
+}
 
 export { CLASS_MAP }
 export const MONSTER_CLASSES = CLASS_MAP
