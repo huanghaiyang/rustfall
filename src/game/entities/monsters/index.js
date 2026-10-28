@@ -14,7 +14,23 @@ import { Scrapper } from './scrapper.js'
 import { Drone } from './drone.js'
 import { Hulkbot } from './hulkbot.js'
 import { GhoulHusk, TunnelHound, CyberMantis, PsychoPunk } from './breeds.js'
-import { ServerWraith, WeldBrute, CultFanatic, AlienOrb } from './theme-minions.js'
+import { BanditLookout, BanditLooter, BanditScav } from './bandits.js'
+import {
+  ServerWraith,
+  WeldBrute,
+  CultFanatic,
+  AlienOrb,
+  VaultPuppet,
+  MineShade,
+  BloodThrall,
+  FogStalker,
+  PunkRaider,
+  CastleKnight,
+  RogueAI,
+  DarkWebGhost,
+  ViralWraith,
+  NanoSwarm,
+} from './theme-minions.js'
 
 /** 全部怪物 id（顺序稳定，UI/任务/图鉴可直接用） */
 export const MONSTER_IDS = [
@@ -34,6 +50,19 @@ export const MONSTER_IDS = [
   'weld_brute',
   'cult_fanatic',
   'alien_orb',
+  'vault_puppet',
+  'mine_shade',
+  'blood_thrall',
+  'fog_stalker',
+  'punk_raider',
+  'castle_knight',
+  'rogue_ai',
+  'dark_web_ghost',
+  'viral_wraith',
+  'nano_swarm',
+  'bandit_lookout',
+  'bandit_looter',
+  'bandit_scav',
 ]
 
 /** id → 类。index 只负责映射；实例化走 createMonster。 */
@@ -54,6 +83,19 @@ const CLASS_MAP = new Map([
   ['weld_brute', WeldBrute],
   ['cult_fanatic', CultFanatic],
   ['alien_orb', AlienOrb],
+  ['vault_puppet', VaultPuppet],
+  ['mine_shade', MineShade],
+  ['blood_thrall', BloodThrall],
+  ['fog_stalker', FogStalker],
+  ['punk_raider', PunkRaider],
+  ['castle_knight', CastleKnight],
+  ['rogue_ai', RogueAI],
+  ['dark_web_ghost', DarkWebGhost],
+  ['viral_wraith', ViralWraith],
+  ['nano_swarm', NanoSwarm],
+  ['bandit_lookout', BanditLookout],
+  ['bandit_looter', BanditLooter],
+  ['bandit_scav', BanditScav],
 ])
 
 export { CLASS_MAP }

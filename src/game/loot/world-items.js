@@ -161,6 +161,8 @@ export class LootDrop {
       this.picked = true
       this.group.visible = false
       if (this.flagKey) G.flags[this.flagKey] = true
+      // 收藏品 / 遗物：全局唯一，捡过之后任何房间都不再生成
+      if (this.def?.unique || this.def?.category === 'artifact') G.flags[`got:${this.itemId}`] = true
       this.game.onLootPicked?.(this.itemId, this.def)
       this.game.particles?.emitMany?.('spark', this.x, this.y, 5)
     }

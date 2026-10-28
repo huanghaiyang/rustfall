@@ -5,6 +5,7 @@
 // =============================================================================
 import { computed } from 'vue'
 import { A } from '../../game/ui-actions.js'
+import { G } from '../../game/state.js'
 // 公共样式只需加载一次（Vite 按模块去重；集成方也可在 main.js 再引入）
 import '../../styles/panels.css'
 
@@ -23,6 +24,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const toneClass = computed(() => `tone-${props.tone || 'rust'}`)
+const closeLabel = computed(() => (G.ui?.padActive ? '关闭（B）' : '关闭（ESC）'))
 
 function close() {
   try {
@@ -71,8 +73,8 @@ function onBackdrop(e) {
             v-if="closable"
             class="rp-close"
             type="button"
-            title="关闭"
-            aria-label="关闭面板"
+            :title="closeLabel"
+            :aria-label="closeLabel"
             @click="close"
           >
             ×

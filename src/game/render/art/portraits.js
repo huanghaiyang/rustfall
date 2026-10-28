@@ -940,7 +940,8 @@ function build(id) {
     const a = (y - 84) / 12
     for (let x = 0; x < 96; x++) s.px(x, y, PAL.void, 0.05 + a * 0.12)
   }
-  const t = s.tex()
+  // 2 倍分辨率输出：画框尺寸不变，纹理清晰度翻倍
+  const t = s.tex(2)
   t.userData.npcId = key
   return t
 }

@@ -10,6 +10,7 @@ import { G } from '../../game/state.js'
 import { A } from '../../game/ui-actions.js'
 import { Content, KIND } from '../../game/core/registry.js'
 import { getItemArt } from '../../game/render/art/items.js'
+import { getHotkey, keyLabel, padLabel } from '../../game/hotkeys.js'
 
 const props = defineProps({
   // 默认自带底部居中定位（App.vue 里就是 <ToolBelt /> 直接挂）；
@@ -70,6 +71,11 @@ const tools = computed(() =>
     return {
       id: c.id,
       key: c.key,
+      bind: padActive.value
+        ? getHotkey('tool' + (i + 1)).pad != null
+          ? padLabel(getHotkey('tool' + (i + 1)).pad)
+          : keyLabel(getHotkey('tool' + (i + 1)).key)
+        : keyLabel(getHotkey('tool' + (i + 1)).key),
       index: i,
       name: (def && (def.name || def.title)) || c.name,
       en: (def && def.en) || c.en,
@@ -82,6 +88,7 @@ const tools = computed(() =>
 )
 
 const current = computed(() => String(G.toolId || ''))
+const padActive = computed(() => !!G.ui.padActive)
 
 // —— 工具字形（注册表没有图标时用，四个形状必须能一眼区分）——
 const cvMap = new Map()
@@ -190,7 +197,7 @@ onMounted(() => nextTick(drawAll))
       :aria-pressed="current === t.id"
       @click="pick(t)"
     >
-      <span class="key">{{ t.key }}</span>
+      <span class="key">{{ t.bind || t.key }}</span>
       <span class="glyph">
         <canvas :ref="setCv(t.id)" class="rp-pixel" />
       </span>

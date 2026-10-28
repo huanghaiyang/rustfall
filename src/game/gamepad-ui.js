@@ -149,6 +149,13 @@ function tick(game, input, dt) {
     return
   }
   const overlay = activeOverlay()
+  // 设置面板正在捕获手柄键：这一帧的所有手柄输入都归绑定使用，不做导航/确认/关闭
+  // 捕获刚结束时保留一小段冷却，避免残留的按住状态立刻触发面板导航
+  const now = typeof performance !== 'undefined' ? performance.now() : 0
+  if (G.ui && (G.ui.padCapture || (G.ui.padCaptureT && now < G.ui.padCaptureT))) {
+    if (game) game._padUiFocus = false
+    return
+  }
   // 游戏中没有覆盖层时，手柄交给玩法输入处理
   if (!overlay) {
     if (focusEl) clearFocus()
@@ -183,8 +190,13 @@ function tick(game, input, dt) {
   const pressed = input.pad.pressed
   const axes = input.pad.axes || [0, 0]
   let dir = ''
-  if (pressed.has('left') || pressed.has('right') || pressed.has('up') || pressed.has('down')) {
-    dir = pressed.has('left') ? 'left' : pressed.has('right') ? 'right' : pressed.has('up') ? 'up' : 'down'
+  // 十字键在玩法里是切武器，在菜单里必须当作方向键使用
+  const left = pressed.has('left') || pressed.has('weaponPrev')
+  const right = pressed.has('right') || pressed.has('weaponNext')
+  const up = pressed.has('up') || pressed.has('quests')
+  const down = pressed.has('down')
+  if (left || right || up || down) {
+    dir = left ? 'left' : right ? 'right' : up ? 'up' : 'down'
     navCd = 0.2
   } else if (navCd <= 0) {
     const [ax, ay] = axes

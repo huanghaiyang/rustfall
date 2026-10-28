@@ -7,7 +7,7 @@ defineProps({
   saveInfo: Object,
   ready: Boolean,
 })
-defineEmits(['start', 'continue', 'mods', 'settings', 'help'])
+defineEmits(['start', 'continue', 'mods', 'settings', 'help', 'levels'])
 const logoRef = ref(null)
 
 onMounted(() => {
@@ -41,6 +41,7 @@ onMounted(() => {
         继 续 · 循环 {{ String(saveInfo?.cycle || 1).padStart(2, '0') }} · 信号 {{ saveInfo?.signal || 2 }}
       </button>
       <button class="btn" @click="$emit('mods')">模 组 管 理</button>
+      <button class="btn" @click="$emit('levels')">关 卡 选 择 · 测 试</button>
       <button class="btn" @click="$emit('settings')">设 置 · 画 面 与 手 柄</button>
       <button class="btn" @click="$emit('help')">操 作 与 生 存 指 南</button>
     </div>

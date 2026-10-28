@@ -19,6 +19,13 @@ const ACTIONS = {
   toolNext: ['KeyX'],
   weaponPrev: ['BracketLeft'],
   weaponNext: ['BracketRight'],
+  weapon1: ['Digit5'],
+  weapon2: ['Digit6'],
+  weapon3: ['Digit7'],
+  weapon4: ['Digit8'],
+  choice1: ['Digit1'],
+  choice2: ['Digit2'],
+  choice3: ['Digit3'],
   chassis: ['KeyQ'],
   growth: ['KeyG'],
   inventory: ['KeyI', 'Tab'],
@@ -44,6 +51,13 @@ const BLOCK_DEFAULT = new Set([
   'Slash',
   'F2',
 ])
+
+/** 取动作的按键列表：设置里绑定过的快捷槽位优先 */
+function keysFor(action) {
+  const hk = G.settings?.hotkeys?.[action]
+  if (hk && typeof hk.key === 'string' && hk.key) return [hk.key]
+  return ACTIONS[action] || []
+}
 
 // 标准 Xbox 布局（navigator.getGamepads 的 standard mapping）
 const PAD_BUTTONS = {
@@ -197,6 +211,18 @@ export class Input {
       nextDown.add(action)
     }
 
+    // 自定义手柄快捷槽位（设置里可绑定任意按键索引）
+    const hks = G.settings?.hotkeys
+    if (hks && typeof hks === 'object') {
+      for (const [action, hk] of Object.entries(hks)) {
+        const idx = hk && hk.pad
+        if (idx == null || idx < 0) continue
+        const btn = pad.buttons?.[idx]
+        if (!btn) continue
+        if (!!btn.pressed || (btn.value ?? 0) > 0.5) nextDown.add(action)
+      }
+    }
+
     for (const a of nextDown) if (!prevDown.has(a)) pressed.add(a)
     for (const a of prevDown) if (!nextDown.has(a)) released.add(a)
     if (pressed.size) this.pad.lastActive = performance.now()
@@ -236,24 +262,24 @@ export class Input {
   // ---------------------------------------------------------------- 查询
   isDown(action) {
     if (this.pad.down.has(action)) return true
-    const keys = ACTIONS[action]
-    if (!keys) return false
+    const keys = keysFor(action)
+    if (!keys.length) return false
     for (const k of keys) if (this.down.has(k)) return true
     if (action === 'attack' && this.mouse.down) return true
     return false
   }
   wasPressed(action) {
     if (this.pad.pressed.has(action)) return true
-    const keys = ACTIONS[action]
-    if (!keys) return false
+    const keys = keysFor(action)
+    if (!keys.length) return false
     for (const k of keys) if (this.pressed.has(k)) return true
     if (action === 'attack' && this.mouse.pressed) return true
     return false
   }
   wasReleased(action) {
     if (this.pad.released.has(action)) return true
-    const keys = ACTIONS[action]
-    if (!keys) return false
+    const keys = keysFor(action)
+    if (!keys.length) return false
     for (const k of keys) if (this.released.has(k)) return true
     return false
   }

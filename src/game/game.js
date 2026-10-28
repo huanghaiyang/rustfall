@@ -42,9 +42,28 @@ import { bindGame } from './ui-actions.js'
 import { addXp, initGrowth, spendGrowth as applyGrowthPoint } from './systems/growth.js'
 import { injectEasterEggs, handleEgg } from './world/easter-eggs.js'
 import { getTheme } from './world/themes.js'
+import { getProp } from './world/props-data.js'
 import { createChaosAI } from './systems/chaos-ai.js'
 import { createLighting } from './systems/lighting.js'
 import { clamp, damp } from './utils.js'
+import { ensureHotkeys, setHotkey as applyHotkey, resetHotkeys as resetHotkeyDefaults } from './hotkeys.js'
+
+// 任务物品保底：collect 目标适合出现在哪些 biome（房间生成时保证至少能捡到）
+const QUEST_ITEM_BIOMES = {
+  diary_1: ['city', 'metro', 'hospital'],
+  diary_2: ['village', 'hospital'],
+  diary_3: ['city', 'village'],
+  photo_2: ['village', 'hospital'],
+  jewelry_1: ['city', 'hospital', 'dump'],
+  cassette_1: ['city', 'metro'],
+  signal_recorder: ['port', 'dump', 'factory'],
+  rare_earth: ['factory', 'dump'],
+  relay_part: ['factory', 'metro'],
+  lubricant: ['city', 'metro', 'factory'],
+  dog_food: ['village', 'dump'],
+  military_shell: ['factory', 'dump', 'port'],
+  huique_toy: ['city', 'village'],
+}
 
 const SFX_MAP = {
   servo: 'step',
@@ -91,6 +110,7 @@ export class Game {
     this.zoomTarget = 1
     this.camWorld = { x: 0, y: 0 }
     this.shakeAmt = 0
+    this.ambientShake = 0
     this.time = 0
     this.input = new Input()
     this.room = null
@@ -152,6 +172,7 @@ export class Game {
     const contentStats = bootstrapContent()
     console.log('[rustfall] content ready', contentStats, contentSummary())
     await this.loadSettingsAndMods()
+    this.buildLevelIndex()
     this.setupSystems()
     this.buildTitleScene()
     this.resize()
@@ -194,6 +215,8 @@ export class Game {
     this.applySettings()
     audio.setVolume(G.volume)
     audio.setMuted(G.muted)
+    // 老存档没有快捷键字段：补齐武器/工具槽位默认值
+    ensureHotkeys()
 
     try {
       await this.mods.discover()
@@ -321,6 +344,69 @@ export class Game {
     return { regionId, roomId: region.startRoom || Object.keys(region.rooms)[0] }
   }
 
+  /** 关卡索引：按世界线顺序铺平所有房间，附主题 / BOSS 信息 */
+  buildLevelIndex() {
+    const mod = this.regionsMod
+    if (!mod?.REGIONS) return []
+    const out = []
+    for (const rid of mod.REGION_ORDER || Object.keys(mod.REGIONS)) {
+      const region = mod.REGIONS[rid]
+      if (!region) continue
+      for (const roomId of region.order || []) {
+        const spec = region.rooms[roomId]
+        if (!spec) continue
+        const theme = spec.theme ? getTheme(spec.theme) : null
+        out.push({
+          index: out.length,
+          regionId: rid,
+          regionName: region.name,
+          regionEn: region.en,
+          roomId,
+          label: spec.label || roomId,
+          kind: spec.kind || 'standard',
+          themeId: theme?.id || null,
+          themeName: theme?.name || null,
+          boss: theme?.boss || null,
+          landmark: spec.landmark || null,
+          regionRoomCount: (region.order || []).length,
+        })
+      }
+    }
+    G.levels = out
+    return out
+  }
+
+  /** 调试 / 反馈用：直接跳到任意关卡（区域 + 房间） */
+  jumpToLevel(regionId, roomId) {
+    const spec = this.regionsMod?.getRoomSpec?.(regionId, roomId)
+    if (!spec) {
+      toast('关卡不存在', 'danger', 2.4)
+      return false
+    }
+    this.audioUnlock()
+    if (!this.robot || G.phase === 'title' || G.phase === 'chassis' || G.phase === 'hibernate') {
+      const chassis = G.chassisUnlocked?.includes(G.chassisId) ? G.chassisId : G.chassisUnlocked?.[0] || G.chassisId
+      this.startNewGame(chassis)
+    }
+    closePanel()
+    G.phase = 'playing'
+    G.showHud = true
+    G.paused = false
+    G.dialogue.active = false
+    this.loadRoom(regionId, roomId, 'left')
+    if (this.robot) {
+      this.robot.dead = false
+      this.robot.refreshStats?.()
+      G.hp = this.robot.stats?.hp || G.hp
+      G.energy = this.robot.stats?.energyMax || G.energy
+    }
+    this.weapons?.reset?.()
+    this.snapCamera()
+    this.saveGame()
+    toast(`已跳转：${G.regionName} · ${G.roomName}`, 'info', 2.6)
+    return true
+  }
+
   getRoomData(regionId, roomId) {
     const key = `${regionId}:${roomId}`
     if (this.roomCache.has(key)) return this.roomCache.get(key)
@@ -333,6 +419,7 @@ export class Game {
     gen.biome = spec.biome || regionBiome
     gen.label = spec.label || roomId
     this.applyThemeRoom(gen, spec)
+    this.ensureQuestItems(gen, regionId, roomId)
     try {
       decorateTerrain(gen)
     } catch (e) {
@@ -365,7 +452,42 @@ export class Game {
     gen.themeName = theme.name
     gen.themeEn = theme.en
     gen.themeAccent = theme.accent
+    gen.themeFamily = theme.family
     gen.sceneryKinds = theme.sceneryKinds
+    // 房间环境：重力 / 雾 / 风 / 减速 / 黑暗，交给 player/weather/lighting 读取
+    if (theme.env) gen.env = { ...(gen.env || {}), ...theme.env }
+
+    // 道具合理放置：主题房里的 biome 标志性杂物（车壳、病床、路灯……）换成主题件，
+    // 只保留真正的功能件（箱桶 / 贩卖机 / 终端 / 工作台 / 营火 / 保险门等）与任务目标。
+    const themeKinds = Array.isArray(theme.sceneryKinds) ? theme.sceneryKinds.filter(Boolean) : []
+    if (themeKinds.length && Array.isArray(gen.props)) {
+      const allowed = new Set(themeKinds)
+      const keep = new Set([
+        'crate', 'barrel', 'military_crate', 'vending_machine', 'terminal', 'workbench',
+        'campfire', 'vault_door', 'beacon', 'beacon_lamp', 'cargo_net',
+      ])
+      let swap = 0
+      for (const p of gen.props) {
+        if (!p || allowed.has(p.kind) || keep.has(p.kind)) continue
+        if (getProp(p.kind)?.questTarget) continue
+        p.kind = themeKinds[swap++ % themeKinds.length]
+        p.theme = theme.id
+      }
+    }
+
+    // 主题战利品：替换房间内已有的地面掉落（沿用已校验过的落点，不凭空造位置）
+    const themedLoot = Array.isArray(theme.loot) ? theme.loot.filter(Boolean) : []
+    if (themedLoot.length && Array.isArray(gen.loot)) {
+      const open = gen.loot.filter((e) => e && !e.hidden && !e.buried)
+      const seed = (spec?.seed || 0) >>> 0
+      for (let i = 0; i < themedLoot.length; i++) {
+        if (!open.length) break
+        const slot = open[(seed + i * 7 + 3) % open.length]
+        if (!slot) continue
+        slot.id = themedLoot[i]
+        slot.theme = theme.id
+      }
+    }
 
     // 小怪：固定池按 monsterCount 铺开，避免 director 走 biome 兜底池
     const pool = Array.isArray(theme.monsters) && theme.monsters.length ? theme.monsters : null
@@ -379,6 +501,49 @@ export class Game {
     if (theme.boss) {
       const w = gen.worldW || 2000
       gen.largeEnemies = [{ id: theme.boss, x: Math.round(w * 0.68), y: 0 }]
+    }
+  }
+
+  /**
+   * 任务物品保底：激活中的 collect 目标必须在世界里真的能捡到。
+   * 每件物品在合适的 biome 里挑 count 间房各塞一份（复用已校验的掉落点），
+   * 同一房间重复生成时位置不变，避免「日志里写着收集，地图上却没有」。
+   */
+  ensureQuestItems(gen, regionId, roomId) {
+    const active = this.quests?.active?.() || []
+    if (!active.length || !Array.isArray(gen.loot) || !gen.loot.length) return
+    const biome = gen.biome || 'city'
+    const need = new Map()
+    for (const q of active) {
+      for (const obj of q.def?.objectives || []) {
+        if (obj.type !== 'collect' || !obj.target) continue
+        if (this.quests.objectiveDone(q.id, obj.id)) continue
+        const count = Math.max(1, Number(obj.count) || 1)
+        const have = Math.max(0, this.inventory?.count?.(obj.target) || 0)
+        const miss = count - have
+        if (miss <= 0) continue
+        need.set(obj.target, Math.max(need.get(obj.target) || 0, miss))
+      }
+    }
+    if (!need.size) return
+    if (!G.quests || typeof G.quests !== 'object') return
+    const sources = (G.quests.itemSources = G.quests.itemSources || {})
+    const key = `${regionId}:${roomId}`
+    let seed = 0
+    for (let i = 0; i < key.length; i++) seed = (seed * 31 + key.charCodeAt(i)) & 0xffff
+    for (const [itemId, want] of need) {
+      const biomes = QUEST_ITEM_BIOMES[itemId]
+      if (biomes && !biomes.includes(biome)) continue
+      const used = Array.isArray(sources[itemId]) ? sources[itemId] : (sources[itemId] = [])
+      const here = used.includes(key)
+      if (!here && used.length >= want) continue
+      if (!here) used.push(key)
+      if (gen.loot.some((e) => e && e.id === itemId)) continue
+      const open = gen.loot.filter((e) => e && !e.hidden && !e.buried && !e.quest)
+      if (!open.length) continue
+      const slot = open[(seed + itemId.length * 13) % open.length]
+      slot.id = itemId
+      slot.quest = true
     }
   }
 
@@ -587,7 +752,7 @@ export class Game {
       this.camWorld.y = damp(this.camWorld.y, ty, 4.8, dt)
     }
     this.shakeAmt = Math.max(0, this.shakeAmt - dt * 2.2)
-    const s = this.shakeAmt * this.shakeAmt * 16
+    const s = this.shakeAmt * this.shakeAmt * 16 + this.ambientShake * 2.4
     const sx = (Math.random() - 0.5) * s
     const sy = (Math.random() - 0.5) * s
     this.camera.position.set(this.camWorld.x + sx, -this.camWorld.y + sy, 200)
@@ -658,6 +823,8 @@ export class Game {
 
   update(dt) {
     this.input.pollGamepad(dt)
+    // 手柄已连接且未在设置里关闭时，所有 UI 按键提示都改用 A/B/X/Y 语义
+    G.ui.padActive = !!(G.settings.gamepad && this.input.pad.connected)
     this.time += dt
     G.hurt = Math.max(0, G.hurt - dt * 2)
     G.flash = Math.max(0, G.flash - dt * 2.6)
@@ -828,6 +995,9 @@ export class Game {
       if (input.wasPressed('tool2')) this.switchTool('pickaxe')
       if (input.wasPressed('tool3')) this.switchTool('welder')
       if (input.wasPressed('tool4')) this.switchTool('scanner')
+      for (let i = 0; i < 4; i++) {
+        if (input.wasPressed('weapon' + (i + 1))) this.equipWeaponSlot(i)
+      }
       if (input.wasPressed('toolPrev')) this.cycleTool(-1)
       if (input.wasPressed('toolNext')) this.cycleTool(1)
       if (input.wasPressed('weaponPrev')) this.switchWeapon(-1)
@@ -846,9 +1016,9 @@ export class Game {
     if (G.phase === 'playing' && G.dialogue.active) {
       // 手柄焦点落在选项按钮上时，A 由 UI 点击处理，不再重复推进文本
       if (!this._padUiFocus && (input.wasPressed('interact') || input.wasPressed('jump'))) this.dialogue.advance()
-      if (input.wasPressed('Digit1')) this.dialogue.choose(0)
-      if (input.wasPressed('Digit2')) this.dialogue.choose(1)
-      if (input.wasPressed('Digit3')) this.dialogue.choose(2)
+      if (input.wasPressed('choice1')) this.dialogue.choose(0)
+      if (input.wasPressed('choice2')) this.dialogue.choose(1)
+      if (input.wasPressed('choice3')) this.dialogue.choose(2)
     }
   }
 
@@ -887,15 +1057,25 @@ export class Game {
       this.weather.setPhase('storm')
       notify('酸雨倾盆而下', 'danger', 5)
       toast('酸雨倾盆！暴露在室外会迅速腐蚀机体', 'danger', 4)
-      this.cameraShake(0.8)
+      this.cameraShake(0.3)
       G.flash = 0.4
+    }
+    // 酸雨天气自然结束（轮换走）而循环还没完：把相位降回去，否则抖动/危险音永不解除
+    if (!storm && G.weatherPhase === 'storm') {
+      G.weatherPhase = warn ? 'warning' : 'calm'
+      this.weather.setPhase(G.weatherPhase)
+      if (!warn) {
+        notify('酸雨停了。机体还在滴水。', 'good', 4)
+        audio.setRain?.(0.03)
+      }
     }
 
     const inShelter = this.room.inShelter(this.robot.centerX, this.robot.centerY)
     G.sheltered = inShelter
 
     if (G.weatherPhase === 'storm') {
-      this.cameraShake(0.04)
+      // 轻微环境抖动：低幅度持续微震，不衰减到零也不累加到失控
+      this.ambientShake = Math.min(0.45, this.ambientShake + dt * 0.5)
       if (!inShelter) {
         const hazard = this.dayNight?.hazard?.() ?? 1
         if (G.settings?.godMode) G.exposed = 0
@@ -926,8 +1106,9 @@ export class Game {
       }
     } else {
       G.exposed = 0
+      // 非风暴相位：环境微抖平滑衰减，酸雨一停抖动随之消失
+      this.ambientShake = Math.max(0, this.ambientShake - dt * 1.1)
     }
-
     let danger = 0
     if (this.director) {
       for (const m of this.director.list) {
@@ -1016,6 +1197,19 @@ export class Game {
     saveSettings({ display: { ...G.settings } })
   }
 
+  /** 设置武器/工具快捷槽位绑定（键盘 code 或手柄按键索引） */
+  setHotkey(action, patch) {
+    if (!applyHotkey(action, patch)) return false
+    saveSettings({ display: { ...G.settings } })
+    return true
+  }
+
+  resetHotkeys() {
+    resetHotkeyDefaults()
+    saveSettings({ display: { ...G.settings } })
+    toast('快捷键已恢复默认', 'good', 1.8)
+  }
+
   // ================================================================ 日夜 / 天气
   applyDayNight(params, st) {
     if (!params) return
@@ -1026,14 +1220,27 @@ export class Game {
     } catch (e) {
       wx = null
     }
+    // 天气淡入淡出系数：wx 的离散参数按它缩放，切换天气时画面不跳变
+    const wk = params.weatherK ?? 1
+    const roomEnv = this.room?.data?.env || null
+    const roomDark = clamp(Number(roomEnv?.dark) || 0, 0, 1)
+    const baseTint = params.tint || [1, 1, 1]
+    let tint = baseTint
+    if (wx?.tint && wk > 0) {
+      tint = [
+        baseTint[0] + (wx.tint[0] - baseTint[0]) * wk,
+        baseTint[1] + (wx.tint[1] - baseTint[1]) * wk,
+        baseTint[2] + (wx.tint[2] - baseTint[2]) * wk,
+      ]
+    }
     pf?.setUniforms?.({
       // 闪电：整屏瞬时提亮（daynight 每 0.1s apply 一次，闪电在 ~0.4s 内衰减）
-      ambient: clamp(params.amb + (params.lightning || 0) * 0.85, 0, 1.35),
-      night: params.night,
-      weatherTint: wx?.tint || params.tint,
-      fog: Math.max(params.fog, wx?.fog || 0),
-      wetness: Math.max(params.wetness, wx?.wetness || 0),
-      toxicity: wx?.toxicity || 0,
+      ambient: clamp((params.amb + (params.lightning || 0) * 0.85) * (1 - roomDark * 0.8), 0, 1.35),
+      night: Math.max(params.night || 0, roomDark),
+      weatherTint: tint,
+      fog: Math.max(params.fog, (wx?.fog || 0) * wk, Number(roomEnv?.fog) || 0),
+      wetness: Math.max(params.wetness, (wx?.wetness || 0) * wk),
+      toxicity: (wx?.toxicity || 0) * wk,
     })
     this.room?.applyDayNight?.(params)
     this.weather?.setIntensity?.(Math.max(params.rain, params.fog * 0.35))
@@ -1046,7 +1253,7 @@ export class Game {
         if (!l.mat) continue
         if (l.baseColor === undefined) l.baseColor = l.mat.color.getHex()
         const tint = params.tint || [1, 1, 1]
-        const amb = 0.35 + params.amb * 0.65
+        const amb = (0.35 + params.amb * 0.65) * (1 - roomDark * 0.8)
         l.mat.color.setRGB(
           clamp(((l.baseColor >> 16) & 255) / 255 * tint[0] * amb, 0, 1),
           clamp(((l.baseColor >> 8) & 255) / 255 * tint[1] * amb, 0, 1),
@@ -1795,35 +2002,67 @@ export class Game {
     if (next) this.switchTool(next.id)
   }
 
-  /** 在背包中的武器之间循环（手柄十字键左右） */
+  /** 背包里的武器按槽位排序（供快捷槽与循环切换共用） */
+  weaponSlotIds() {
+    const ids = []
+    const seen = new Set()
+    const add = (id) => {
+      if (!id || seen.has(id)) return
+      const def = Content.get(KIND.ITEM, id)
+      if (!def || (def.category !== 'weapon' && def.slot !== 'weapon')) return
+      seen.add(id)
+      ids.push(id)
+    }
+    for (const s of this.inventory?.slots || []) add(s?.id)
+    // 兼容旧存档：装备栏/当前武器即使不在背包里也要能切回
+    add(G.equipped?.weapon)
+    add(this.weapons?.weaponId)
+    return ids
+  }
+
+  /** 快捷槽：装备背包里的第 index 把武器（0-3） */
+  equipWeaponSlot(index) {
+    if (!this.weapons) return
+    const ids = this.weaponSlotIds()
+    const id = ids[index]
+    if (!id) {
+      toast(`快捷槽 ${index + 1} 没有武器`, 'info', 1.4)
+      return
+    }
+    const def = Content.get(KIND.ITEM, id)
+    const res = this.weapons.equip(id)
+    if (res?.ok) {
+      this.syncWeaponState()
+      this.sfx('weapon_swap', { vol: 0.5 })
+      toast(`武器 ${index + 1}：${def?.name || id}`, 'info', 1.4)
+    } else toast(res?.reason || '无法装备武器', 'warn', 1.8)
+  }
+
+  /** 按顺序循环切换武器（十字键 / 方括号） */
   switchWeapon(dir = 1) {
     if (!this.weapons) return
-    const slots = this.inventory?.slots || []
-    const ids = []
-    const names = {}
-    for (const s of slots) {
-      if (!s || !s.item) continue
-      if (s.item.category !== 'weapon') continue
-      if (!ids.includes(s.id)) {
-        ids.push(s.id)
-        names[s.id] = s.item.name || s.id
-      }
-    }
+    const ids = this.weaponSlotIds()
     if (ids.length === 0) {
       toast('背包里没有可切换的武器', 'info', 1.6)
       return
     }
-    if (ids.length === 1) {
-      this.weapons.equip(ids[0])
-      toast(`武器：${names[ids[0]]}`, 'info', 1.4)
-      return
-    }
+    const order = dir > 0 ? ids : [...ids].reverse()
     const cur = this.weapons.weaponId
-    let idx = ids.indexOf(cur)
-    idx = idx < 0 ? 0 : (idx + (dir > 0 ? 1 : ids.length - 1)) % ids.length
-    const res = this.weapons.equip(ids[idx])
-    if (res?.ok) toast(`武器：${names[ids[idx]]}`, 'info', 1.4)
-    else toast(res?.reason || '无法切换武器', 'warn', 1.8)
+    const start = order.indexOf(cur)
+    // 从当前位置往后找第一把能装的武器；装不了就跳过，别卡在不可用武器上
+    let lastReason = ''
+    for (let step = 1; step <= order.length; step++) {
+      const idx = start < 0 ? step - 1 : (start + step) % order.length
+      const id = order[idx]
+      const res = this.weapons.equip(id)
+      if (res?.ok) {
+        this.syncWeaponState()
+        toast(`武器：${Content.get(KIND.ITEM, id)?.name || id}`, 'info', 1.4)
+        return
+      }
+      lastReason = res?.reason || lastReason
+    }
+    toast(lastReason || '没有装得上的武器', 'warn', 2)
   }
 
   // ================================================================ 门 / 转场

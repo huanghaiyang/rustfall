@@ -278,6 +278,87 @@ const FRONTIER_ROOMS = [
 ]
 
 // =====================================================================
+// 锈土旧城（16）—— 图书馆 / 学校 / 大学 / 纸厂 / 遗迹 / 监狱 / 旅馆 / 港区
+// =====================================================================
+const OLDTOWN_ROOMS = [
+  R('oldtown_shelter', '旧城营地', 'shelter', 'shelter', 118, 52, 0x9a01a1, {
+    shelterSide: 'left',
+    biome: 'city',
+    notes: '旧城消防站改的营地，卷帘门只拉下来一半，车库深处还停着一辆没轮子的消防车。',
+  }),
+  R('oldtown_post', '旧邮局', 'standard', 'street', 120, 52, 0x9a02b3, {
+    biome: 'city',
+    notes: '分拣格架从地排到顶，格子里塞着没人来取的信。柜台上的邮戳日期是同一个。',
+  }),
+  R('oldtown_library', '市立图书馆', 'arena', 'ward', 140, 58, 0x9a03c5, { biome: 'hospital', theme: 'library', notes: '还书箱满了，借阅证摊在桌上，日期停在同一场酸雨之前。' }),
+  R('oldtown_school', '第九中学', 'standard', 'ward', 136, 56, 0x9a04d7, { biome: 'hospital', theme: 'school', notes: '黑板上最后一行板书没擦，值日表还挂在门后。' }),
+  R('oldtown_university', '理工大学', 'arena', 'atrium', 148, 60, 0x9a05e9, { biome: 'hospital', theme: 'university', notes: '阶梯教室的椅子全朝一个方向，讲台上的录音机还在转。' }),
+  R('oldtown_papermill', '造纸厂', 'standard', 'line', 150, 58, 0x9a06f1, { biome: 'factory', theme: 'paper_mill', notes: '纸浆池泛着灰白，烘干辊上还卷着一层没切完的纸。' }),
+  R('oldtown_ruins', '考古遗迹', 'arena', 'pit', 146, 56, 0x9a070d, { biome: 'dump', theme: 'archaeological_site', notes: '探方一格一格排开，塑料标签被晒得发白。' }),
+  R('oldtown_prison', '废弃监狱', 'arena', 'depot', 150, 60, 0x9a081b, { biome: 'metro', theme: 'prison', notes: '牢门全开着，操场的探照灯还慢慢转。' }),
+  R('oldtown_hotel', '无人旅馆', 'standard', 'ward', 142, 58, 0x9a0929, { biome: 'hospital', theme: 'hotel', notes: '前台铃一按就响，钥匙架上的房间号全被翻成了 13。' }),
+  R('oldtown_cinema', '旧电影院', 'standard', 'plaza', 134, 56, 0x9a0a37, { biome: 'city', notes: '银幕破了一个洞，放映机的胶片卡在同一格。' }),
+  R('oldtown_dock', '旧码头', 'standard', 'dock', 152, 58, 0x9a0b45, { biome: 'port', theme: 'dock', notes: '系缆桩上缠着断绳，水面上漂着一层油。' }),
+  R('oldtown_lighthouse', '断光灯塔', 'arena', 'lighthouse', 120, 62, 0x9a0c53, { biome: 'port', theme: 'lighthouse', notes: '透镜还转，光会在半途折回来。' }),
+  R('oldtown_shipyard', '造船厂', 'arena', 'hull', 154, 60, 0x9a0d65, { biome: 'port', theme: 'shipyard', notes: '船骨焊到一半，焊缝一路延伸进墙里。' }),
+  R('oldtown_drydock', '干船坞', 'standard', 'hull', 148, 58, 0x9a0e77, { biome: 'port', theme: 'drydock', notes: '闸门合着，坞底的水位却每天涨一指。' }),
+  R('oldtown_substation', '变电站', 'arena', 'control', 132, 56, 0x9a0f89, { biome: 'factory', theme: 'substation', notes: '绝缘子还在冒蓝火，电表倒着走。' }),
+  R('oldtown_gate', '旧城界门', 'gate', 'gate', 116, 50, 0x9a10a1, { biome: 'city', notes: '门楣上的旧城徽被酸雨蚀掉一半，门轴还能转动。' }),
+]
+
+// =====================================================================
+// 地底深井（16）—— 堡垒 / 矿 / 电力 / 辐射 / 军械 / 朋克 / 暗影 / 城堡 / 血巢
+// =====================================================================
+const UNDERWORLD_ROOMS = [
+  R('underworld_shelter', '地底驿站', 'shelter', 'shelter', 116, 50, 0x9b01a3, {
+    shelterSide: 'right',
+    biome: 'metro',
+    notes: '竖井底部的检修平台，头顶能看见一小块天。墙角堆着别人留下的空水桶。',
+  }),
+  R('underworld_bunker', '地下堡垒', 'arena', 'depot', 146, 58, 0x9b02b5, { biome: 'metro', theme: 'bunker', notes: '防爆门内侧写着一句「里面还有人」，敲门声每隔七小时响一次。' }),
+  R('underworld_coalmine', '煤矿厂', 'standard', 'pit', 150, 58, 0x9b03c7, { biome: 'dump', theme: 'coal_mine', notes: '矿车还在往上升，斗里的煤压着别的东西。' }),
+  R('underworld_vent', '通风井', 'standard', 'escalator', 112, 62, 0x9b04d9, { biome: 'metro', notes: '竖井一直通到地面，风带着雨腥味灌下来。' }),
+  R('underworld_drain', '排水渠', 'standard', 'flood', 144, 54, 0x9b05e1, { biome: 'metro', notes: '水在膝盖以下，渠壁上是一层滑腻的黑。' }),
+  R('underworld_lift', '升降机', 'standard', 'control', 124, 60, 0x9b06f3, { biome: 'factory', notes: '货运升降机的钢缆还绷着，楼层指示停在 −7。' }),
+  R('underworld_thermal', '火电厂', 'arena', 'furnace', 152, 60, 0x9b0705, { biome: 'factory', theme: 'thermal_plant', notes: '锅炉压力表停在红区，值夜班的记录本只剩一个「热」字。' }),
+  R('underworld_nuclear', '核电厂', 'arena', 'hall', 154, 62, 0x9b0817, { biome: 'factory', theme: 'nuclear_plant', notes: '控制棒的刻度被人用粉笔画了箭头，指向「再深一点」。' }),
+  R('underworld_radiation', '辐射区', 'standard', 'core', 150, 56, 0x9b0929, { biome: 'dump', theme: 'radiation_zone', notes: '废料堆的缝里透出蓝光，盖革计数器一直在响。' }),
+  R('underworld_arsenal', '轰隆不停的兵工厂', 'arena', 'line', 152, 60, 0x9b0a3b, { biome: 'factory', theme: 'arsenal', notes: '流水线不停，弹壳落进筐里，盖住所有别的声音。' }),
+  R('underworld_scrapyard', '废料仓', 'standard', 'mountain', 136, 54, 0x9b0b4d, { biome: 'dump', notes: '废料按牌号分堆，标签在潮气里烂成了纸浆。' }),
+  R('underworld_repair', '维修巷道', 'standard', 'tunnel', 128, 52, 0x9b0c5f, { biome: 'metro', notes: '巷道两侧摆着拆到一半的机架，工具还插在螺丝上。' }),
+  R('underworld_punk', '朋克机械', 'arena', 'line', 146, 58, 0x9b0d71, { biome: 'factory', theme: 'punk_mech', notes: '音箱堆成墙，鼓点自己响。' }),
+  R('underworld_shadow', '暗影迷踪', 'standard', 'tunnel', 150, 60, 0x9b0e83, { biome: 'metro', theme: 'shadow_labyrinth', notes: '走廊的灯只亮一半，监控画面里总多一个人影。' }),
+  R('underworld_castle', '混乱城堡', 'arena', 'tower', 154, 62, 0x9b0f95, { biome: 'city', theme: 'chaos_castle', notes: '王座上的盔甲是空的，钟一响它就换个坐姿。' }),
+  R('underworld_vampire', '吸血巢穴', 'arena', 'morgue', 142, 58, 0x9b10a7, { biome: 'hospital', theme: 'vampire_lair', notes: '棺材盖反着钉，冷藏柜里码着写日期的血袋。' }),
+]
+
+// =====================================================================
+// 雾海禁区（16）—— 重力 / 浓雾 / 海峡 / 泥沼 / 枯林 / 赤潮 / 灰港 / 恐怖酒店
+// =====================================================================
+const MIST_ROOMS = [
+  R('mist_shelter', '雾海驿站', 'shelter', 'shelter', 118, 52, 0x9c01a5, {
+    shelterSide: 'left',
+    biome: 'port',
+    notes: '航标站改的驿站，窗上钉着塑料布。雾太厚的时候，连门都看不清。',
+  }),
+  R('mist_gravity', '重力异常区', 'arena', 'plaza', 148, 60, 0x9c02b7, { biome: 'city', theme: 'gravity_anomaly', notes: '碎石往天上掉，雨滴悬在半空。' }),
+  R('mist_fog', '浓雾区', 'standard', 'silt', 150, 58, 0x9c03c9, { biome: 'port', theme: 'dense_fog', notes: '雾里能听见自己的脚步声晚半拍。' }),
+  R('mist_road', '雾中公路', 'standard', 'street', 140, 54, 0x9c04db, { biome: 'city', notes: '车道线一段一段被雾吞掉，路牌只剩背面的铁皮。' }),
+  R('mist_saltflat', '盐碱滩', 'standard', 'silt', 146, 52, 0x9c05e3, { biome: 'port', notes: '地面结着一层白盐，踩上去会碎成粉。' }),
+  R('mist_strait', '嚎叫海峡', 'arena', 'breakwater', 154, 58, 0x9c06f5, { biome: 'port', theme: 'howling_strait', notes: '风从海峡那头灌过来，带着像人声一样的呜咽。' }),
+  R('mist_brokenbridge', '断桥', 'standard', 'crane', 148, 60, 0x9c070d, { biome: 'port', notes: '桥面从中间断下去，断口还挂着几根钢筋。' }),
+  R('mist_swamp', '深渊泥沼', 'standard', 'silt', 150, 56, 0x9c081f, { biome: 'port', theme: 'abyss_swamp', notes: '泥面冒着泡，每个泡破开都像有人在下面换气。' }),
+  R('mist_forest', '干枯树林', 'standard', 'field', 148, 56, 0x9c0931, { biome: 'village', theme: 'withered_forest', notes: '树皮全是裂口，风一吹，树干里传出空腔的回声。' }),
+  R('mist_gasstation', '废弃加油站', 'standard', 'street', 130, 54, 0x9c0a43, { biome: 'city', notes: '加油枪还挂在机器上，价格牌定格在最后一个数字。' }),
+  R('mist_tide', '红色潮水', 'arena', 'silt', 152, 56, 0x9c0b55, { biome: 'port', theme: 'red_tide', notes: '海水是红的，潮线一天比一天高。' }),
+  R('mist_harbor', '灰色港湾', 'standard', 'crane', 154, 58, 0x9c0c67, { biome: 'port', theme: 'grey_harbor', notes: '雾把吊机切成一段一段，汽笛每十分钟响一次。' }),
+  R('mist_observatory', '潮汐观测站', 'standard', 'lighthouse', 120, 62, 0x9c0d79, { biome: 'port', notes: '观测站的记录纸一直在走，潮位线越画越高。' }),
+  R('mist_wreck', '沉船滩', 'standard', 'hull', 144, 58, 0x9c0e8b, { biome: 'port', notes: '半条渔船埋在沙里，船舱里灌满了黑水。' }),
+  R('mist_hotel', '恐怖酒店', 'arena', 'ward', 144, 60, 0x9c0f9d, { biome: 'hospital', theme: 'horror_hotel', notes: '走廊尽头的房间号永远是 13。' }),
+  R('mist_trail', '雾林小径', 'standard', 'field', 138, 52, 0x9c10af, { biome: 'village', notes: '小径两边的草压向同一个方向，像有什么刚走过去。' }),
+]
+
+// =====================================================================
 // 组装
 // =====================================================================
 
@@ -346,6 +427,33 @@ const REGION_DEFS = [
     desc: '港口再往外，地图上就没有标了。二十一处地标散在荒野里，每一处都住着人。',
     rooms: FRONTIER_ROOMS,
   },
+  {
+    id: 'old_town',
+    name: '锈土旧城',
+    en: 'OLD TOWN',
+    sky: '#8a7a5a',
+    biome: 'city',
+    desc: '旧城没有被彻底拆掉，图书馆、学校、监狱和港区都还在。门牌掉在地上，房间里的东西一件没少。',
+    rooms: OLDTOWN_ROOMS,
+  },
+  {
+    id: 'underworld',
+    name: '地底深井',
+    en: 'UNDERWORLD',
+    sky: '#4a4a52',
+    biome: 'metro',
+    desc: '竖井一路往下打着，矿道、机房、堡垒和更下面的东西都接在这口井上。风是从底下吹上来的。',
+    rooms: UNDERWORLD_ROOMS,
+  },
+  {
+    id: 'mist',
+    name: '雾海禁区',
+    en: 'MIST SEA',
+    sky: '#6a7a7a',
+    biome: 'port',
+    desc: '海雾推进到岸上就不退了。重力在这里会打弯，潮水是红的，走进去的人多半原路退回来。',
+    rooms: MIST_ROOMS,
+  },
 ]
 
 /** 确定性散列：给房间一个稳定的 monsterCount / lootDensity（不用 Math.random） */
@@ -382,7 +490,7 @@ function buildRegion(def) {
     id: def.id,
     name: def.name,
     en: def.en,
-    biome: def.id,
+    biome: def.biome || def.id,
     sky: def.sky,
     desc: def.desc,
     order,
@@ -399,7 +507,19 @@ export const REGIONS = {}
 for (const def of REGION_DEFS) REGIONS[def.id] = buildRegion(def)
 
 /** 区域顺序（世界线） */
-export const REGION_ORDER = ['city', 'village', 'factory', 'dump', 'metro', 'hospital', 'port', 'frontier']
+export const REGION_ORDER = [
+  'city',
+  'village',
+  'factory',
+  'dump',
+  'metro',
+  'hospital',
+  'port',
+  'frontier',
+  'old_town',
+  'underworld',
+  'mist',
+]
 
 // 1) 先连区内相邻房间（order[i] ⇄ order[i+1]）
 for (const rid of REGION_ORDER) {
@@ -571,13 +691,17 @@ export function roomCount() {
 export function validateRegions() {
   const problems = []
   const IDs = new Set()
+  // 新增区域（old_town / underworld / mist）借用已有 biome 生成器，因此只校验 biome 合法性
+  const LEGAL_BIOMES = ['city', 'village', 'factory', 'dump', 'metro', 'hospital', 'port']
   for (const rid of REGION_ORDER) {
     const region = REGIONS[rid]
     if (!region) {
       problems.push(`缺少区域 ${rid}`)
       continue
     }
-    if (region.biome !== rid) problems.push(`${rid}: biome 字段应为 ${rid}`)
+    // frontier 是纯主题区，区域自身 biome 沿用旧值 'frontier'，允许保留
+    if (!LEGAL_BIOMES.includes(region.biome) && region.biome !== rid)
+      problems.push(`${rid}: biome=${region.biome} 不是合法 biome（应为 ${LEGAL_BIOMES.join('/')}）`)
     const rooms = Object.keys(region.rooms)
     if (rooms.length < 16) problems.push(`${rid}: 房间数 ${rooms.length} < 16`)
     if (region.order.length !== rooms.length) problems.push(`${rid}: order 与 rooms 数量不一致`)
@@ -588,6 +712,7 @@ export function validateRegions() {
       IDs.add(roomId)
       if (spec.id !== roomId) problems.push(`${roomId}: spec.id 不一致（${spec.id}）`)
       if (!spec.label) problems.push(`${roomId}: 缺 label`)
+      if (!LEGAL_BIOMES.includes(spec.biome)) problems.push(`${roomId}: biome=${spec.biome} 不合法`)
       if (!spec.exits) problems.push(`${roomId}: 缺 exits`)
       if (!Number.isInteger(spec.seed)) problems.push(`${roomId}: seed 必须是整数`)
       if (!(spec.w >= 96 && spec.w <= 160)) problems.push(`${roomId}: w=${spec.w} 不在 96~160`)

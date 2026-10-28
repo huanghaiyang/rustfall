@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { getAcidRainArt, getAshArt, getSmokeArt, getEmberArt } from '../render/art/atmosphere.js'
+import { getAcidRainArt, getAshArt, getSmokeArt, getEmberArt, getLightningArt } from '../render/art/atmosphere.js'
 import { createSmokeMaterial } from '../render/fx/shaders.js'
 import { makeRng } from '../render/rng.js'
 
@@ -112,6 +112,28 @@ export class WeatherSystem {
     this.fog.position.z = 12
     this.fog.renderOrder = 20
     scene.add(this.fog)
+
+    // ---------- 可见闪电（雷暴/辐射风暴时在天幕劈落） ----------
+    let boltTex = null
+    try {
+      boltTex = getLightningArt()
+    } catch (e) {
+      boltTex = null
+    }
+    this.boltMat = new THREE.MeshBasicMaterial({
+      map: boltTex || null,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+    })
+    this.bolt = new THREE.Mesh(new THREE.PlaneGeometry(220, 550), this.boltMat)
+    this.bolt.position.z = 11
+    this.bolt.renderOrder = 19
+    this.bolt.visible = false
+    scene.add(this.bolt)
+    this.boltFlip = 1
   }
 
   setPhase(phase, intensity = null) {
@@ -219,9 +241,10 @@ export class WeatherSystem {
     this.ash.geometry.attributes.position.needsUpdate = true
     this.ashMat.opacity = 0.35 + I * 0.2
 
-    // 贴地酸雾
+    // 贴地酸雾（主题房间可强制加浓：浓雾区 / 灰港 / 恐怖酒店）
     this.fog.position.set(cam.x, cam.y - viewH * 0.32, 12)
-    this.fogMat.opacity = Math.max(0, (I - 0.15) * 0.42)
+    const roomFog = game?.room?.data?.env?.fog || 0
+    this.fogMat.opacity = Math.max(Math.max(0, (I - 0.15) * 0.42), roomFog)
 
     // 烟源
     for (const s of this.smokeSources) {
@@ -242,8 +265,23 @@ export class WeatherSystem {
       if (this.flashTimer <= 0) {
         this.flash = 0.4 + Math.random() * 0.35
         this.flashTimer = 5 + Math.random() * 9
+        this._boltPending = true
         game?.sfx?.('thunder', { vol: 0.65 })
       }
+    }
+    // 新一次劈落（含 daynight 外部触发）：在视野内重新定位并随机翻转
+    if (this.bolt && this._boltPending) {
+      this._boltPending = false
+      this.bolt.position.x = cam.x + (Math.random() - 0.5) * viewW * 0.9
+      this.bolt.position.y = cam.y - viewH * 0.12
+      this.boltFlip = Math.random() < 0.5 ? 1 : -1
+      this.bolt.scale.set(this.boltFlip * (0.8 + Math.random() * 0.7), 0.9 + Math.random() * 0.6, 1)
+    }
+    if (this.bolt) {
+      const b = this.flash
+      this.bolt.visible = b > 0.06
+      // 双闪：主闪后在余晖里再抖一下
+      this.boltMat.opacity = b > 0.3 ? Math.min(1, b * 1.25) : b * (Math.sin(this.time * 60) > 0 ? 0.9 : 0.35)
     }
 
     // postfx 参数
@@ -267,6 +305,7 @@ export class WeatherSystem {
 
   triggerLightning(strength = 0.6) {
     this.flash = Math.max(this.flash, Math.min(1, strength))
+    this._boltPending = true
     if (this.flash > 0.5) this.flashTimer = 4 + Math.random() * 6
   }
 
@@ -274,6 +313,7 @@ export class WeatherSystem {
     this.scene.remove(this.rain)
     this.scene.remove(this.ash)
     this.scene.remove(this.fog)
+    this.scene.remove(this.bolt)
     this.scene.remove(this.smokeGroup)
     this.rainGeo.dispose()
     this.rainMat.dispose()
@@ -281,6 +321,8 @@ export class WeatherSystem {
     this.ashMat.dispose()
     this.fog.geometry.dispose()
     this.fogMat.dispose()
+    this.bolt.geometry.dispose()
+    this.boltMat.dispose()
     this.clearSmokeSources()
   }
 }

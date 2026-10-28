@@ -181,13 +181,14 @@ function placeholder(ctx, s) {
 function drawPortrait(c) {
   const cv = cvMap.get(c.id)
   if (!cv || typeof cv.getContext !== 'function') return
-  const S = 64
+  // 立绘纹理 192×192：画布取 128，CSS 仍按 64 显示
+  const S = 128
   if (cv.width !== S) cv.width = S
   if (cv.height !== S) cv.height = S
   const ctx = cv.getContext('2d')
   if (!ctx) return
   ctx.clearRect(0, 0, S, S)
-  ctx.imageSmoothingEnabled = false
+  ctx.imageSmoothingEnabled = true
   if (!c.met) {
     placeholder(ctx, S)
     return
@@ -387,6 +388,8 @@ watch(
   display: block;
   width: 64px;
   height: 64px;
+  /* 128 画布缩到 64 展示：平滑缩放 */
+  image-rendering: auto;
 }
 .p-badge {
   position: absolute;

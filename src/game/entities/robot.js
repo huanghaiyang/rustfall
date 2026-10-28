@@ -741,6 +741,27 @@ export class Robot {
     this.squash += (1 - this.squash) * Math.min(1, dt * 14)
   }
 
+  /** 机体当前帧的实际手部世界坐标（贴图 userData.hand 为朝右的像素坐标） */
+  handPoint() {
+    const hand = this.mat?.map?.userData?.hand
+    if (!hand || !this.artMesh) return null
+    const artW = this.art?.w || this.spriteW
+    const artH = this.art?.h || this.spriteH
+    const scaleY = (this.spriteH / artH) * this.squash
+    const xPx = this.spriteW / artW
+    const yPx = (this.spriteH * scaleY) / artH
+    const dx = this.facing * (hand[0] - artW / 2) * xPx
+    const dy = (artH / 2 - hand[1]) * yPx
+    const rot = this.artMesh.rotation.z || 0
+    const cos = Math.cos(rot)
+    const sin = Math.sin(rot)
+    return {
+      x: this.artMesh.position.x + dx * cos - dy * sin,
+      y: this.artMesh.position.y + dx * sin + dy * cos,
+      rot,
+    }
+  }
+
   syncMesh(dt) {
     const b = this.body
     const scaleY = (this.spriteH / (this.art?.h || this.spriteH)) * this.squash
@@ -754,18 +775,51 @@ export class Robot {
         this.artMesh.rotation.z = 0
       }
     }
+    const hand = this.handPoint()
     if (this.weaponMesh) {
-      this.weaponMesh.position.x = b.x + b.w / 2 + this.facing * (b.w * 0.34)
-      this.weaponMesh.position.y = -(b.y + b.h * 0.62)
+      const tex = this.weaponMesh.material.map
+      const grip = tex?.userData?.grip || [16, 14]
+      if (hand) {
+        // 武器贴图的握把像素对齐到机体实际手部，随挥动一起旋转
+        const tw = tex?.image?.width || 32
+        const th = tex?.image?.height || 24
+        const rot = hand.rot + this.facing * (this.shootT > 0 ? 0.16 : 0)
+        const cos = Math.cos(rot)
+        const sin = Math.sin(rot)
+        const gx = this.facing * (grip[0] - tw / 2)
+        const gy = th / 2 - grip[1]
+        this.weaponMesh.position.x = hand.x - (gx * cos - gy * sin)
+        this.weaponMesh.position.y = hand.y - (gx * sin + gy * cos)
+        this.weaponMesh.rotation.z = rot
+      } else {
+        this.weaponMesh.position.x = b.x + b.w / 2 + this.facing * (b.w * 0.34)
+        this.weaponMesh.position.y = -(b.y + b.h * 0.62)
+        this.weaponMesh.rotation.z = this.facing * (this.shootT > 0 ? 0.16 : 0)
+      }
       this.weaponMesh.scale.x = this.facing
-      this.weaponMesh.rotation.z = this.facing * (this.shootT > 0 ? 0.16 : 0)
       this.weaponMesh.visible = !this.dead
     }
     if (this.toolMesh) {
-      this.toolMesh.position.x = b.x + b.w / 2 + this.facing * (b.w * 0.34)
-      this.toolMesh.position.y = -(b.y + b.h * 0.58)
+      const tex = this.toolMesh.material.map
+      const grip = tex?.userData?.grip || [10, 15]
+      const swing = this.swingT > 0 ? Math.sin((0.26 - this.swingT) / 0.26 * Math.PI) * 0.7 : 0
+      if (hand) {
+        const tw = tex?.image?.width || 20
+        const th = tex?.image?.height || 20
+        const rot = hand.rot + this.facing * swing
+        const cos = Math.cos(rot)
+        const sin = Math.sin(rot)
+        const gx = this.facing * (grip[0] - tw / 2)
+        const gy = th / 2 - grip[1]
+        this.toolMesh.position.x = hand.x - (gx * cos - gy * sin)
+        this.toolMesh.position.y = hand.y - (gx * sin + gy * cos)
+        this.toolMesh.rotation.z = rot
+      } else {
+        this.toolMesh.position.x = b.x + b.w / 2 + this.facing * (b.w * 0.34)
+        this.toolMesh.position.y = -(b.y + b.h * 0.58)
+        this.toolMesh.rotation.z = this.facing * swing
+      }
       this.toolMesh.scale.x = this.facing
-      this.toolMesh.rotation.z = this.facing * (this.swingT > 0 ? Math.sin((0.26 - this.swingT) / 0.26 * Math.PI) * 0.7 : 0)
       this.toolMesh.visible = !this.dead
     }
     if (this.moduleMesh) {

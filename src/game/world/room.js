@@ -3,7 +3,10 @@ import { fixSpriteMesh } from '../render/materials.js'
 import { TS } from '../config.js'
 import { T } from './tilemap.js'
 import { hash2 } from '../render/rng.js'
-import { getBiomeArt, getSkyArt, getStarField } from '../render/art/world.js'
+import { getBiomeArt, getSkyArt, getStarField, getSunArt, getMoonArt } from '../render/art/world.js'
+import { getThemeBackdrop } from '../render/art/backdrops.js'
+import { Surf, mix } from '../render/art/core.js'
+import { PAL } from '../render/palette.js'
 import { getPropArt } from '../render/art/props.js'
 import { getWeatherArt } from '../render/art/atmosphere.js'
 import { getPortrait } from '../render/art/portraits.js'
@@ -32,6 +35,54 @@ const Z = {
   actors: 3,
   front: 9,
   fx: 12,
+}
+
+const PANEL_CACHE = new Map()
+
+/** 避难所面板底纹：铆钉 + 板缝 + 划痕 + 锈斑 + 噪点（128×64 可平铺，颜色由 material.color 染色）。 */
+function getPanelArt() {
+  let tex = PANEL_CACHE.get('panel')
+  if (tex) return tex
+  const s = new Surf(128, 64, 0x5a17, 'room-panel')
+  const base = mix(PAL.steelLight, PAL.dust, 0.35)
+  for (let y = 0; y < 64; y++) {
+    for (let x = 0; x < 128; x++) {
+      const r = hash2(x, y, 0x5a17)
+      const c = r > 0.9 ? mix(base, PAL.white, 0.14) : r < 0.1 ? mix(base, PAL.void, 0.16) : base
+      s.set(x, y, c)
+    }
+  }
+  // 板缝（凹槽 + 高光）
+  for (const y of [15, 31, 47]) {
+    s.rect(0, y, 128, 1, mix(base, PAL.void, 0.3))
+    s.rect(0, y + 1, 128, 1, mix(base, PAL.white, 0.1))
+  }
+  s.rect(63, 0, 1, 64, mix(base, PAL.void, 0.26))
+  s.rect(64, 0, 1, 64, mix(base, PAL.white, 0.08))
+  // 铆钉
+  for (let y = 6; y < 64; y += 15) {
+    for (let x = 5; x < 128; x += 21) {
+      s.ell(x, y, 1.6, 1.6, mix(base, PAL.void, 0.25))
+      s.px(x, y - 1, mix(base, PAL.white, 0.25))
+    }
+  }
+  // 划痕 / 锈斑
+  for (let i = 0; i < 26; i++) {
+    const x = s.r() * 128
+    const y = s.r() * 64
+    const len = 4 + s.r() * 20
+    if (s.r() < 0.5) s.line(x, y, x + len, y - s.r() * 6, mix(base, PAL.white, 0.12), 1)
+    else s.line(x, y, x + len * 0.6, y + s.r() * 5, mix(base, PAL.void, 0.18), 1)
+  }
+  for (let i = 0; i < 14; i++) {
+    s.ell(s.r() * 128, s.r() * 64, 1 + s.r() * 4, 1 + s.r() * 3, mix(PAL.rust, base, 0.45), 1)
+  }
+  tex = s.tex()
+  tex.name = 'room-panel'
+  tex.wrapS = THREE.RepeatWrapping
+  tex.wrapT = THREE.RepeatWrapping
+  PANEL_CACHE.set('panel', tex)
+  return tex
 }
 
 /** 一间废土房间：地形、生态背景、道具、战利品、牢笼、地标、同伴 */
@@ -104,23 +155,9 @@ export class Room {
     const baseY = this.floorBase() * TS + 40
     this.bgBaseY = baseY
 
-    // 天空：跟随相机的渐变底
-    if (art?.sky) {
-      const tex = art.sky
-      tex.wrapS = THREE.ClampToEdgeWrapping
-      tex.wrapT = THREE.ClampToEdgeWrapping
-      const mat = new THREE.MeshBasicMaterial({
-        map: tex,
-        transparent: true,
-        opacity: 1,
-        depthWrite: false,
-        toneMapped: false,
-      })
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(7600, 4200), mat)
-      mesh.position.set(this.game.roomW ? this.game.roomW / 2 : 0, -(baseY - 1200), Z.sky)
-      group.add(mesh)
-      layers.push({ mesh, p: 0.99, mat, sky: true, yOff: 0 })
-    }
+    // 天空：交给 buildSkyLayers 的日夜天空层统一绘制。
+    // 旧版这里还叠一张 biome 静态天空，两张不同色调的半透明大平面叠在一起，
+    // 抖动透明像素互相透出，形成满屏「交错斑块」——已移除。
 
     const texW = 1280
     const texH = 560
@@ -149,9 +186,22 @@ export class Room {
       return entry
     }
 
-    addLandscape(art?.far, 0.88, 0xd9c9a8, 0.95, 0)
-    addLandscape(art?.mid, 0.7, 0xfff0d8, 0.98, 0)
-    addLandscape(art?.near, 0.48, 0x6a5c4a, 0.98, 0)
+    // 主题房间：专属全景立绘替换 biome 背景，避免「数据中心外面还是城市天际线」的乱搭配
+    let themeBd = null
+    if (this.data.themeId) {
+      try {
+        themeBd = getThemeBackdrop(this.data.themeId)
+      } catch (e) {
+        themeBd = null
+      }
+    }
+    if (themeBd) {
+      addLandscape(themeBd, 0.4, 0xffffff, 1.0, -6)
+    } else {
+      addLandscape(art?.far, 0.88, 0xd9c9a8, 0.95, 0)
+      addLandscape(art?.mid, 0.7, 0xfff0d8, 0.98, 0)
+      addLandscape(art?.near, 0.48, 0x6a5c4a, 0.98, 0)
+    }
 
     this.bgLayers = layers
     this.buildSkyLayers(group)
@@ -183,6 +233,53 @@ export class Room {
       group.add(mesh)
       this.skyMesh = mesh
       this.skyMat = mat
+      // 交叉淡化层：时段切换时新天空从这层淡入，旧天空垫底，避免闪变
+      const matB = new THREE.MeshBasicMaterial({ map: skyTex, depthWrite: false, toneMapped: false, transparent: true, opacity: 0 })
+      const meshB = new THREE.Mesh(new THREE.PlaneGeometry(7600, 4200), matB)
+      meshB.position.set(0, -(this.bgBaseY - 1200), Z.sky - 1)
+      meshB.visible = false
+      group.add(meshB)
+      this.skyMeshB = meshB
+      this.skyMatB = matB
+      this.skyFade = 1
+    }
+
+    // 太阳 / 月亮（夕阳在黄昏低垂、放大、染橙）
+    try {
+      const sunTex = getSunArt()
+      if (sunTex) {
+        const mat = new THREE.MeshBasicMaterial({
+          map: sunTex,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          toneMapped: false,
+        })
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(360, 360), mat)
+        mesh.position.set(0, -(this.bgBaseY - 1200), Z.sky + 0.5)
+        group.add(mesh)
+        this.sunMesh = mesh
+        this.sunMat = mat
+      }
+      const moonTex = getMoonArt()
+      if (moonTex) {
+        const mat = new THREE.MeshBasicMaterial({
+          map: moonTex,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          toneMapped: false,
+        })
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), mat)
+        mesh.position.set(0, -(this.bgBaseY - 1200), Z.sky + 0.5)
+        group.add(mesh)
+        this.moonMesh = mesh
+        this.moonMat = mat
+      }
+    } catch (e) {
+      /* 天体贴图不可用则跳过 */
     }
 
     // 星野（仅夜晚）
@@ -263,7 +360,7 @@ export class Room {
     }
   }
 
-  /** 切换日夜阶段 */
+  /** 切换日夜阶段：新天空从 B 层淡入，旧天空垫底，~2.6s 完成 */
   setSkyPhase(phase) {
     if (phase === this.skyPhase) return
     this.skyPhase = phase
@@ -275,12 +372,18 @@ export class Room {
     }
     if (!art) return
     this.skyArt = art
-    if (this.skyMesh && art.sky) {
+    if (this.skyMeshB && this.skyMat && art.sky) {
+      // B 层承接新图并淡入；A 层保持旧图垫底
+      art.sky.wrapS = THREE.ClampToEdgeWrapping
+      art.sky.wrapT = THREE.ClampToEdgeWrapping
+      this.skyMatB.map = art.sky
+      this.skyMatB.opacity = 0
+      this.skyMatB.needsUpdate = true
+      this.skyMeshB.visible = true
+      this.skyFade = 0
+    } else if (this.skyMesh && art.sky) {
       this.skyMat.map = art.sky
       this.skyMat.needsUpdate = true
-    }
-    if (this.starMat) {
-      this.starMat.opacity = phase === 'night' ? 0.85 : phase === 'dusk' || phase === 'dawn' ? 0.25 : 0
     }
     const layers = art.cloudLayers || []
     for (let i = 0; i < this.cloudLayers.length; i++) {
@@ -311,21 +414,76 @@ export class Room {
     if (!params) return
     this.setSkyPhase(params.phase?.id)
     this.setWeatherOverlay(params.weather?.id)
+    const wk = params.weatherK ?? 1
     if (this.overlayMat) {
-      const d = params.weather?.density ?? params.fog ?? 0
-      this.overlayMat.opacity = Math.min(0.62, 0.06 + d * 0.55)
+      const wx = this.safeWeatherArt(this.weatherId)
+      const d = (wx?.density ?? params.fog ?? 0) * wk
+      this.overlayMat.opacity = Math.min(0.62, (0.06 + d * 0.55) * wk)
     }
     if (this.cloudLayers) {
-      for (const cl of this.cloudLayers) cl.mat.opacity = cl.base * (0.55 + (params.amb ?? 1) * 0.45)
+      const t = params.tint || [1, 1, 1]
+      for (const cl of this.cloudLayers) {
+        cl.mat.opacity = cl.base * (0.55 + (params.amb ?? 1) * 0.45)
+        cl.mat.color.setRGB(t[0], t[1], t[2])
+      }
     }
-    if (this.starMat && params.phase?.id !== 'night' && params.phase?.id !== 'dusk' && params.phase?.id !== 'dawn') {
-      this.starMat.opacity = 0
+    // 星星按连续 night 值淡入淡出，不再按阶段跳变
+    if (this.starMat) {
+      const n = params.night || 0
+      this.starMat.opacity = Math.max(0, Math.min(0.85, (n - 0.18) * 1.35)) * (1 - Math.min(1, (params.fog || 0) * 1.4))
+    }
+    // 太阳 / 月亮
+    this.updateCelestial(params)
+  }
+
+  /** 太阳/月亮不透明度与颜色（applyDayNight 0.1s 节拍调用） */
+  updateCelestial(params) {
+    const night = params.night || 0
+    const cover = Math.min(1, (params.fog || 0) * 1.6 + (params.rain || 0) * 0.9)
+    if (this.sunMesh) {
+      const show = Math.max(0, 1 - night * 1.5) * (1 - cover)
+      this.sunMat.opacity = show * 0.85
+      this.sunMesh.visible = show > 0.02
+    }
+    if (this.moonMesh) {
+      const show = Math.max(0, (night - 0.3) * 1.6) * (1 - cover)
+      this.moonMat.opacity = Math.min(0.9, show)
+      this.moonMesh.visible = show > 0.02 && this._moonInWindow !== false
+    }
+  }
+
+  /** 太阳/月亮位置：跟随相机横移（弱视差），黄昏低垂放大染橙（夕阳） */
+  updateCelestialPos(camera) {
+    if (!this.sunMesh && !this.moonMesh) return
+    const time = G.dayNight?.time ?? 0.27
+    const baseY = this.skyMesh ? this.skyMesh.position.y : -(this.bgBaseY - 1200)
+    const baseZ = this.skyMesh ? this.skyMesh.position.z : Z.sky - 2
+    const cx = camera.position.x
+    if (this.sunMesh?.visible) {
+      const p = Math.max(0, Math.min(1, (time - 0.02) / 0.84))
+      const arc = Math.sin(Math.PI * p)
+      this.sunMesh.position.set(cx + (p - 0.5) * 1100, baseY + 460 - arc * 1500, baseZ + 2)
+      const low = 1 - arc
+      this.sunMesh.scale.setScalar(2.4 + low * 1.6)
+      const warm = low * low
+      this.sunMat.color.setRGB(1, 0.96 - warm * 0.42, 0.86 - warm * 0.52)
+    }
+    if (this.moonMesh) {
+      const mt = time >= 0.84 ? (time - 0.84) / 0.21 : time <= 0.05 ? (0.16 + time) / 0.21 : -1
+      this._moonInWindow = mt >= 0 && mt <= 1
+      if (this._moonInWindow && this.moonMesh.visible) {
+        const arc = Math.sin(Math.PI * mt)
+        this.moonMesh.position.set(cx + (mt - 0.5) * 900, baseY + 380 - arc * 1200, baseZ + 2)
+      } else {
+        this.moonMesh.visible = false
+      }
     }
   }
 
   updateBackground(camera) {
     const cx = camera.position.x
     const cy = camera.position.y
+    this.updateCelestialPos(camera)
     for (const l of this.bgLayers) {
       if (l.sky) {
         l.mesh.position.x = cx
@@ -600,6 +758,7 @@ export class Room {
     // 酸雨只会落在屋顶上；inShelter() 的判定范围与屋顶投影一致。
     const addPanel = (w, h, ox, oy, color, z = -1.7, opacity = 1, rot = 0) => {
       const m = new THREE.MeshBasicMaterial({
+        map: getPanelArt(),
         color,
         transparent: opacity < 1,
         opacity,
@@ -665,17 +824,16 @@ export class Room {
       city: ['building_facade', 'streetlight', 'car_wreck', 'mech_cable_run', 'streetlight', 'house_facade', 'bus_wreck'],
       factory: ['factory_pipe', 'generator', 'gear_assembly', 'conveyor_segment', 'crane_hook', 'mech_turbine', 'antenna'],
       dump: ['junk_heap_bags', 'tree_dead', 'junk_heap_scrap', 'mech_servo_arm', 'container_small', 'tree_dead', 'junk_heap_plastic'],
-      shore: ['life_ring', 'hull_plate', 'cargo_net', 'beacon', 'mech_cable_run', 'container_small', 'satellite_dish'],
+      port: ['life_ring', 'hull_plate', 'cargo_net', 'beacon', 'mech_cable_run', 'container_small', 'satellite_dish'],
       village: ['house_facade', 'tree_dead', 'mech_pipe_bundle', 'farm_silo', 'weed', 'house_facade', 'torn_flag'],
       metro: ['server_rack', 'metro_sign', 'mech_cable_run', 'mech_rail', 'mech_console', 'neon_poster', 'mech_rail'],
       hospital: ['mech_console', 'lab_tank', 'gurney', 'mech_cable_run', 'hospital_bed', 'server_rack', 'lunar_flower'],
     }
     const biome = this.data.biome || 'city'
-    const scenery = Array.isArray(this.data.sceneryKinds) && this.data.sceneryKinds.length
-      ? this.data.sceneryKinds
-      : KINDS[biome] || KINDS.city
-    const base = KINDS[biome] || KINDS.city
-    const kinds = [...scenery, ...base.slice(0, 2)]
+    const themed = Array.isArray(this.data.sceneryKinds) && this.data.sceneryKinds.length
+    // 主题站点只用主题件做远景，避免「太阳能中心」背后立着居民楼、撞毁巴士之类的乱搭配
+    const scenery = themed ? this.data.sceneryKinds : (KINDS[biome] || KINDS.city)
+    const kinds = themed ? scenery : [...scenery, ...(KINDS[biome] || KINDS.city).slice(0, 2)]
     const worldW = this.data.worldW || 2000
     const floorY = typeof this.data.floorY === 'number' ? this.data.floorY : 0
     const count = Math.max(4, Math.min(9, Math.round(worldW / 430)))
@@ -912,6 +1070,9 @@ export class Room {
     for (const l of this.data.loot || []) {
       const flagKey = `taken:${this.data.roomId}:${l.lid ?? l.id}:${Math.round(l.x)}`
       if (G.flags[flagKey]) continue
+      // 收藏品 / 遗物全局唯一：捡过之后不再生成
+      const def = Content.get(KIND.ITEM, l.id)
+      if ((def?.unique || def?.category === 'artifact') && G.flags[`got:${l.id}`]) continue
       const drop = new LootDrop(this.game, l.id, l.x, l.y, {
         hidden: !!l.hidden,
         buried: !!l.buried,
@@ -1008,6 +1169,16 @@ export class Room {
   // ---------------------------------------------------------------- 每帧
   update(dt) {
     this.time += dt
+    // 天空交叉淡化：B 层淡入完成后落定为新底
+    if (this.skyMeshB && this.skyFade < 1) {
+      this.skyFade = Math.min(1, this.skyFade + dt / 2.6)
+      this.skyMatB.opacity = this.skyFade
+      if (this.skyFade >= 1) {
+        this.skyMat.map = this.skyMatB.map
+        this.skyMat.needsUpdate = true
+        this.skyMeshB.visible = false
+      }
+    }
     for (const l of this.lootDrops) l.update(dt)
     for (const n of this.npcHolograms) {
       if (!n.holo) continue
@@ -1064,6 +1235,11 @@ export class Room {
 
   dispose() {
     this.game.scene.remove(this.bg)
+    // 天空/天体/云层等背景网格的材质与几何一并释放（贴图是共享缓存，不 dispose）
+    this.bg.traverse((o) => {
+      if (o.geometry) o.geometry.dispose()
+      if (o.material) o.material.dispose()
+    })
     for (const l of this.bgLayers) {
       l.mesh.geometry.dispose()
       l.mat.dispose()

@@ -49,16 +49,19 @@ import {
 } from '../src/game/world/regions.js'
 import { PROPS } from '../src/game/world/props-data.js'
 
-const ITEM_IDS = new Set([
-  'lubricant', 'scrap_plate', 'copper_wire', 'aluminum_sheet', 'rubber', 'cloth', 'cement',
-  'chemical', 'rare_earth', 'uranium_dust', 'servo_motor', 'bearing', 'gyro', 'board_cpu',
-  'ram_stick', 'optical_module', 'hydraulic_rod', 'battery_cell', 'sensor_unit', 'cell_small',
-  'cell_large', 'repair_kit', 'acid_neutralizer', 'rad_meds', 'dog_food', 'reactor_core',
-  'military_shell', 'quantum_chip', 'satellite_gyro', 'relay_part', 'huique_toy',
-  'signal_recorder', 'diary_1', 'diary_2', 'diary_3', 'photo_1', 'photo_2', 'photo_3',
-  'book_1', 'jewelry_1', 'clothes_1', 'toy_1', 'cassette_1',
+// 物品 id 直接取内容注册表（catalog.js 顶层注册），避免手抄清单漏项
+const { Content, KIND } = await import('../src/game/core/registry.js')
+await import('../src/game/loot/catalog.js')
+await import('../src/game/loot/lore-artifacts.js')
+const ITEM_IDS = new Set(Content.ids(KIND.ITEM))
+const MONSTER_IDS = new Set([
+  'radboar', 'crawler', 'spitter', 'wingrat', 'sentry', 'scrapper', 'drone', 'hulkbot',
+  'ghoul_husk', 'tunnel_hound', 'cyber_mantis', 'psycho_punk',
+  'server_wraith', 'weld_brute', 'cult_fanatic', 'alien_orb', 'vault_puppet', 'mine_shade',
+  'blood_thrall', 'fog_stalker', 'punk_raider', 'castle_knight', 'rogue_ai',
+  'dark_web_ghost', 'viral_wraith', 'nano_swarm',
+  'bandit_lookout', 'bandit_looter', 'bandit_scav',
 ])
-const MONSTER_IDS = new Set(['radboar', 'crawler', 'spitter', 'wingrat', 'sentry', 'scrapper', 'drone', 'hulkbot'])
 const PROP_IDS = new Set(Object.keys(PROPS))
 const WEAPON_SET = new Set(WEAPON_IDS)
 const ECO_SET = new Set(ECOSYSTEM_KINDS)

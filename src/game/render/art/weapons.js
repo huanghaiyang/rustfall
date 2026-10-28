@@ -553,29 +553,39 @@ export function getWeaponArt(id) {
 
 const HOLD_CACHE = new Map()
 
+/** 各武器在 32×24 持握画布里的握把像素位置（朝右，原点左上）。 */
+const HOLD_GRIP = {
+  iron_pipe: [10, 12],
+  dagger: [10, 12],
+  hammer: [10, 12],
+  wrench_heavy: [10, 12],
+  shock_baton: [10, 12],
+  chainblade: [9, 16],
+  fatman: [11, 19],
+  plasma_cannon: [10, 18],
+  tesla_arc: [11, 18],
+  gravity_emitter: [11, 18],
+}
+
+/** 握把上的手套：只画包住握把的手指，手臂由机体精灵负责。 */
+function holdGlove(s, x, y) {
+  const c = mix(PAL.rust, PAL.dust, 0.35)
+  const d = mix(PAL.steelDark, PAL.void, 0.3)
+  s.rect(x - 2, y - 2, 5, 4, d)
+  s.rect(x - 1, y - 2, 3, 1, c)
+  s.rect(x - 1, y + 1, 4, 1, d)
+  s.px(x - 2, y - 1, PAL.steelDark)
+  s.px(x + 2, y, c, 0.85)
+}
+
 function buildHold(id) {
   const s = new Surf(32, 24, strSeed('hold:' + id) + 7, 'weapons')
   const kind = KIND[id] || 'gun'
   const isMelee = kind === 'melee'
-  // 手臂（右手握把、左手托前）
-  const armC = mix(PAL.rust, PAL.dust, 0.4)
-  const armL = mix(armC, PAL.sand, 0.35)
-  // 右臂（从右下进画）
-  s.thick(26, 23, 18, 15, 3.2, PAL.steelDark)
-  s.thick(26, 23, 18, 15, 2.2, armC)
-  s.line(24, 21, 19, 16, armL, 0.9)
-  // 左手（前握）
-  const leftX = isMelee ? 12 : 14
-  s.thick(6, 23, leftX, 16, 3, PAL.steelDark)
-  s.thick(6, 23, leftX, 16, 2, mix(armC, PAL.rustDark, 0.3))
-  // 握把 / 手指
-  s.rect(15, 12, 5, 4, PAL.steelDark)
-  s.rect(16, 12, 3, 3, PAL.steel)
-  s.rect(leftX, 12, 4, 4, PAL.steelDark)
-  s.rect(leftX + 1, 12, 2, 3, PAL.steel)
-
-  // 武器本体（放大一点：在 32×24 里占据 y=8..16）
+  // 只画武器本体；手臂由机体精灵绘制，武器按 grip 对齐到机体实际手部
   weaponBody(s, id, 4, 12)
+  const grip = HOLD_GRIP[id] || (isMelee || !KIND[id] ? [10, 12] : [10, 16])
+  holdGlove(s, grip[0], grip[1])
 
   // 枪口方向提示：能量武器加一点光
   const g = MUZZLE[id]
@@ -594,7 +604,9 @@ function buildHold(id) {
   }
   s.edges(mix(PAL.white, PAL.sand, 0.5), PAL.void, 0.35, 0.45)
   s.outline(mix(PAL.void, PAL.steel, 0.2))
-  return s.tex()
+  const tex = s.tex()
+  tex.userData.grip = [grip[0], grip[1]]
+  return tex
 }
 
 /** 持握姿态（32×24，枪口朝右）。未知 id 退化为常规枪械。 */

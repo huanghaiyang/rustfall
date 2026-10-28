@@ -828,6 +828,8 @@ function hybrid(sp, P) {
   s.rect(cx + 14, bodyY + 1, 2, 2, PAL.neonWarm)
   eyeAt(P, cx + 15, bodyY + 2, PAL.neonWarm, 0.45, 5)
 
+  // 手握点：混合式机体的工作臂末端
+  P.gunAt = [cx + 21, armY + 9]
   if (P.tool) handTool(s, P.tool, cx + 20, armY + 8, 1)
   return finish(s, sp, P)
 }
@@ -955,6 +957,8 @@ function armRig(sp, P) {
   eyeAt(P, cx + 6, hy2, PAL.neonWarm, 0.5, 4)
   if (P.lamp) s.glow(cx + 8, hy2 + 4, 8, PAL.neonWarm, 0.25)
 
+  // 手握点：工作臂末端夹爪
+  P.gunAt = [hx + 1, hy + 5]
   if (P.tool) handTool(s, P.tool, hx, hy + 4, 1)
   return finish(s, sp, P)
 }
@@ -1079,6 +1083,8 @@ function quad(sp, P) {
   // 战术挂载
   s.rect(cx - 2, bodyY - 6, 7, 3, PAL.steelDark)
   s.rect(cx, bodyY - 5, 4, 1, PAL.rust)
+  // 手握点：四足背部挂载臂
+  P.gunAt = [hx + 5, hy + 9]
   if (P.tool) handTool(s, P.tool, hx + 4, hy + 8, 1)
   return finish(s, sp, P)
 }
@@ -1198,6 +1204,8 @@ function light(sp, P) {
     s.rect(cx + 5, g - 8, 3, 5, PAL.steel, 0.9)
   }
 
+  // 手握点：轻量机体右侧小臂末端
+  P.gunAt = [cx + 10, hipY - 9]
   if (P.tool) handTool(s, P.tool, cx + 9, hipY - 10, 1)
   return finish(s, sp, P)
 }
@@ -1337,6 +1345,8 @@ function ghost(sp, P) {
   // 脚下布条（飘）
   s.line(cx - 4, hipY + 8, cx - 6 + sway, g - 3, clothDark, 0.7)
   s.line(cx + 4, hipY + 8, cx + 6 + sway, g - 5, clothDark, 0.6)
+  // 手握点：潜行机体布条下的手
+  P.gunAt = [ax + 3, ay + 13]
   if (P.tool) handTool(s, P.tool, ax + 2, ay + 12, 1)
   return finish(s, sp, P)
 }
@@ -2191,7 +2201,13 @@ function build(id) {
   const sp = SPECS[id]
   const poses = poseSet(sp.rig, sp)
   const rig = RIGS[sp.rig]
-  const arr = (list) => list.map((P) => rig(sp, P))
+  // 每帧把手握点写进贴图元数据，Robot 据此把武器/道具放到位
+  const arr = (list) =>
+    list.map((P) => {
+      const tex = rig(sp, P)
+      if (tex && Array.isArray(P.gunAt)) tex.userData.hand = [P.gunAt[0], P.gunAt[1]]
+      return tex
+    })
   const frames = {
     idle: arr(poses.idle),
     run: arr(poses.run),

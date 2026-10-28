@@ -493,11 +493,109 @@ export class Surf {
     return semi
   }
 
-  /** 输出贴图（统一采样参数 + 二值化 alpha + cleanAlpha 标记）。 */
-  tex() {
-    if (this.binarized) return this._tex
-    this.binarize()
-    this.binarized = true
+  /**
+   * 输出贴图（统一采样参数 + 二值化 alpha + cleanAlpha 标记）。
+   * @param {number} [scale=1] 整数倍放大输出。>1 时用边缘感知的双线性采样生成
+   *        更高分辨率的贴图；alpha 仍保持 0/255，不引入半透明脏边。
+   */
+  tex(scale = 1) {
+    const s = Math.max(1, Math.min(4, Math.round(scale) || 1))
+    if (s > 1) {
+      if (this._texHi && this._texHi.userData.scale === s) return this._texHi
+      if (!this.binarized) {
+        this.binarize()
+        this.binarized = true
+      }
+      const { w, h, d } = this
+      const W = w * s
+      const H = h * s
+      const canvas = document.createElement('canvas')
+      canvas.width = W
+      canvas.height = H
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.imageSmoothingEnabled = false
+        const img = ctx.createImageData(W, H)
+        const out = img && img.data ? img.data : null
+        if (out) {
+          const alphaAt = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : d[(y * w + x) * 4 + 3])
+          for (let oy = 0; oy < H; oy++) {
+            // 每个输出像素映射回逻辑像素中心，取 2x2 邻域加权颜色
+            const fy = (oy + 0.5) / s - 0.5
+            const y0 = Math.floor(fy)
+            const ty = fy - y0
+            for (let ox = 0; ox < W; ox++) {
+              const fx = (ox + 0.5) / s - 0.5
+              const x0 = Math.floor(fx)
+              const tx = fx - x0
+              const ai = (oy * W + ox) * 4
+              const near = alphaAt(Math.round(fx), Math.round(fy))
+              if (near < 128) {
+                out[ai] = 0
+                out[ai + 1] = 0
+                out[ai + 2] = 0
+                out[ai + 3] = 0
+                continue
+              }
+              let r = 0
+              let g = 0
+              let b = 0
+              let wsum = 0
+              for (let dy = 0; dy <= 1; dy++) {
+                for (let dx = 0; dx <= 1; dx++) {
+                  const sx = x0 + dx
+                  const sy = y0 + dy
+                  if (alphaAt(sx, sy) < 128) continue
+                  const wgt = (dx ? tx : 1 - tx) * (dy ? ty : 1 - ty)
+                  const si = (sy * w + sx) * 4
+                  r += d[si] * wgt
+                  g += d[si + 1] * wgt
+                  b += d[si + 2] * wgt
+                  wsum += wgt
+                }
+              }
+              if (wsum <= 0) {
+                const si = (Math.round(fy) * w + Math.round(fx)) * 4
+                r = d[si]
+                g = d[si + 1]
+                b = d[si + 2]
+              } else {
+                r /= wsum
+                g /= wsum
+                b /= wsum
+              }
+              // 极轻微的确定性颗粒，避免放大后色块过平
+              const n = ((ox * 7 + oy * 13) % 5) - 2
+              out[ai] = Math.max(0, Math.min(255, r + n))
+              out[ai + 1] = Math.max(0, Math.min(255, g + n))
+              out[ai + 2] = Math.max(0, Math.min(255, b + n))
+              out[ai + 3] = 255
+            }
+          }
+          ctx.putImageData(img, 0, 0)
+        }
+      }
+      const hi = new THREE.CanvasTexture(canvas)
+      hi.magFilter = THREE.LinearFilter
+      hi.minFilter = THREE.LinearFilter
+      hi.generateMipmaps = false
+      hi.colorSpace = THREE.SRGBColorSpace
+      hi.wrapS = THREE.ClampToEdgeWrapping
+      hi.wrapT = THREE.ClampToEdgeWrapping
+      hi.needsUpdate = true
+      hi.userData.size = [W, H]
+      hi.userData.scale = s
+      hi.userData.cleanAlpha = true
+      hi.userData.module = this.module
+      this._texHi = hi
+      ALPHA_STATS.textures++
+      return hi
+    }
+    if (this.binarized && this._tex) return this._tex
+    if (!this.binarized) {
+      this.binarize()
+      this.binarized = true
+    }
     const { w, h, d } = this
     const canvas = document.createElement('canvas')
     canvas.width = w
@@ -520,6 +618,7 @@ export class Surf {
     t.wrapT = THREE.ClampToEdgeWrapping
     t.needsUpdate = true
     t.userData.size = [w, h]
+    t.userData.scale = 1
     t.userData.cleanAlpha = true
     t.userData.module = this.module
     this._tex = t

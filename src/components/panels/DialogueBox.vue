@@ -13,10 +13,12 @@ import { Content, KIND } from '../../game/core/registry.js'
 import { getPortrait } from '../../game/render/art/portraits.js'
 
 const CPS = 46 // 打字速度（字符/秒）
-const PORTRAIT = 128
+// 立绘纹理为 96×96 的 2 倍输出（192×192），画布同尺寸承接，CSS 仍按 128 显示
+const PORTRAIT = 192
 
 const d = computed(() => G.dialogue || {})
 const active = computed(() => !!d.value.active)
+const padActive = computed(() => !!G.ui.padActive)
 const fullText = computed(() => String(d.value.text || ''))
 
 const reveal = ref(0)
@@ -297,11 +299,11 @@ onBeforeUnmount(() => {
         </ul>
 
         <footer class="dlg-foot">
-          <span v-if="isTyping" class="hint">点击跳过</span>
-          <span v-else-if="hasChoices" class="hint">按数字键选择 · Enter 选第一项</span>
-          <span v-else class="hint">Enter / 点击 继续</span>
+          <span v-if="isTyping" class="hint">{{ padActive ? 'A 跳过' : '点击跳过' }}</span>
+          <span v-else-if="hasChoices" class="hint">{{ padActive ? '方向键选择 · A 确认' : '按数字键选择 · Enter 选第一项' }}</span>
+          <span v-else class="hint">{{ padActive ? 'A / 点击 继续' : 'Enter / 点击 继续' }}</span>
           <span class="rp-grow" />
-          <span class="hint dim">Esc 结束对话</span>
+          <span class="hint dim">{{ padActive ? 'B 结束对话' : 'Esc 结束对话' }}</span>
         </footer>
       </div>
     </div>
@@ -365,6 +367,8 @@ onBeforeUnmount(() => {
   width: 128px;
   height: 128px;
   display: block;
+  /* 192 画布缩到 128 显示：平滑缩放，避免最近邻丢像素 */
+  image-rendering: auto;
 }
 
 .p-frame {

@@ -24,6 +24,7 @@ import ToolBelt from './components/panels/ToolBelt.vue'
 import NotificationFeed from './components/panels/NotificationFeed.vue'
 import CompanionPanel from './components/panels/CompanionPanel.vue'
 import GrowthPanel from './components/panels/GrowthPanel.vue'
+import LevelPicker from './components/panels/LevelPicker.vue'
 import { installGamepadUi } from './game/gamepad-ui.js'
 
 const host = ref(null)
@@ -150,6 +151,9 @@ if (import.meta.hot) {
     <div v-if="G.ui.panel === 'settings'" class="overlay z-panel">
       <SettingsPanel @close="A.closePanel()" />
     </div>
+    <div v-if="G.ui.panel === 'level'" class="overlay z-panel">
+      <LevelPicker />
+    </div>
     <div v-if="G.ui.panel === 'help'" class="overlay z-panel">
       <HelpOverlay @close="A.closePanel()" />
     </div>
@@ -164,6 +168,7 @@ if (import.meta.hot) {
       @mods="A.openPanel('mods')"
       @settings="A.openPanel('settings')"
       @help="A.openPanel('help')"
+      @levels="A.openPanel('level')"
     />
 
     <div v-if="showChassisPicker || G.phase === 'chassis'" class="overlay z-chassis">
@@ -181,6 +186,7 @@ if (import.meta.hot) {
       @archive="A.openPanel('archive')"
       @companions="A.openPanel('companions')"
       @growth="A.openPanel('growth')"
+      @levels="A.openPanel('level')"
       @restart="A.restartRun"
       @title="onTitle"
       @mute="A.toggleMute"

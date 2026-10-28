@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import * as monsterArt from '../../../render/art/monsters.js'
+import { attachNameplate } from '../../../render/art/nameplate.js'
 
 /**
  * 大型敌人公共工具（junk_golem / sky_warden / mimic_beast / swarm_core 共用）。
@@ -156,6 +157,9 @@ export function initLarge(m, opts = {}) {
   }
 
   m.isActivated = () => m.activated
+
+  // 所有大型敌人都在头顶挂名字，血条随之上移
+  attachNameplate(m)
 
   return m
 }

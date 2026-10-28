@@ -1,5 +1,9 @@
 <script setup>
+import { computed } from 'vue'
+import { G } from '../game/state.js'
+
 defineEmits(['close'])
+const padActive = computed(() => !!G.ui.padActive)
 </script>
 
 <template>
@@ -8,7 +12,36 @@ defineEmits(['close'])
       <h2 class="panel-title" style="font-size: 24px">生 存 指 南</h2>
       <div class="panel-sub">HOW TO SURVIVE IN THE RUST</div>
 
-      <div class="help-grid">
+      <div v-if="padActive" class="help-grid">
+        <b><kbd>左摇杆</kbd></b>
+        <span>移动。轮式机体最快，履带最稳，四足跳得最高。</span>
+
+        <b><kbd>A</kbd></b>
+        <span>跳跃（按住更高）；二段跳/悬停机体消耗能量；水中上浮。</span>
+
+        <b><kbd>左摇杆↓</kbd></b>
+        <span>蹲伏（降低被发现概率）、下穿平台；在避难所按住待机充电。</span>
+
+        <b><kbd>X</kbd> / <kbd>RT</kbd></b>
+        <span>使用当前工具：铲子挖土、镐破裂墙、焊枪修理、扫描仪标记埋藏物；也能打怪。</span>
+
+        <b><kbd>LB</kbd> <kbd>RB</kbd></b>
+        <span>依次切换工具（铲 / 镐 / 焊枪 / 扫描仪）。</span>
+
+        <b><kbd>十字键 ← →</kbd></b>
+        <span>切换背包里的武器；武器快捷槽可在设置里绑定手柄按键后直接装备。</span>
+
+        <b><kbd>B</kbd></b>
+        <span>交互：拾取、开箱、撬牢笼、修理地标、与同伴对话；面板中返回。</span>
+
+        <b><kbd>Y</kbd></b>
+        <span>切换已解锁机体（消耗能量，有冷却）。</span>
+
+        <b><kbd>Back</kbd> <kbd>Start</kbd></b>
+        <span>背包 / 暂停与设置；任务与档案在暂停面板内查看。</span>
+      </div>
+
+      <div v-else class="help-grid">
         <b><kbd>A</kbd> <kbd>D</kbd> / <kbd>←</kbd> <kbd>→</kbd></b>
         <span>移动。轮式机体最快，履带最稳，四足跳得最高。</span>
 
@@ -23,6 +56,9 @@ defineEmits(['close'])
 
         <b><kbd>1</kbd>-<kbd>4</kbd></b>
         <span>快速切换工具（铲 / 镐 / 焊枪 / 扫描仪）。</span>
+
+        <b><kbd>5</kbd>-<kbd>8</kbd> / <kbd>[</kbd> <kbd>]</kbd></b>
+        <span>装备武器快捷槽 / 切换背包武器。快捷键可在设置里重绑。</span>
 
         <b><kbd>E</kbd></b>
         <span>交互：拾取、开箱、撬牢笼、修理地标、与同伴对话。</span>
@@ -41,7 +77,7 @@ defineEmits(['close'])
         <span>· 每个循环 300 秒。倒计时结束酸雨会腐蚀暴露在室外的机体，5 秒内报废。</span>
         <span>· 收集电量（电池、发电机）→ 攒够 3 格，回避难所待机，信号 +1。信号不足会掉。</span>
         <span>· 变异野兽与失控机器人都会掉零件；稀有组件可以装进六个槽位强化机体。</span>
-        <span>· 营救任务：靠近牢笼按 E 撬开，把幸存者带回他们的避难所。</span>
+        <span>· 营救任务：靠近牢笼按 {{ padActive ? 'B' : 'E' }} 撬开，把幸存者带回他们的避难所。</span>
         <span>· 遗物（日记 / 照片 / 书 / 首饰 / 衣物）会进入档案，凑齐能拼出旧世界的故事。</span>
         <span>· 支持 MOD：把内容包放进 public/mods/，在「模组管理」里开关，刷新后生效。</span>
       </div>

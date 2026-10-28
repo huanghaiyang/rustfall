@@ -25,6 +25,8 @@ export const G = reactive({
   roomName: '',
   biome: 'city',
   isShelter: false,
+  // 关卡选择器数据：[{ regionId, regionName, roomId, label, kind, themeId, boss, ... }]
+  levels: [],
 
   // 角色
   chassisId: DEFAULT_CHASSIS,
@@ -87,6 +89,8 @@ export const G = reactive({
     deadzone: 0.24,
     rumble: true,
     showClock: true,
+    // 武器/工具快捷槽位（键盘 + 手柄按键索引）
+    hotkeys: {},
     // 测试选项（游戏内调试用）：无敌 / 无限跳
     godMode: false,
     infiniteJump: false,
@@ -119,14 +123,19 @@ export const G = reactive({
 
   // UI
   ui: {
-    panel: null, // inventory | quests | archive | mods | help | chassis | map | growth
+    panel: null, // inventory | quests | archive | mods | help | chassis | map | growth | level
     inventoryTab: 'all',
+    levelRegion: null,
+    padCapture: false,
+    padCaptureT: 0,
     selectedItem: null,
     selectedQuest: null,
     selectedArchive: null,
     toolBeltOpen: false,
     stack: [],
     showCompass: false,
+    // 当前是否按手柄输入显示按键提示（手柄已连接时由 Game.update 刷新）
+    padActive: false,
   },
 
   // 对话

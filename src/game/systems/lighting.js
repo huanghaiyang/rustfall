@@ -102,8 +102,10 @@ export function createLighting(game) {
     const dn = G.dayNight || {}
     const night = Number(dn.night) || 0
     const amb = Number.isFinite(dn.amb) ? dn.amb : 1
+    // 主题房间可以强制变暗（恐怖酒店 / 暗影迷宫 / 地下）
+    const roomDark = Number(game.room?.data?.env?.dark) || 0
     // 夜里或天气压暗时，灯才亮起来
-    return clamp(Math.max(night, 1 - amb), 0, 1)
+    return clamp(Math.max(night, 1 - amb, roomDark), 0, 1)
   }
 
   // ---------------------------------------------------------------- 静态光源

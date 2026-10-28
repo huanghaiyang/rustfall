@@ -109,6 +109,11 @@ export class Player {
     const ix = input.axisX()
     const wantUp = input.isDown('up')
     const wantDown = input.isDown('down')
+    // 主题房间环境：重力倍率 / 移动减速 / 持续风
+    const env = this.game.room?.data?.env || null
+    const gravityMul = typeof env?.gravity === 'number' ? env.gravity : 1
+    const speedMul = typeof env?.slow === 'number' ? env.slow : 1
+    const wind = typeof env?.wind === 'number' ? env.wind : 0
 
     b.inWater = map.rectWaterRatio(b.x, b.y, b.w, b.h) > 0.3
     const nearPole = map.rectPole(b.x, b.y, b.w, b.h)
@@ -151,13 +156,13 @@ export class Player {
     if (this.climbing && b.onGround && wantDown) this.climbing = false
 
     // ---------- 水平移动 ----------
-    const maxSpeed = b.inWater
+    const maxSpeed = (b.inWater
       ? PLAYER.swimSpeed
       : this.climbing
         ? PLAYER.climb * 0.7
         : this.crouching
           ? PLAYER.crouchWalk
-          : PLAYER.walk
+          : PLAYER.walk) * speedMul
     const accel = b.onGround || this.climbing ? PLAYER.accel : PLAYER.airAccel
     if (ix !== 0) {
       b.vx = approach(b.vx, ix * maxSpeed, accel * dt)
@@ -165,6 +170,7 @@ export class Player {
     } else if (b.onGround || this.climbing || b.inWater) {
       b.vx = approach(b.vx, 0, PLAYER.friction * dt)
     }
+    if (wind) b.vx = clamp(b.vx + wind * dt, -PLAYER.maxFall, PLAYER.maxFall)
 
     // ---------- 跳跃缓冲 / coyote ----------
     if (input.wasPressed('jump')) this.jumpBuffer = PLAYER.buffer
@@ -230,8 +236,8 @@ export class Player {
         this.sfx('jump', { vol: 0.5 })
       }
     } else {
-      b.vy += PLAYER.gravity * dt
-      b.vy = Math.min(b.vy, PLAYER.maxFall)
+      b.vy += PLAYER.gravity * gravityMul * dt
+      b.vy = Math.min(b.vy, PLAYER.maxFall / Math.max(0.25, Math.min(1, gravityMul)))
     }
 
     const preVy = b.vy

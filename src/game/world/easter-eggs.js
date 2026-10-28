@@ -69,11 +69,49 @@ export const EGGS = {
     text: '一具巨大的白色骨架横在垃圾场尽头，肋骨像教堂的梁。没有人知道它是不是机器，也没有人敢拆它。',
     toast: '风穿过骨架，发出像歌声一样的低鸣。',
   },
+  // ---------------------------------------------------------------- 新增彩蛋
+  t800_endoskeleton: {
+    name: 'T-800 残骸',
+    biome: ['factory', 'dump', 'metro'],
+    themes: ['arsenal', 'bunker', 'robot_factory', 'data_center'],
+    xp: 30,
+    text: '一具银灰色金属骨架被压在液压机下面，胸腔里的红色指示灯还在按两秒一次的节奏闪。它的手指比人的少一节，掌心刻着一行编号：CSM-101。',
+    toast: '「I\'ll be back.」——声音是从骨架的喉部扬声器里出来的。',
+  },
+  delorean: {
+    name: '鸥翼门跑车',
+    biome: ['city', 'village'],
+    themes: ['highway', 'stadium', 'skyscraper'],
+    xp: 28,
+    text: '一辆楔形银灰跑车停在高速路肩上，鸥翼门开着，车尾挂着一圈铜线圈和一堆叫不出名字的电子盒。仪表盘上的时间停在 88，日期是 1955 年 11 月 5 日。',
+    toast: '仪表盘的指针跳了一下，又落回 88。',
+  },
+  earth_engine: {
+    name: '行星发动机',
+    biome: ['factory', 'port', 'dump'],
+    themes: ['solar_center', 'spaceport', 'dam', 'skyscraper'],
+    xp: 34,
+    text: '一座比山还高的喷口斜插在地平线上，冰蓝色的等离子柱一直烧到云层里。基座上用五种语言刻着同一句话：「无论最终结果将人类历史导向何处，我们决定选择希望。」',
+    toast: '脚下的地面传来低频震动，像整颗星球在呼吸。',
+  },
+  matrix_phonebooth: {
+    name: '绿色电话亭',
+    biome: ['metro', 'city', 'hospital'],
+    themes: ['data_center', 'shadow_labyrinth', 'ai_origin', 'ai_lab'],
+    xp: 30,
+    text: '一个老式电话亭立在走廊尽头，玻璃上全是绿色的字符雨。听筒悬在半空，铃声一直响。亭子里没有人，但门是从里面反锁的。',
+    toast: '铃声停了。你听见有人在很近的地方说：「红色，还是蓝色？」',
+  },
 }
 
 const EGG_IDS = Object.keys(EGGS)
 
-function pickEgg(rnd, biome) {
+function pickEgg(rnd, biome, themeId = null) {
+  // 主题专属彩蛋优先：T800 在军工厂、DeLorean 在高速路、行星发动机在航天基地……
+  if (themeId) {
+    const themed = EGG_IDS.filter((id) => EGGS[id].themes?.includes(themeId))
+    if (themed.length && rnd() < 0.85) return themed[Math.floor(rnd() * themed.length)]
+  }
   const candidates = EGG_IDS.filter((id) => EGGS[id].biome.includes(biome))
   if (!candidates.length) return null
   return candidates[Math.floor(rnd() * candidates.length)]
@@ -98,13 +136,16 @@ export function injectEasterEggs(data, regionId, roomId) {
   const rnd = makeRnd(hashStr(key) ^ 0x9e3779b9)
   const roll = rnd()
   let count = roll < 0.12 ? 2 : roll < 0.5 ? 1 : 0
+  // 主题房间至少给一次机会放专属彩蛋
+  const themedIds = data.themeId ? EGG_IDS.filter((id) => EGGS[id].themes?.includes(data.themeId)) : []
+  if (!count && themedIds.length && rnd() < 0.55) count = 1
   if (!count) return
   const worldW = data.worldW || 1600
   const floorY = data.floorY || 0
   data.props = data.props || []
   const used = new Set()
   for (let i = 0; i < count; i++) {
-    let id = pickEgg(rnd, data.biome)
+    let id = pickEgg(rnd, data.biome, data.themeId)
     if (!id) break
     if (used.has(id)) id = EGG_IDS.find((x) => !used.has(x)) || id
     used.add(id)

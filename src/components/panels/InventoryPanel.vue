@@ -65,6 +65,7 @@ const BONUS = {
 }
 
 // —— 空安全小工具 ——
+const padActive = computed(() => !!G.ui?.padActive)
 function num(v, d = 0) {
   const n = Number(v)
   return Number.isFinite(n) ? n : d
@@ -421,7 +422,8 @@ function unequip(slot) {
     </div>
 
     <template #foot>
-      <span>点击格子选中 · <kbd>1</kbd>-<kbd>9</kbd> 切换分类（游戏内按键由此面板之外处理）</span>
+      <span v-if="padActive">十字键 ← → 切换分类 · A 选择 / 装备 · B 关闭</span>
+      <span v-else>点击格子选中 · <kbd>1</kbd>-<kbd>9</kbd> 切换分类（游戏内按键由此面板之外处理）</span>
       <span class="rp-grow" />
       <span class="rp-dim">负重超限会影响移动速度</span>
     </template>

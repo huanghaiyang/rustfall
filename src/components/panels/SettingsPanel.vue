@@ -5,11 +5,19 @@
 // 动作：A.setSetting / setDeadzone / setVolume / toggleMute / closePanel
 //   门面尚未补齐对应方法时，退回本地 G 兜底（不抛错、不写日志）
 // =============================================================================
-import { computed } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import PanelFrame from './PanelFrame.vue'
 import { G } from '../../game/state.js'
 import { A } from '../../game/ui-actions.js'
 import { getSettingsIcon } from '../../game/render/art/ui.js'
+import {
+  HOTKEY_ACTIONS,
+  getHotkey,
+  setHotkey,
+  resetHotkeys,
+  keyLabel,
+  padLabel,
+} from '../../game/hotkeys.js'
 
 const emit = defineEmits(['close'])
 
@@ -128,7 +136,114 @@ function resetDefaults() {
   setDeadzone(DEFAULTS.deadzone)
   setVolume(DEFAULT_VOLUME)
   if (G.muted) toggleMute()
+  resetBinds()
+  if (!callA('resetHotkeys')) resetHotkeys()
 }
+
+// —— 武器 / 工具快捷槽位绑定 ——
+const capturing = ref(null) // { action, type: 'key' | 'pad' }
+let padRaf = 0
+let padPrev = []
+
+function applyBind(action, patch) {
+  if (!callA('setHotkey', action, patch)) setHotkey(action, patch)
+}
+function resetBinds() {
+  if (!callA('resetHotkeys')) resetHotkeys()
+}
+function readPad() {
+  try {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : []
+    const p = Array.from(pads || []).find((x) => x && x.connected)
+    if (!p) return null
+    return Array.from(p.buttons || []).map((b) => !!(b && (b.pressed || (b.value ?? 0) > 0.5)))
+  } catch (e) {
+    return null
+  }
+}
+function onPadCaptureKey(e) {
+  if (!capturing.value || capturing.value.type !== 'pad') return
+  if (e.code === 'Escape' || e.code === 'Backspace') {
+    e.preventDefault()
+    e.stopPropagation()
+    cancelCapture()
+  }
+}
+function cancelCapture() {
+  if (capturing.value && capturing.value.type === 'key') {
+    window.removeEventListener('keydown', onCaptureKey, true)
+  }
+  if (capturing.value && capturing.value.type === 'pad') {
+    window.removeEventListener('keydown', onPadCaptureKey, true)
+  }
+  if (padRaf) cancelAnimationFrame(padRaf)
+  padRaf = 0
+  padPrev = []
+  capturing.value = null
+  if (G.ui) {
+    G.ui.padCapture = false
+    // 松手前残留的手柄输入不要立刻触发面板导航/确认
+    G.ui.padCaptureT = typeof performance !== 'undefined' ? performance.now() + 260 : 0
+  }
+}
+function onCaptureKey(e) {
+  if (!capturing.value || capturing.value.type !== 'key') return
+  e.preventDefault()
+  e.stopPropagation()
+  if (e.code === 'Escape' || e.code === 'Backspace') {
+    cancelCapture()
+    return
+  }
+  const action = capturing.value.action
+  applyBind(action, { key: e.code })
+  cancelCapture()
+}
+function captureKey(action) {
+  if (capturing.value && capturing.value.action === action && capturing.value.type === 'key') {
+    cancelCapture()
+    return
+  }
+  cancelCapture()
+  capturing.value = { action, type: 'key' }
+  window.addEventListener('keydown', onCaptureKey, true)
+}
+function capturePad(action) {
+  if (capturing.value && capturing.value.action === action && capturing.value.type === 'pad') {
+    cancelCapture()
+    return
+  }
+  cancelCapture()
+  capturing.value = { action, type: 'pad' }
+  if (G.ui) G.ui.padCapture = true
+  window.addEventListener('keydown', onPadCaptureKey, true)
+  padPrev = readPad() || []
+  const tick = () => {
+    if (!capturing.value || capturing.value.type !== 'pad') return
+    const cur = readPad()
+    if (cur) {
+      for (let i = 0; i < cur.length; i++) {
+        if (cur[i] && !padPrev[i]) {
+          applyBind(action, { pad: i })
+          cancelCapture()
+          return
+        }
+      }
+      padPrev = cur
+    }
+    padRaf = requestAnimationFrame(tick)
+  }
+  padRaf = requestAnimationFrame(tick)
+}
+function clearPad(action) {
+  applyBind(action, { pad: null })
+}
+function captureLabel(action, type) {
+  const c = capturing.value
+  if (c && c.action === action && c.type === type) return type === 'key' ? '按下键盘键…' : '按手柄键…'
+  const hk = getHotkey(action)
+  return type === 'key' ? keyLabel(hk.key) : padLabel(hk.pad)
+}
+onBeforeUnmount(cancelCapture)
 function close() {
   try {
     emit('close')
@@ -246,6 +361,53 @@ const ICONS = {
           </div>
           <span class="stg-dot" :class="{ on: padConnected }"></span>
         </div>
+      </section>
+
+      <!-- 快捷键 -->
+      <section class="stg-group">
+        <header class="stg-head">
+          <img class="stg-ico" :src="ICONS.input" width="20" height="20" alt="" />
+          <div class="stg-title"><b>武器 / 工具快捷键</b><em>HOTKEYS</em></div>
+          <span class="rp-grow"></span>
+          <span class="stg-note">键盘 · 手柄</span>
+        </header>
+        <div class="stg-rows">
+          <div v-for="h in HOTKEY_ACTIONS" :key="h.id" class="stg-row">
+            <div class="stg-label"><b>{{ h.label }}</b><em>{{ h.en }}</em></div>
+            <div class="stg-control hk-pair">
+              <button
+                class="hk-btn"
+                :class="{ cap: capturing && capturing.action === h.id && capturing.type === 'key' }"
+                type="button"
+                :title="`点击后按下键盘按键（Esc 取消）：${h.label}`"
+                @click="captureKey(h.id)"
+              >
+                {{ captureLabel(h.id, 'key') }}
+              </button>
+              <button
+                class="hk-btn pad"
+                :class="{ cap: capturing && capturing.action === h.id && capturing.type === 'pad' }"
+                type="button"
+                :title="`点击后按下手柄按键：${h.label}`"
+                @click="capturePad(h.id)"
+              >
+                {{ captureLabel(h.id, 'pad') }}
+              </button>
+              <button
+                v-if="getHotkey(h.id).pad !== null && getHotkey(h.id).pad >= 0"
+                class="hk-clear"
+                type="button"
+                title="清除手柄绑定"
+                @click="clearPad(h.id)"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+        <p class="stg-hint">
+          左框点击后按键盘键，右框点击后按手柄键（Esc / 再次点击取消）。武器槽按背包中的武器顺序对应 1-4 号；手柄需先在“输入”中开启。
+        </p>
       </section>
 
       <!-- 测试 -->
@@ -492,6 +654,59 @@ const ICONS = {
   line-height: 1.65;
   letter-spacing: 0.05em;
   color: var(--c-bone-dark);
+}
+
+.hk-pair {
+  gap: 4px;
+}
+
+.hk-btn {
+  min-width: 44px;
+  padding: 2px 7px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--c-sand);
+  background: rgba(18, 23, 26, 0.9);
+  border: 1px solid rgba(58, 68, 75, 0.9);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.1s linear, color 0.1s linear;
+}
+.hk-btn:hover {
+  border-color: rgba(192, 112, 56, 0.85);
+  color: var(--c-rust-light);
+}
+.hk-btn.pad {
+  color: var(--c-bone-dark);
+  border-style: dashed;
+}
+.hk-btn.cap {
+  color: #0b0d0e;
+  background: var(--c-toxic-glow);
+  border-color: var(--c-toxic-glow);
+  animation: hk-blink 0.6s steps(2, end) infinite;
+}
+@keyframes hk-blink {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.hk-clear {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--c-bone-dark);
+  background: transparent;
+  border: 1px solid rgba(58, 68, 75, 0.9);
+  cursor: pointer;
+}
+.hk-clear:hover {
+  color: var(--c-danger);
+  border-color: var(--c-danger);
 }
 
 .stg-pad {

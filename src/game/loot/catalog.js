@@ -1329,6 +1329,605 @@ item('antenna_dish', {
 })
 
 // ---------------------------------------------------------------------------
+// 人类生活用品 —— 按房间主题散落：厨房、卧室、教室、旅馆、码头、工地、机房
+// ---------------------------------------------------------------------------
+
+item('kettle', {
+  name: '电水壶',
+  en: 'Electric Kettle',
+  category: 'material',
+  rarity: 1,
+  weight: 1.1,
+  value: 8,
+  stack: 4,
+  desc: '白色塑料外壳的电水壶，底座不见了，壶嘴有一圈烧焦的痕。壶盖内侧贴着手写的「烧开再喝」。',
+  tags: ['household', 'kitchen'],
+  art: 'kettle',
+})
+
+item('umbrella_old', {
+  name: '旧雨伞',
+  en: 'Old Umbrella',
+  category: 'material',
+  rarity: 1,
+  weight: 0.8,
+  value: 5,
+  stack: 6,
+  desc: '伞骨断了两根，伞面补过三块不同颜色的布。撑开时能挡住酸雨，也只能挡住一会儿。',
+  tags: ['household', 'rain'],
+  art: 'umbrella',
+})
+
+item('wall_clock', {
+  name: '挂钟',
+  en: 'Wall Clock',
+  category: 'material',
+  rarity: 1,
+  weight: 1.3,
+  value: 10,
+  stack: 4,
+  desc: '圆形石英挂钟，停在四点十七分。玻璃罩上有指印，从里侧按上去的那种。',
+  tags: ['household', 'time'],
+  art: 'clock',
+})
+
+item('old_shoe', {
+  name: '旧皮鞋',
+  en: 'Worn Shoe',
+  category: 'material',
+  rarity: 1,
+  weight: 0.6,
+  value: 3,
+  stack: 10,
+  desc: '左脚的皮鞋，鞋头磨出了白底，鞋带被打了死结。鞋垫下压着一张折过很多次的公交票。',
+  tags: ['household', 'cloth'],
+  art: 'shoe',
+})
+
+item('toothbrush', {
+  name: '牙刷',
+  en: 'Toothbrush',
+  category: 'material',
+  rarity: 1,
+  weight: 0.1,
+  value: 2,
+  stack: 10,
+  desc: '刷毛已经发黄，手柄上用记号笔写了名字，字迹被擦掉了一半。',
+  tags: ['household', 'bathroom'],
+  art: 'brush',
+})
+
+item('soap_bar', {
+  name: '肥皂',
+  en: 'Soap Bar',
+  category: 'consumable',
+  rarity: 1,
+  weight: 0.2,
+  value: 3,
+  stack: 10,
+  desc: '半块洗衣皂，表面刻着厂标，边缘被水泡得发软。刮掉表面还能闻出一点皂角味。',
+  tags: ['household', 'bathroom', 'clean'],
+  art: 'soap',
+})
+
+item('lunchbox', {
+  name: '铝饭盒',
+  en: 'Tin Lunchbox',
+  category: 'material',
+  rarity: 1,
+  weight: 0.7,
+  value: 6,
+  stack: 6,
+  desc: '长方铝饭盒，卡扣松了，里面是一层干掉的面条和一把缠着胶布的小勺。',
+  tags: ['household', 'kitchen'],
+  art: 'lunchbox',
+})
+
+item('folding_chair', {
+  name: '折叠椅',
+  en: 'Folding Chair',
+  category: 'material',
+  rarity: 1,
+  weight: 2.4,
+  value: 7,
+  stack: 3,
+  desc: '铁管折叠椅，椅面的人造革裂成一张地图。坐上去会先晃一下，再慢慢稳住。',
+  tags: ['household', 'furniture'],
+  art: 'chair',
+})
+
+item('desk_fan', {
+  name: '台式风扇',
+  en: 'Desk Fan',
+  category: 'material',
+  rarity: 1,
+  weight: 2.0,
+  value: 9,
+  stack: 3,
+  desc: '三叶台扇，网罩变形，扇叶上积着一层黑色的灰。插上电会先咳两声，然后转起来。',
+  tags: ['household', 'appliance'],
+  art: 'fan',
+})
+
+item('old_tv', {
+  name: '旧电视',
+  en: 'Old TV',
+  category: 'material',
+  rarity: 2,
+  weight: 6.5,
+  value: 18,
+  stack: 1,
+  desc: '显像管电视，屏幕中央有一道烧灼的黑斑。打开只有雪花，偶尔能听见半句新闻。',
+  tags: ['household', 'appliance', 'electronic'],
+  art: 'tv',
+})
+
+item('microwave', {
+  name: '微波炉',
+  en: 'Microwave',
+  category: 'material',
+  rarity: 2,
+  weight: 5.5,
+  value: 16,
+  stack: 1,
+  desc: '转盘裂了一半，门上的金属网被撬开过。里面放着一只没有取出来的搪瓷杯。',
+  tags: ['household', 'appliance', 'kitchen'],
+  art: 'microwave',
+})
+
+item('fridge', {
+  name: '冰箱',
+  en: 'Refrigerator',
+  category: 'material',
+  rarity: 2,
+  weight: 12,
+  value: 24,
+  stack: 1,
+  desc: '单门冰箱，门封条老化，压缩机早就不转了。冷冻层结着霜，霜里冻着几张便签。',
+  tags: ['household', 'appliance', 'kitchen'],
+  art: 'fridge',
+})
+
+item('washer', {
+  name: '洗衣机',
+  en: 'Washing Machine',
+  category: 'material',
+  rarity: 2,
+  weight: 11,
+  value: 22,
+  stack: 1,
+  desc: '波轮洗衣机，桶里还有半桶发黑的水。脱水时的声音像有人在里面敲桶壁。',
+  tags: ['household', 'appliance'],
+  art: 'washer',
+})
+
+item('typewriter', {
+  name: '打字机',
+  en: 'Typewriter',
+  category: 'material',
+  rarity: 3,
+  weight: 4.8,
+  value: 30,
+  stack: 1,
+  desc: '机械打字机，色带干成一条硬边。滚筒上夹着一张没打完的信，最后一行重复了同一个字。',
+  tags: ['household', 'office', 'writing'],
+  art: 'typewriter',
+})
+
+item('camera_old', {
+  name: '旧相机',
+  en: 'Old Camera',
+  category: 'material',
+  rarity: 2,
+  weight: 0.9,
+  value: 26,
+  stack: 2,
+  desc: '旁轴胶片相机，取景窗有裂纹，快门还能按。胶卷仓里剩着一张曝光过度的底片。',
+  tags: ['household', 'electronic', 'photo'],
+  art: 'camera',
+})
+
+item('radio', {
+  name: '收音机',
+  en: 'Radio',
+  category: 'material',
+  rarity: 2,
+  weight: 1.4,
+  value: 20,
+  stack: 2,
+  desc: '便携收音机，天线断了一截。夜里能把旋钮拧到一个只播报数字的频道。',
+  tags: ['household', 'electronic', 'signal'],
+  art: 'radio',
+})
+
+item('textbook', {
+  name: '旧课本',
+  en: 'Textbook',
+  category: 'material',
+  rarity: 1,
+  weight: 0.8,
+  value: 6,
+  stack: 6,
+  desc: '封皮被磨白的课本，页边写满铅笔批注。最后几页被撕掉了，断口很整齐。',
+  tags: ['household', 'school', 'book'],
+  art: 'book',
+})
+
+item('pencil_case', {
+  name: '文具盒',
+  en: 'Pencil Case',
+  category: 'material',
+  rarity: 1,
+  weight: 0.3,
+  value: 4,
+  stack: 8,
+  desc: '铁皮文具盒，盖子上印着已经褪色的卡通图案。里面有两支削短的铅笔和一个掰弯的圆规。',
+  tags: ['household', 'school'],
+  art: 'pencil',
+})
+
+item('globe', {
+  name: '地球仪',
+  en: 'Globe',
+  category: 'material',
+  rarity: 2,
+  weight: 1.8,
+  value: 15,
+  stack: 1,
+  desc: '桌面地球仪，支架锈死。海面被刮掉一层，露出一片不属于任何国家的底色。',
+  tags: ['household', 'school'],
+  art: 'globe',
+})
+
+item('microscope', {
+  name: '显微镜',
+  en: 'Microscope',
+  category: 'material',
+  rarity: 3,
+  weight: 3.2,
+  value: 40,
+  stack: 1,
+  desc: '单目光学显微镜，物镜少了一个，载物台上还夹着一片标本。看进去只有一团缓慢移动的东西。',
+  tags: ['household', 'school', 'science'],
+  art: 'microscope',
+})
+
+item('hard_hat', {
+  name: '安全帽',
+  en: 'Hard Hat',
+  category: 'material',
+  rarity: 1,
+  weight: 1.0,
+  value: 8,
+  stack: 6,
+  desc: '黄色安全帽，帽檐裂了一道，内衬上的编号被磨掉。戴着能挡落石，也能挡一次钝击。',
+  tags: ['household', 'work', 'armor'],
+  art: 'helmet',
+})
+
+item('power_drill', {
+  name: '电钻',
+  en: 'Power Drill',
+  category: 'tool',
+  rarity: 2,
+  weight: 2.6,
+  value: 28,
+  stack: 1,
+  desc: '手枪式电钻，电池仓用胶带缠着，钻头断在夹头里。转速还能调，声音很大。',
+  tags: ['household', 'tool', 'work'],
+  art: 'drill',
+})
+
+item('bucket', {
+  name: '铁皮水桶',
+  en: 'Tin Bucket',
+  category: 'material',
+  rarity: 1,
+  weight: 1.2,
+  value: 5,
+  stack: 6,
+  desc: '镀锌铁皮桶，桶底有一处焊补。提手是弯的，拎起来会歪向一边。',
+  tags: ['household', 'tool', 'water'],
+  art: 'bucket',
+})
+
+item('fishing_rod', {
+  name: '鱼竿',
+  en: 'Fishing Rod',
+  category: 'tool',
+  rarity: 2,
+  weight: 1.5,
+  value: 18,
+  stack: 1,
+  desc: '三节玻璃钢鱼竿，导环缺了两个，轮座还能用。线轴上缠着一段发绿的旧线。',
+  tags: ['household', 'tool', 'water'],
+  art: 'rod',
+})
+
+item('hotel_keycard', {
+  name: '旅馆房卡',
+  en: 'Hotel Keycard',
+  category: 'material',
+  rarity: 1,
+  weight: 0.05,
+  value: 0,
+  stack: 6,
+  desc: '白色磁卡，正面印着旅馆标志，房号被磨掉了。背面贴着一张写着「不用打扫」的纸条。',
+  tags: ['household', 'key', 'hotel'],
+  art: 'keycard',
+})
+
+item('suitcase', {
+  name: '旧行李箱',
+  en: 'Suitcase',
+  category: 'material',
+  rarity: 2,
+  weight: 3.6,
+  value: 14,
+  stack: 1,
+  desc: '硬壳行李箱，拉链头没了，用铁丝别着。里面叠着两件没送洗的衬衫和一本空白护照。',
+  tags: ['household', 'hotel', 'travel'],
+  art: 'suitcase',
+})
+
+item('wristwatch', {
+  name: '手表',
+  en: 'Wristwatch',
+  category: 'material',
+  rarity: 2,
+  weight: 0.1,
+  value: 20,
+  stack: 2,
+  desc: '机械手表，表蒙有细划痕，表带是后配的。秒针还在走，比广播里的报时慢四分钟。',
+  tags: ['household', 'time', 'jewelry'],
+  art: 'watch',
+})
+
+item('brick', {
+  name: '红砖',
+  en: 'Red Brick',
+  category: 'material',
+  rarity: 1,
+  weight: 2.2,
+  value: 3,
+  stack: 30,
+  desc: '一块普通红砖，棱角磕掉了一点。侧面印着砖厂的缩写，被雨水泡得发白。',
+  tags: ['household', 'build'],
+  art: 'brick',
+})
+
+item('steel_mesh', {
+  name: '钢丝网',
+  en: 'Steel Mesh',
+  category: 'material',
+  rarity: 1,
+  weight: 1.8,
+  value: 7,
+  stack: 10,
+  desc: '被剪成方块的钢丝网，边缘卷曲，网格里卡着几片碎玻璃。铺在窗洞上很合适。',
+  tags: ['household', 'build', 'metal'],
+  art: 'mesh',
+})
+
+item('pressure_meter', {
+  name: '压力表',
+  en: 'Pressure Gauge',
+  category: 'component',
+  rarity: 2,
+  weight: 0.9,
+  value: 18,
+  stack: 4,
+  desc: '铜壳压力表，表面玻璃有一道裂纹，指针停在红区外。接头处还缠着生料带。',
+  tags: ['industrial', 'gauge', 'component'],
+  art: 'meter',
+})
+
+item('hand_pump', {
+  name: '手摇泵',
+  en: 'Hand Pump',
+  category: 'tool',
+  rarity: 2,
+  weight: 3.4,
+  value: 24,
+  stack: 1,
+  desc: '铸铁手摇泵，摇柄包着一层黑胶，进出水口都还在。压下去时会发出很长的吱声。',
+  tags: ['industrial', 'tool', 'water'],
+  art: 'pump',
+})
+
+item('valve_handle', {
+  name: '阀门手轮',
+  en: 'Valve Handwheel',
+  category: 'component',
+  rarity: 1,
+  weight: 1.7,
+  value: 9,
+  stack: 6,
+  desc: '红色铸铁手轮，轮辐断了一根，中心轴孔还带着键槽。拧起来很沉，但确实能转动。',
+  tags: ['industrial', 'valve', 'component'],
+  art: 'valve',
+})
+
+item('canvas_bag', {
+  name: '帆布袋',
+  en: 'Canvas Bag',
+  category: 'material',
+  rarity: 1,
+  weight: 0.6,
+  value: 4,
+  stack: 8,
+  desc: '厚帆布袋，提手被缝过两次，袋底有一圈洗不掉的泥。里面还剩半截粉笔。',
+  tags: ['household', 'bag'],
+  art: 'bag',
+})
+
+item('metal_dish', {
+  name: '搪瓷盘',
+  en: 'Enamel Plate',
+  category: 'material',
+  rarity: 1,
+  weight: 0.4,
+  value: 4,
+  stack: 8,
+  desc: '搪瓷盘，盘沿磕掉了几块瓷，露出黑色的铁。盘底印着一圈蓝色的麦穗图案。',
+  tags: ['household', 'kitchen'],
+  art: 'dish',
+})
+
+item('cloth_sheet', {
+  name: '旧床单',
+  en: 'Old Sheet',
+  category: 'material',
+  rarity: 1,
+  weight: 0.9,
+  value: 4,
+  stack: 8,
+  desc: '洗到发灰的棉布床单，中间有一大片洗不掉的黄渍。撕成条可以当绷带用。',
+  tags: ['household', 'cloth'],
+  art: 'sheet',
+})
+
+item('signal_flare', {
+  name: '信号焰棒',
+  en: 'Signal Flare',
+  category: 'consumable',
+  rarity: 2,
+  weight: 0.4,
+  value: 12,
+  stack: 4,
+  desc: '红色信号焰棒，外壳受潮，擦火头还能用。点燃后能亮三分钟，光很刺眼。',
+  tags: ['household', 'light', 'survival'],
+  art: 'flare',
+})
+
+item('gyro_compass', {
+  name: '陀螺罗盘',
+  en: 'Gyro Compass',
+  category: 'component',
+  rarity: 3,
+  weight: 1.2,
+  value: 35,
+  stack: 1,
+  desc: '航空陀螺罗盘，玻璃罩内有一小滴油。通电后指针会慢慢转向一个不属于北方的方向。',
+  tags: ['industrial', 'navigation', 'component'],
+  art: 'gyro',
+})
+
+item('rope_coil', {
+  name: '缆绳',
+  en: 'Rope Coil',
+  category: 'material',
+  rarity: 1,
+  weight: 2.8,
+  value: 8,
+  stack: 6,
+  desc: '盘成圈的尼龙缆绳，外层的编股磨毛了，绳头用火烧过。能承住一个人的重量。',
+  tags: ['household', 'rope', 'harbor'],
+  art: 'coil',
+})
+
+item('can', {
+  name: '罐头',
+  en: 'Tin Can',
+  category: 'consumable',
+  rarity: 1,
+  weight: 0.4,
+  value: 6,
+  stack: 12,
+  desc: '没有标签的铁皮罐头，拉环断了一半。里面的东西是咸的，嚼起来像浸过油的豆子。',
+  tags: ['household', 'food'],
+  art: 'can',
+})
+
+// ---------------------------------------------------------------------------
+// 收藏品 —— 旧世代游戏机，全图仅一件，拾取后不再生成
+// ---------------------------------------------------------------------------
+
+item('collect_gba', {
+  name: 'GBA 掌机',
+  en: 'Game Boy Advance',
+  category: 'artifact',
+  rarity: 5,
+  weight: 0.3,
+  value: 0,
+  stack: 1,
+  unique: true,
+  desc: '横版掌机，屏幕有一道斜划痕，电池仓盖用胶布粘着。开机后只剩下一格电和一段没有声音的开机动画。',
+  tags: ['artifact', 'collectible', 'console', 'game'],
+  art: 'console_gba',
+})
+
+item('collect_subor', {
+  name: '小霸王学习机',
+  en: 'Subor Learning Machine',
+  category: 'artifact',
+  rarity: 5,
+  weight: 1.6,
+  value: 0,
+  stack: 1,
+  unique: true,
+  desc: '灰白色的键盘式主机，卡槽里插着一盘「学习卡」。接上电视，屏幕上出现的是九十年代的开机画面。',
+  tags: ['artifact', 'collectible', 'console', 'game'],
+  art: 'console_subor',
+})
+
+item('collect_ps1', {
+  name: 'PlayStation 主机',
+  en: 'PlayStation Console',
+  category: 'artifact',
+  rarity: 5,
+  weight: 2.2,
+  value: 0,
+  stack: 1,
+  unique: true,
+  desc: '初代灰色 PlayStation，光驱盖卡住，托盘里有一张划花的碟。插电后风扇会先转起来。',
+  tags: ['artifact', 'collectible', 'console', 'game'],
+  art: 'console_ps',
+})
+
+item('collect_ps2', {
+  name: 'PS2 主机',
+  en: 'PlayStation 2',
+  category: 'artifact',
+  rarity: 5,
+  weight: 2.4,
+  value: 0,
+  stack: 1,
+  unique: true,
+  desc: '薄版 PS2，竖放支架不见了。背面贴着一张保修贴，日期早于这个世界最后一场雨。',
+  tags: ['artifact', 'collectible', 'console', 'game'],
+  art: 'console_ps2',
+})
+
+item('collect_psp', {
+  name: 'PSP 掌机',
+  en: 'PlayStation Portable',
+  category: 'artifact',
+  rarity: 5,
+  weight: 0.35,
+  value: 0,
+  stack: 1,
+  unique: true,
+  desc: '黑色 PSP，屏幕亮着，停在游戏标题界面。UMD 仓里没有碟，读盘灯却一直在闪。',
+  tags: ['artifact', 'collectible', 'console', 'game'],
+  art: 'console_psp',
+})
+
+item('game_cartridge', {
+  name: '游戏卡带',
+  en: 'Game Cartridge',
+  category: 'artifact',
+  rarity: 4,
+  weight: 0.2,
+  value: 0,
+  stack: 1,
+  unique: true,
+  desc: '黄色塑料卡带，标签已经泡烂，金属触点发黑。擦干净后插进旧机器，还能亮起一个开始界面。',
+  tags: ['artifact', 'collectible', 'console', 'game'],
+  art: 'cartridge',
+})
+
+// ---------------------------------------------------------------------------
 // 查询辅助：只读，供 UI / loot / recipes 使用
 // ---------------------------------------------------------------------------
 

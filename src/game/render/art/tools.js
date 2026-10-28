@@ -221,10 +221,10 @@ function drawScanner(s) {
 }
 
 const TOOLS = {
-  shovel: { draw: drawShovel, seed: 0x501 },
-  pickaxe: { draw: drawPickaxe, seed: 0x502 },
-  welder: { draw: drawWelder, seed: 0x503 },
-  scanner: { draw: drawScanner, seed: 0x504 },
+  shovel: { draw: drawShovel, seed: 0x501, grip: [5, 14] },
+  pickaxe: { draw: drawPickaxe, seed: 0x502, grip: [10, 15] },
+  welder: { draw: drawWelder, seed: 0x503, grip: [8, 14] },
+  scanner: { draw: drawScanner, seed: 0x504, grip: [5, 14] },
 }
 
 export const TOOL_ART_IDS = ['shovel', 'pickaxe', 'welder', 'scanner']
@@ -246,6 +246,7 @@ export function getToolArt(toolId) {
   s.outline(mix(PAL.void, PAL.steel, 0.18))
   tex = s.tex()
   tex.userData.toolId = TOOLS[key] ? key : 'shovel'
+  tex.userData.grip = (def.grip || [10, 15]).slice()
   CACHE.set(key, tex)
   return tex
 }

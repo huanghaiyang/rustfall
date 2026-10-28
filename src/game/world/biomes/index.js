@@ -137,60 +137,67 @@ export const ITEM_POOLS = {
   city: [
     'scrap_plate', 'copper_wire', 'lubricant', 'battery_cell', 'cloth', 'cement',
     'rubber', 'board_cpu', 'ram_stick', 'cell_small', 'repair_kit', 'acid_neutralizer',
-    'diary_1', 'photo_1', 'cassette_1', 'jewelry_1', 'sensor_unit',
+    'diary_1', 'diary_3', 'photo_1', 'cassette_1', 'jewelry_1', 'sensor_unit', 'huique_toy',
+    'umbrella_old', 'wall_clock', 'old_tv', 'fridge', 'kettle',
   ],
   village: [
     'cloth', 'cement', 'rubber', 'dog_food', 'scrap_plate', 'chemical', 'acid_neutralizer',
-    'diary_2', 'photo_2', 'book_1', 'toy_1', 'huique_toy', 'cell_small', 'repair_kit',
+    'diary_2', 'diary_3', 'photo_2', 'book_1', 'toy_1', 'huique_toy', 'cell_small', 'repair_kit',
     'bearing', 'aluminum_sheet', 'rad_meds',
+    'bucket', 'folding_chair', 'lunchbox', 'hard_hat', 'can',
   ],
   factory: [
     'scrap_plate', 'copper_wire', 'servo_motor', 'hydraulic_rod', 'bearing', 'gyro',
     'board_cpu', 'battery_cell', 'cell_large', 'chemical', 'uranium_dust', 'relay_part',
-    'photo_3', 'clothes_1', 'acid_neutralizer', 'optical_module',
+    'photo_3', 'clothes_1', 'acid_neutralizer', 'optical_module', 'signal_recorder',
+    'hard_hat', 'pressure_meter', 'valve_handle', 'hand_pump', 'lunchbox',
   ],
   dump: [
     'scrap_plate', 'copper_wire', 'rubber', 'aluminum_sheet', 'cement', 'rare_earth',
     'uranium_dust', 'sensor_unit', 'ram_stick', 'cell_large', 'rad_meds', 'diary_3',
-    'toy_1', 'jewelry_1', 'clothes_1', 'military_shell',
+    'toy_1', 'jewelry_1', 'clothes_1', 'military_shell', 'signal_recorder',
+    'old_tv', 'microwave', 'washer', 'brick', 'folding_chair',
   ],
   metro: [
     'copper_wire', 'battery_cell', 'scrap_plate', 'ram_stick', 'board_cpu', 'sensor_unit',
     'lubricant', 'cloth', 'cement', 'acid_neutralizer', 'diary_1', 'cassette_1',
     'optical_module', 'relay_part', 'cell_small', 'rubber',
+    'radio', 'camera_old', 'wristwatch', 'old_shoe', 'suitcase',
   ],
   hospital: [
     'cloth', 'chemical', 'acid_neutralizer', 'rad_meds', 'repair_kit', 'cell_small',
     'sensor_unit', 'optical_module', 'board_cpu', 'diary_2', 'photo_2', 'book_1',
     'jewelry_1', 'clothes_1', 'dog_food', 'bearing',
+    'toothbrush', 'soap_bar', 'wall_clock', 'cloth_sheet', 'metal_dish',
   ],
   port: [
     'aluminum_sheet', 'scrap_plate', 'copper_wire', 'rubber', 'cement', 'hydraulic_rod',
     'servo_motor', 'gyro', 'bearing', 'cell_large', 'rad_meds', 'diary_3', 'photo_3',
     'toy_1', 'signal_recorder', 'military_shell',
+    'fishing_rod', 'bucket', 'rope_coil', 'radio', 'signal_flare',
   ],
 }
 
 /** 稀有池（深层 / 井底 / 高台） */
 export const RARE_POOLS = {
-  city: ['relay_part', 'optical_module', 'servo_motor', 'military_shell', 'quantum_chip'],
-  village: ['reactor_core', 'servo_motor', 'quantum_chip', 'relay_part', 'signal_recorder'],
-  factory: ['reactor_core', 'military_shell', 'quantum_chip', 'satellite_gyro', 'relay_part'],
-  dump: ['reactor_core', 'quantum_chip', 'satellite_gyro', 'military_shell', 'rare_earth'],
-  metro: ['relay_part', 'optical_module', 'quantum_chip', 'signal_recorder', 'satellite_gyro'],
-  hospital: ['reactor_core', 'optical_module', 'sensor_unit', 'quantum_chip', 'relay_part'],
-  port: ['military_shell', 'reactor_core', 'satellite_gyro', 'hydraulic_rod', 'quantum_chip'],
+  city: ['relay_part', 'optical_module', 'servo_motor', 'military_shell', 'quantum_chip', 'collect_gba'],
+  village: ['reactor_core', 'servo_motor', 'quantum_chip', 'relay_part', 'signal_recorder', 'collect_subor'],
+  factory: ['reactor_core', 'military_shell', 'quantum_chip', 'satellite_gyro', 'relay_part', 'collect_ps1'],
+  dump: ['reactor_core', 'quantum_chip', 'satellite_gyro', 'military_shell', 'rare_earth', 'collect_ps2'],
+  metro: ['relay_part', 'optical_module', 'quantum_chip', 'signal_recorder', 'satellite_gyro', 'collect_psp'],
+  hospital: ['reactor_core', 'optical_module', 'sensor_unit', 'quantum_chip', 'relay_part', 'game_cartridge'],
+  port: ['military_shell', 'reactor_core', 'satellite_gyro', 'hydraulic_rod', 'quantum_chip', 'collect_psp'],
 }
 
 /** 怪物池（按 biome） */
 export const MONSTER_POOLS = {
-  city: ['radboar', 'crawler', 'scrapper', 'sentry', 'drone'],
-  village: ['radboar', 'crawler', 'wingrat', 'spitter'],
-  factory: ['sentry', 'scrapper', 'drone', 'hulkbot', 'spitter'],
-  dump: ['crawler', 'wingrat', 'scrapper', 'radboar', 'hulkbot'],
-  metro: ['crawler', 'wingrat', 'spitter', 'scrapper', 'drone'],
-  hospital: ['crawler', 'spitter', 'sentry', 'scrapper', 'wingrat'],
-  port: ['radboar', 'scrapper', 'drone', 'hulkbot', 'spitter'],
+  city: ['radboar', 'crawler', 'scrapper', 'sentry', 'drone', 'bandit_lookout', 'bandit_looter'],
+  village: ['radboar', 'crawler', 'wingrat', 'spitter', 'bandit_scav'],
+  factory: ['sentry', 'scrapper', 'drone', 'hulkbot', 'spitter', 'bandit_looter'],
+  dump: ['crawler', 'wingrat', 'scrapper', 'radboar', 'hulkbot', 'bandit_scav', 'bandit_looter'],
+  metro: ['crawler', 'wingrat', 'spitter', 'scrapper', 'drone', 'bandit_lookout', 'bandit_scav'],
+  hospital: ['crawler', 'spitter', 'sentry', 'scrapper', 'wingrat', 'bandit_lookout'],
+  port: ['radboar', 'scrapper', 'drone', 'hulkbot', 'spitter', 'bandit_looter'],
 }
 
 /** 默认怪物数量（spec.monsterCount 可覆盖；shelter 恒为 0） */
@@ -977,53 +984,88 @@ export function isSurfaceReachable(reach, x, y) {
   return false
 }
 
+/** 平台顶面是否已经能从出生点站上去（以可达 BFS 结果为准） */
+function platformReached(reach, p) {
+  const w = reach.__w
+  if (!w) return true
+  for (let x = p.x0; x <= p.x1; x++) {
+    if (x < 1 || x >= w) continue
+    if (reach[p.row * w + x]) return true
+  }
+  return false
+}
+
 /**
- * 给「孤立平台」补一根爬杆 —— 保证每一层高台都能上去。
- * 判定：平台下方 3 行、±2 列内没有别的可站面，且同一行也没有相邻平台 → 加杆。
- * 返回补了多少根。
+ * 保证每一层浮空平台都能上去：以「出生点可达性」为准，
+ * 够不着的平台先补一根下到地面的爬杆；补杆也不行就拆掉平台，
+ * 绝不留「看得见却够不着」的地方。返回补杆数。
  */
 export function ensurePlatformAccess(ctx) {
   const { map, w, h } = ctx
   let fixed = 0
-  const plat = ctx.platforms.slice()
-  for (const p of plat) {
-    let ok = false
-    for (let x = Math.max(1, p.x0 - 2); x <= Math.min(w - 2, p.x1 + 2) && !ok; x++) {
-      for (let dy = 1; dy <= 3 && !ok; dy++) {
-        const y = p.row + dy
-        if (y >= h - 1) break
-        const t = map.get(x, y)
-        if ((t === T.SOLID || t === T.PLATFORM) && map.get(x, y - 1) !== T.SOLID) ok = true
-      }
+  for (let pass = 0; pass < 3; pass++) {
+    let reach = null
+    try {
+      reach = reachableSurfaces(ctx)
+    } catch (e) {
+      reach = null
     }
-    if (!ok) {
-      for (const q of plat) {
-        if (q === p) continue
-        if (q.row !== p.row) continue
-        if (q.x1 >= p.x0 - 2 && q.x0 <= p.x1 + 2) {
-          ok = true
+    if (!reach || !reach.length) return fixed
+    // 出生点本身站不住时 BFS 全空，此时不再动平台
+    let any = false
+    for (let i = 0; i < reach.length; i++) if (reach[i]) { any = true; break }
+    if (!any) return fixed
+    let added = 0
+    for (const p of ctx.platforms) {
+      if (platformReached(reach, p)) continue
+      for (let x = p.x0 + 1; x <= p.x1 - 1; x++) {
+        if (x < 1 || x >= w - 1) continue
+        if (poleInColumn(ctx, x, p.row + 1, h - 2)) break
+        const ground = map.groundBelow(x * TS + TS / 2, (p.row + 1) * TS, TS * 26)
+        if (ground == null) continue
+        const groundRow = Math.floor(ground / TS)
+        if (groundRow <= p.row + 1) continue
+        let n = 0
+        for (let y = p.row + 1; y < groundRow; y++) {
+          if (map.get(x, y) === T.EMPTY) {
+            map.set(x, y, T.POLE)
+            n++
+          }
+        }
+        if (n) {
+          ctx.poles.push({ x, top: p.row + 1, bottom: groundRow - 1 })
+          fixed++
+          added++
           break
         }
       }
     }
-    if (!ok && poleInColumn(ctx, p.x0, p.row + 1, p.row + 12)) ok = true
-    if (ok) continue
-    const px = clamp(p.x0, 1, w - 2)
-    const ground = map.groundBelow(px * TS + TS / 2, (p.row + 1) * TS, TS * 26)
-    if (ground == null) continue
-    const groundRow = Math.floor(ground / TS)
-    if (groundRow <= p.row + 1) continue
-    let n = 0
-    for (let y = p.row + 1; y < groundRow; y++) {
-      if (map.get(px, y) === T.EMPTY) {
-        map.set(px, y, T.POLE)
-        n++
+    if (!added) break
+  }
+  // 二次校验：仍然够不着的平台直接拆掉（上面的物件交给 pruneUnreachable 挪走）
+  let reach = null
+  try {
+    reach = reachableSurfaces(ctx)
+  } catch (e) {
+    reach = null
+  }
+  let any = false
+  if (reach && reach.length) {
+    for (let i = 0; i < reach.length; i++) if (reach[i]) { any = true; break }
+  }
+  if (any) {
+    const keep = []
+    for (const p of ctx.platforms) {
+      if (platformReached(reach, p)) {
+        keep.push(p)
+        continue
       }
-    }
-    if (n) {
-      ctx.poles.push({ x: px, top: p.row + 1, bottom: groundRow - 1 })
+      for (let x = p.x0; x <= p.x1; x++) {
+        if (map.get(x, p.row) === T.PLATFORM) map.set(x, p.row, T.EMPTY)
+      }
       fixed++
     }
+    ctx.platforms = keep
   }
   return fixed
 }
@@ -1379,6 +1421,49 @@ export function addProp(ctx, kind, x, row, opts = {}) {
   ctx.props.push(e)
   markTaken(ctx, x, row, opts.r ?? 1)
   return e
+}
+
+// ---------------------------------------------------------------- 地面小杂物
+/** 纯装饰地面杂物池：按 biome 选，全部是无交互小尺寸散布件。 */
+const DEBRIS_POOLS = {
+  city: ['paper_trash', 'glass_shards', 'rubble_small', 'scrap_bits', 'crack_ground', 'bone_scatter'],
+  village: ['paper_trash', 'bone_scatter', 'rubble_small', 'crack_ground', 'glass_shards'],
+  factory: ['scrap_bits', 'shell_casings', 'cable_coil', 'rubble_small', 'glass_shards'],
+  dump: ['scrap_bits', 'paper_trash', 'glass_shards', 'rubble_small', 'bone_scatter'],
+  metro: ['cable_coil', 'paper_trash', 'glass_shards', 'crack_ground', 'shell_casings'],
+  hospital: ['paper_trash', 'glass_shards', 'bone_scatter', 'cable_coil'],
+  port: ['cable_coil', 'shell_casings', 'scrap_bits', 'crack_ground', 'bone_scatter'],
+}
+
+/**
+ * 沿主地面随机散布小杂物（纯装饰、不占位、不参与可达性）。
+ * 由 buildRoom 统一调用；避难所内减量且不进避难所区域。
+ */
+export function scatterDebris(ctx) {
+  const { rng, w } = ctx
+  const pool = DEBRIS_POOLS[ctx.biome] || DEBRIS_POOLS.city
+  const isShelterRoom = ctx.variant === 'shelter'
+  const n = Math.max(3, Math.round((w / 13) * (isShelterRoom ? 0.35 : 1)))
+  let placed = 0
+  let guard = 0
+  while (placed < n && guard++ < n * 8) {
+    const kind = pool[placed % pool.length]
+    const x = clamp(rng.int(3, w - 4), 2, w - 3)
+    const row = ctx.floorY ? ctx.floorY[x] : surfaceRow(ctx, x)
+    if (row == null || row < 0) continue
+    if (inShelter(ctx, x)) continue
+    if (!isFree(ctx, x, row, 0)) continue
+    const e = {
+      kind,
+      x: x * TS + TS / 2 + (rng.next() - 0.5) * 18,
+      y: row * TS,
+    }
+    if (rng.chance(0.5)) e.flip = true
+    if (rng.chance(0.35)) e.scale = 0.8 + rng.next() * 0.25
+    ctx.props.push(e)
+    placed++
+  }
+  return placed
 }
 
 /** 牢笼：必须站在平地上、上方 4 行净空、左右各 2 列可接近 */
@@ -1753,9 +1838,30 @@ export function buildRoom(ctx, extra = {}) {
   } catch (e) {
     ctx.notes.push({ type: 'gen-error', where: 'extras', error: String(e && e.message ? e.message : e) })
   }
+  // 地面小杂物（纯装饰散布件：碎石 / 纸屑 / 玻璃渣 / 线缆等，按 biome 选池）
+  try {
+    scatterDebris(ctx)
+  } catch (e) {
+    ctx.notes.push({ type: 'gen-error', where: 'debris', error: String(e && e.message ? e.message : e) })
+  }
+  // 兜底：浮空平台必须可到达（孤立平台补爬杆，确实够不着的拆掉）
+  try {
+    const fixedPlat = ensurePlatformAccess(ctx)
+    if (fixedPlat) ctx.notes.push({ type: 'platform-access', fixed: fixedPlat })
+  } catch (e) {
+    ctx.notes.push({ type: 'gen-error', where: 'platformAccess', error: String(e && e.message ? e.message : e) })
+  }
   pruneUnsupported(ctx)
   const spawn = computeSpawn(ctx)
-  pruneUnreachable(ctx, qualityFallback && !qualityFallback.changed ? ctx.reach : null)
+  // 用补杆后的最新可达性清理够不着的物件
+  let reach = null
+  try {
+    reach = reachableSurfaces(ctx)
+    ctx.reach = reach
+  } catch (e) {
+    reach = null
+  }
+  pruneUnreachable(ctx, reach)
   // 复杂度统计（写进 gen.meta.complexity）
   let complexity = null
   try {
@@ -1908,6 +2014,25 @@ export function validateRoom(gen) {
   const wpCount = (gen.weapons || []).length
   if (wpCount > 3) problems.push(`too many weapons: ${wpCount}`)
   if ((gen.kind || '') === 'shelter' && wpCount < 1) problems.push('shelter room needs >=1 weapon')
+
+  // ---- 4d. 浮空平台必须能从出生点走上去（禁止看得见够不着） ----
+  try {
+    const reach = reachableSurfaces({ map, w, h, poles: gen.poles || [] }, { spawn })
+    let any = false
+    for (let i = 0; i < reach.length; i++) if (reach[i]) { any = true; break }
+    if (any) {
+      for (const p of gen.platforms || []) {
+        let ok = false
+        for (let x = p.x0; x <= p.x1; x++) {
+          if (x < 1 || x >= w) continue
+          if (reach[p.row * w + x]) { ok = true; break }
+        }
+        if (!ok) problems.push(`platform unreachable @ x${p.x0}-${p.x1} row ${p.row}`)
+      }
+    }
+  } catch (e) {
+    problems.push(`platform reach check failed: ${e && e.message ? e.message : e}`)
+  }
 
   // ---- 4c. 多层结构：≥3 层可站立面 ----
   const bands = layerBands(gen, 4)

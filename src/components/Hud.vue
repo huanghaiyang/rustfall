@@ -35,6 +35,13 @@ const tracked = computed(() => {
 
 const rescue = computed(() => (G.rescue?.active ? G.rescue : null))
 const interact = computed(() => G.interactHint || null)
+const padActive = computed(() => !!G.ui.padActive)
+const interactKey = computed(() => (padActive.value ? 'B' : 'E'))
+const hudKeys = computed(() =>
+  padActive.value
+    ? '左摇杆 移动 · A 跳跃 · X 攻击/工具 · B 交互 · Y 切机体 · LB/RB 工具 · 十字键←→ 武器 · Back 背包 · Start 暂停'
+    : 'A/D 移动 · 空格 跳跃 · J 攻击/使用工具 · E 交互 · Q 切换机体 · 1-4 工具 · 5-8 武器 · I 背包 · L 任务 · C 档案 · R 同伴 · ESC 暂停',
+)
 </script>
 
 <template>
@@ -124,7 +131,7 @@ const interact = computed(() => G.interactHint || null)
     </div>
 
     <div v-if="interact" class="interact-hint">
-      <span class="interact-key">E</span>
+      <span class="interact-key">{{ interactKey }}</span>
       <span>{{ interact.label }}</span>
       <span v-if="interact.sub" class="interact-sub">{{ interact.sub }}</span>
     </div>
@@ -140,7 +147,7 @@ const interact = computed(() => G.interactHint || null)
     </div>
 
     <div class="hud-keys">
-      A/D 移动 · 空格 跳跃 · J 攻击/使用工具 · E 交互 · Q 切换机体 · 1-4 工具 · I 背包 · L 任务 · C 档案 · R 同伴 · ESC 暂停
+      {{ hudKeys }}
     </div>
   </div>
 </template>

@@ -143,6 +143,9 @@ export const A = {
   hibernate() {
     safe(() => game()?.hibernate())
   },
+  jumpToLevel(regionId, roomId) {
+    safe(() => game()?.jumpToLevel(regionId, roomId))
+  },
   interact() {
     safe(() => game()?.interact())
   },
@@ -157,6 +160,16 @@ export const A = {
     const g = game()
     if (!g) return
     safe(() => g.setDeadzone(v))
+  },
+  setHotkey(action, patch) {
+    const g = game()
+    if (!g) return
+    safe(() => g.setHotkey(action, patch))
+  },
+  resetHotkeys() {
+    const g = game()
+    if (!g) return
+    safe(() => g.resetHotkeys())
   },
   setWeather(id) {
     const g = game()
