@@ -52,6 +52,7 @@ export class BaseMonster {
       this.art = null
     }
     this.frames = this.art?.frames || null
+    this.animFps = this.art?.fps || null
     this.animName = 'idle'
     this.animT = 0
     this.buildVisual()
@@ -108,6 +109,12 @@ export class BaseMonster {
     this.animName = name
     this.animT = 0
     this.applyFrame()
+  }
+
+  /** 各动作帧率：动作表自带 fps 表，没有就用 9。 */
+  animFpsFor(name) {
+    const fps = this.animFps?.[name]
+    return typeof fps === 'number' && fps > 0 ? fps : 9
   }
 
   applyFrame() {
@@ -244,7 +251,7 @@ export class BaseMonster {
   update(dt) {
     if (!this.alive) {
       this.deadT += dt
-      this.animT += dt * 6
+      this.animT += dt * this.animFpsFor('dead')
       this.applyFrame()
       this.syncMesh()
       if (this.deadT > 1.6) {
@@ -277,7 +284,7 @@ export class BaseMonster {
     }
 
     // 动画
-    this.animT += dt * 9
+    this.animT += dt * this.animFpsFor(this.animName)
     this.applyFrame()
     this.syncMesh()
     if (this.hurtFlash > 0.01) {

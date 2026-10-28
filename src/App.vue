@@ -26,7 +26,9 @@ import NotificationFeed from './components/panels/NotificationFeed.vue'
 import CompanionPanel from './components/panels/CompanionPanel.vue'
 import GrowthPanel from './components/panels/GrowthPanel.vue'
 import LevelPicker from './components/panels/LevelPicker.vue'
+import BossTestPanel from './components/panels/BossTestPanel.vue'
 import { installGamepadUi } from './game/gamepad-ui.js'
+import { loadBossPortraits } from './game/render/art/boss-portraits.js'
 
 const host = ref(null)
 const ready = ref(false)
@@ -88,6 +90,13 @@ onMounted(async () => {
     await game.bootPromise
   } catch (e) {
     console.error('[app] boot failed', e)
+  }
+  // AI 立绘（PNG）与程序化美术并行加载；失败时自动退回程序化绘制
+  try {
+    const n = await loadBossPortraits()
+    if (n) console.log(`[art] BOSS PNG 立绘 ${n} 张`)
+  } catch (e) {
+    console.warn('[art] BOSS PNG 立绘加载失败，使用程序化美术', e)
   }
   ready.value = true
   window.addEventListener('keydown', onKey)
@@ -158,6 +167,9 @@ if (import.meta.hot) {
     <div v-if="G.ui.panel === 'level'" class="overlay z-panel">
       <LevelPicker />
     </div>
+    <div v-if="G.ui.panel === 'boss_test'" class="overlay z-panel">
+      <BossTestPanel @close="A.closePanel()" />
+    </div>
     <div v-if="G.ui.panel === 'help'" class="overlay z-panel">
       <HelpOverlay @close="A.closePanel()" />
     </div>
@@ -173,6 +185,7 @@ if (import.meta.hot) {
       @settings="A.openPanel('settings')"
       @help="A.openPanel('help')"
       @levels="A.openPanel('level')"
+      @boss-test="A.openPanel('boss_test')"
       @bestiary="A.openPanel('bestiary')"
     />
 
@@ -193,6 +206,7 @@ if (import.meta.hot) {
       @companions="A.openPanel('companions')"
       @growth="A.openPanel('growth')"
       @levels="A.openPanel('level')"
+      @boss-test="A.openPanel('boss_test')"
       @restart="A.restartRun"
       @title="onTitle"
       @mute="A.toggleMute"

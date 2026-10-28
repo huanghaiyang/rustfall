@@ -1,0 +1,41 @@
+{
+  "tb_data_archon": {
+    "file": "sprites/boss-action/tb_data_archon.png",
+    "w": 3264,
+    "h": 336,
+    "frameW": 272,
+    "frameH": 336,
+    "logicalW": 136,
+    "logicalH": 168,
+    "frames": {
+      "idle": [
+        0,
+        1
+      ],
+      "run": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "attack": [
+        6,
+        7
+      ],
+      "cast": [
+        8,
+        9
+      ],
+      "hurt": [
+        10
+      ],
+      "dead": [
+        11
+      ]
+    },
+    "grid": [
+      "2x3",
+      "3x2"
+    ]
+  }
+}

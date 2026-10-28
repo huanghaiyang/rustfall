@@ -20,6 +20,8 @@
 import { PAL } from '../palette.js'
 import { Surf, mix, shade, mulberry32 } from './core.js'
 import { THEME_BOSS_LARGE_DEFS } from './theme-boss-art.js'
+import { getBossPortrait } from './boss-portraits.js'
+import { getBossAction } from './boss-action.js'
 
 const TAU = Math.PI * 2
 
@@ -923,8 +925,43 @@ function largeDead(id, k) {
 
 const LARGE_CACHE = new Map()
 
+/** 已加载 AI 动作图集时：返回 12 帧的动作美术。 */
+function actionBossArt(id) {
+  const a = getBossAction(id)
+  if (!a || !a.frames) return null
+  return {
+    w: a.w,
+    h: a.h,
+    artId: id,
+    anchor: 'bottom-center',
+    png: true,
+    fps: a.fps,
+    frames: a.frames,
+  }
+}
+
+/** 已加载 AI PNG 立绘时：单帧纹理供全部动作共用（尺寸仍按游戏内逻辑尺寸）。 */
+function pngBossArt(id) {
+  const action = actionBossArt(id)
+  if (action) return action
+  const p = getBossPortrait(id)
+  if (!p || !p.tex) return null
+  const t = p.tex
+  // 单帧兜底也要覆盖全部动画名，否则 run/cast 会沿用上一帧贴图
+  return {
+    w: p.w,
+    h: p.h,
+    artId: id,
+    anchor: 'bottom-center',
+    png: true,
+    frames: { idle: [t], run: [t], move: [t], attack: [t], cast: [t], hurt: [t], dead: [t] },
+  }
+}
+
 function buildLarge(id) {
   const key = largeDefOf(id) ? id : 'junk_golem'
+  const png = pngBossArt(key)
+  if (png) return png
   const def = largeDefOf(key)
   const frames = {
     idle: [largeFrame(key, { anim: 'idle', i: 0 }), largeFrame(key, { anim: 'idle', i: 1 })],
@@ -955,6 +992,10 @@ const LARGE_IDLE_CACHE = new Map()
 /** 单帧 idle 立绘：图鉴 / 列表用，避免为每只 BOSS 预构建整套帧。 */
 export function getLargeMonsterIdle(id) {
   const key = largeDefOf(id) ? String(id || '') : 'junk_golem'
+  const action = getBossAction(key)
+  if (action && action.frames?.idle?.[0]) return action.frames.idle[0]
+  const png = getBossPortrait(key)
+  if (png && png.tex) return png.tex
   let tex = LARGE_IDLE_CACHE.get(key)
   if (!tex) {
     tex = largeFrame(key, { anim: 'idle', i: 0 })

@@ -16,6 +16,7 @@ defineEmits([
   'companions',
   'growth',
   'levels',
+  'bossTest',
 ])
 </script>
 
@@ -62,6 +63,7 @@ defineEmits([
         <button class="btn" @click="$emit('mods')">模 组</button>
         <button class="btn" @click="$emit('settings')">设 置</button>
         <button class="btn" @click="$emit('levels')">关 卡 选 择</button>
+        <button class="btn" @click="$emit('bossTest')">BOSS 测 试 房</button>
         <button class="btn" @click="$emit('restart')">重 新 开 始</button>
         <button class="btn danger" @click="$emit('title')">返 回 标 题</button>
       </div>

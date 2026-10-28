@@ -149,6 +149,9 @@ export const A = {
   jumpToLevel(regionId, roomId) {
     safe(() => game()?.jumpToLevel(regionId, roomId))
   },
+  startBossTest(bossId) {
+    safe(() => game()?.startBossTest(bossId))
+  },
   interact() {
     safe(() => game()?.interact())
   },

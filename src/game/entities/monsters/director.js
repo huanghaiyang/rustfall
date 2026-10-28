@@ -409,6 +409,7 @@ export function createMonsterDirector(game) {
     const biome = data.biome || data.spec?.biome || game.room?.data?.biome || 'city'
     const kind = data.kind || data.spec?.kind || (data.shelter ? 'shelter' : 'standard')
     const isShelter = !!(data.shelter || String(kind).toLowerCase() === 'shelter')
+    const isTest = !!data.testRoom
 
     if (isShelter) {
       // 庇护所不刷怪（大型 / 小怪 / 生态都不刷）
@@ -451,7 +452,7 @@ export function createMonsterDirector(game) {
         const sy = Number.isFinite(s.y) ? s.y : 0
         enqueue(s.id, sx, sy)
       }
-    } else {
+    } else if (!isTest) {
       autoFill(biome, kind, data)
     }
     flushImmediate()
@@ -459,7 +460,7 @@ export function createMonsterDirector(game) {
 
     // ---- 生态 ----
     // 引擎自己管理 ecosystem 时不重复 populate（否则会清掉引擎刚生成的实体）
-    if (!engineOwnsEco && eco?.populate) {
+    if (!isTest && !engineOwnsEco && eco?.populate) {
       try {
         eco.populate(data)
       } catch (e) {

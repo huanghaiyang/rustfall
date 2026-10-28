@@ -42,6 +42,8 @@ import { bindGame } from './ui-actions.js'
 import { addXp, initGrowth, spendGrowth as applyGrowthPoint } from './systems/growth.js'
 import { injectEasterEggs, handleEgg } from './world/easter-eggs.js'
 import { getTheme } from './world/themes.js'
+import { buildBossTestSpec, carveBossTestArena, getBossTest } from './world/boss-test.js'
+import { updateBossVfx, clearBossVfx } from './render/art/boss-vfx.js'
 import { getRoomScene } from './world/scene-data.js'
 import { getProp } from './world/props-data.js'
 import { createChaosAI } from './systems/chaos-ai.js'
@@ -408,7 +410,65 @@ export class Game {
     return true
   }
 
+  /** 从菜单进入某只 BOSS 的专属测试房。 */
+  startBossTest(bossId) {
+    const test = getBossTest(bossId)
+    if (!test) {
+      toast('BOSS 测试房不存在', 'danger', 2.4)
+      return false
+    }
+    this.audioUnlock()
+    if (!this.robot || G.phase === 'title' || G.phase === 'chassis' || G.phase === 'hibernate') {
+      const chassis = G.chassisUnlocked?.includes(G.chassisId) ? G.chassisId : G.chassisUnlocked?.[0] || G.chassisId
+      this.startNewGame(chassis)
+    }
+    closePanel()
+    G.phase = 'playing'
+    G.showHud = true
+    G.paused = false
+    G.dialogue.active = false
+    this.loadRoom('boss_test', bossId, 'center', { bossTest: true })
+    if (this.robot) {
+      this.robot.dead = false
+      this.robot.refreshStats?.()
+      this.robot.stats.hp = this.robot.stats.hpMax
+      G.hp = this.robot.stats.hpMax
+      G.energy = this.robot.stats.energyMax
+    }
+    this.weapons?.reset?.()
+    this.snapCamera()
+    toast(`BOSS 测试房 · ${test.name}`, 'info', 2.6)
+    return true
+  }
+
+  /** BOSS 测试房：主题站点场景 + 由 bossId 派生的高低落差试炼场。 */
+  getBossTestData(bossId) {
+    const key = `boss_test:${bossId}`
+    if (this.roomCache.has(key)) return this.roomCache.get(key)
+    const spec = buildBossTestSpec(bossId)
+    if (!spec) throw new Error(`missing boss test ${bossId}`)
+    const gen = this.generateRoom({ ...spec, regionId: 'boss_test', roomId: bossId })
+    gen.regionId = 'boss_test'
+    gen.roomId = bossId
+    gen.biome = spec.biome
+    gen.label = spec.label
+    this.applyThemeRoom(gen, spec)
+    gen.monsters = []
+    gen.testRoom = true
+    gen.kind = 'boss'
+    gen.largeEnemies = [{ id: bossId, x: Math.round((gen.worldW || 4000) * 0.66), y: 0 }]
+    carveBossTestArena(gen, getBossTest(bossId))
+    try {
+      decorateTerrain(gen)
+    } catch (e) {
+      console.warn('[rustfall] 测试房地形装饰失败', e)
+    }
+    this.roomCache.set(key, gen)
+    return gen
+  }
+
   getRoomData(regionId, roomId) {
+    if (regionId === 'boss_test') return this.getBossTestData(roomId)
     const key = `${regionId}:${roomId}`
     if (this.roomCache.has(key)) return this.roomCache.get(key)
     const spec = this.regionsMod.getRoomSpec(regionId, roomId)
@@ -555,6 +615,7 @@ export class Game {
   }
 
   loadRoom(regionId, roomId, entry = null, opts = {}) {
+    clearBossVfx()
     try {
       this.war?.leaveRoom?.()
     } catch (e) {
@@ -576,8 +637,10 @@ export class Game {
     this.regionId = regionId
     G.regionId = regionId
     G.roomId = roomId
-    G.roomName = this.regionsMod?.getRoomSpec?.(regionId, roomId)?.label || roomId
-    G.regionName = this.regionsMod?.REGIONS?.[regionId]?.name || regionId
+    G.roomName = data.testRoom
+      ? data.label || 'BOSS 测试房'
+      : this.regionsMod?.getRoomSpec?.(regionId, roomId)?.label || roomId
+    G.regionName = data.testRoom ? 'BOSS 测试房' : this.regionsMod?.REGIONS?.[regionId]?.name || regionId
     G.biome = data.biome
     G.isShelter = !!data.shelter
     G.hint = ''
@@ -595,7 +658,7 @@ export class Game {
       }
     }
     this.chaos?.reset?.(data)
-    if (!opts.preview && !data.shelter) {
+    if (!opts.preview && !data.shelter && !data.testRoom) {
       try {
         this.war?.enterRoom?.({ ...data, regionId, roomId })
       } catch (e) {
@@ -615,7 +678,7 @@ export class Game {
 
     this.spawnRoomWeapons(data)
     this.ecosystem?.clear?.()
-    if (this.ecosystemFactory && !opts.preview) {
+    if (this.ecosystemFactory && !opts.preview && !data.testRoom) {
       try {
         this.ecosystem = this.ecosystemFactory(this)
         this.ecosystem.populate(data)
@@ -626,7 +689,7 @@ export class Game {
     }
     this.snapCamera()
     Events.emit(EV.ROOM_ENTER, { regionId, roomId })
-    if (!opts.preview) {
+    if (!opts.preview && !data.testRoom) {
       G.stats.roomsExplored = (G.stats.roomsExplored || 0) + 1
       // 首次进入某房间给探索经验
       const vk = `visited:${regionId}:${roomId}`
@@ -911,6 +974,7 @@ export class Game {
     this.updateWeatherCycle(dt)
     this.updateBuffs(dt)
     this.updateProjectiles(dt)
+    updateBossVfx(dt)
     this.interactTarget = this.findInteractable()
     this.updateInteractHint()
     this.handleInteractions()

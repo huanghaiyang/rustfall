@@ -28,6 +28,8 @@ import {
 import { BOSS_KIT_FACTORIES } from './theme-boss-kits.js'
 import { BOSS_SIGNATURES } from './boss-signatures.js'
 import { updateFx, clearFx } from './theme-boss-fx.js'
+import { loadBossAction } from '../../../render/art/boss-action.js'
+import { playBossVfx, preloadBossVfx, vfxForMove, vfxNamesForBoss } from '../../../render/art/boss-vfx.js'
 
 /** 各站点 BOSS 的配置表。moves 即该 BOSS 独占的四招，按出招优先级排列。 */
 export const THEME_BOSS_DEFS = [
@@ -872,8 +874,25 @@ class ThemeBoss extends BaseMonster {
     this._fx = []
     initLarge(this, { intro: 1.25, activateRange: 780 })
     applyLargeArt(this)
+    this._loadActionFrames()
+    // 六招对应的特效序列帧按需预载（每只 BOSS 约 3~5 张）
+    this._vfxNames = vfxNamesForBoss(this.moves.map((id) => ({ id, name: this.kit[id]?.name || '' })), cfg.id)
+    preloadBossVfx(this._vfxNames)
     this.tell = createTell(this, { inner: 44, outer: 76, color: cfg.accent })
     this._buildAura()
+  }
+
+  /** 按需加载 12 帧动作图集；到货后直接替换当前动作帧，无需重建 mesh。 */
+  _loadActionFrames() {
+    const id = String(this.def?.artId || this.def?.id || '')
+    if (!id.startsWith('tb_')) return
+    loadBossAction(id).then((art) => {
+      if (!art || !art.frames || this.dead || !this.mesh) return
+      this.frames = art.frames
+      this.art = Object.assign({}, this.art, { frames: art.frames, w: art.w, h: art.h })
+      this.playAnim(this.animName)
+      this.applyFrame()
+    })
   }
 
   _buildAura() {
@@ -995,8 +1014,30 @@ class ThemeBoss extends BaseMonster {
     const spec = this.kit[move]
     if (!spec || typeof spec.exec !== 'function') return
     spec.exec(this)
+    this._playMoveVfx(move, spec)
     this.moveReady[move] = spec.cool ?? 2
     this.lastMove = move
+  }
+
+  /** 招式特效序列帧：地面类落在玩家脚下，其余落在 BOSS 胸口/落点。 */
+  _playMoveVfx(move, spec) {
+    const name = vfxForMove(move, spec?.name || '', this.cfg?.id || '')
+    const p = this.player
+    const ground = name === 'ground_burst' || name === 'spike_eruption' || name === 'shockwave_ring' || name === 'gravity_well'
+    let x = this.px + this.facing * 20
+    let y = this.body.y + this.body.h * 0.52
+    if (ground && p && !p.dead && Math.abs(p.centerX - this.px) < 560) {
+      x = p.centerX
+      y = p.body.y + p.body.h
+    }
+    playBossVfx(this.game, name, x, y, {
+      size: Math.max(120, this.body.h * 0.9),
+      color: this.accent,
+      flip: this.facing < 0,
+      grow: name === 'shockwave_ring' ? 0.55 : 0,
+      rot: name === 'beam_lance' ? Math.PI * 0.5 : 0,
+      z: 7.4,
+    })
   }
 
   updateBehavior(dt) {
@@ -1048,7 +1089,10 @@ class ThemeBoss extends BaseMonster {
     if (this.state.startsWith('wind:')) {
       const move = this.state.slice(5)
       this.vxTarget = 0
-      this.playAnim('attack')
+      // 近战招读攻击帧，远程/施法招读施法帧
+      const spec = this.kit[move]
+      const melee = Array.isArray(spec?.range) && (spec.range[1] ?? 0) <= 260
+      this.playAnim(melee ? 'attack' : 'cast')
       this.facePlayer()
       if (this.tell) showTell(this.tell, 0.35 + Math.sin(this.stateT * 22) * 0.3)
       const wind = this.kit[move] ? this.kit[move].wind : 0.5

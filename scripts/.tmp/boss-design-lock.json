@@ -1,0 +1,353 @@
+{
+  "_note": "BOSS 动作表设计锁：look/weapon/glow 来自立绘总览 + theme-boss-unique 原型/标志物表；atk/cast 对应现有六招体系，用于让攻击帧与施法帧匹配技能。",
+  "tb_swamp_maw": {
+    "look": "hunched swamp beast, barrel body half sunk in mud, a huge vertical circular maw ringed with crooked teeth filling the chest, bog-green and mud-brown hide, tangled vines and reed strands hanging off the back",
+    "weapon": "no weapon, the maw itself and two clawed forelimbs",
+    "glow": "murky yellow-green glow from deep inside the maw",
+    "atk": "lunging forward and snapping the giant maw shut",
+    "cast": "gagging, then spewing a burst of mud and writhing vines from the maw"
+  },
+  "tb_acid_mother": {
+    "look": "bloated acid mother, four short splayed legs around a sagging translucent belly sac full of bright green liquid, small low-set head with a long dripping tongue, acid-eaten carapace plates and tubes on the back",
+    "weapon": "no weapon, dripping acid from every limb",
+    "glow": "sickly lime-green light glowing through the belly sac",
+    "atk": "raising both forelimbs and slamming the belly down, spraying acid",
+    "cast": "arching back and vomiting a wide stream of green acid upward"
+  },
+  "tb_proto_mind": {
+    "look": "prototype mind, an oversized pink brain suspended in a cracked glass jar, steel clamps and lens rings around the jar, thin cable legs and two thin manipulator arms, small sensor array on top",
+    "weapon": "two thin telescoping manipulator arms tipped with probe needles",
+    "glow": "cyan-blue light pulsating inside the jar",
+    "atk": "thrusting both probe arms forward in a fast double stab",
+    "cast": "jar rings spinning, cable arms raised, brain flaring with cyan arcs"
+  },
+  "tb_prime_core": {
+    "look": "prime core, tall pale-white humanoid frame with teal light seams, a huge round reactor core set into the chest, a second smaller core floating above the shoulder, smooth ceramic plating and exposed cable bundles",
+    "weapon": "no weapon, both palms open as emitters",
+    "glow": "bright mint-teal core light in the chest and palm emitters",
+    "atk": "driving a straight palm thrust with the chest core surging",
+    "cast": "both arms spread wide, twin cores splitting apart and flaring teal"
+  },
+  "tb_observer": {
+    "look": "alien observer, slender pale-blue elongated body, long neck and oversized smooth tapering head, one huge black lens eye, thin ribbed limbs, a floating observation ring orbiting behind the shoulders",
+    "weapon": "no weapon, the ring floats beside it",
+    "glow": "ice-blue light around the floating ring and the single eye",
+    "atk": "sweeping a thin scanning beam from the eye ring across the ground",
+    "cast": "raising both arms, the ring spinning fast and opening into a vertical abduction portal"
+  },
+  "tb_curator": {
+    "look": "the curator, gaunt tall human in a long tan trench-coat and wide-brimmed hat, bandaged hands, a specimen jar strapped to the hip, a lean vulture-like posture",
+    "weapon": "a long silver display hook in one hand and a capped specimen jar in the other",
+    "glow": "amber glow from the jar of preserved specimens",
+    "atk": "stepping in and swinging the display hook in a wide downward arc",
+    "cast": "holding up the specimen jar, amber light spilling out to form a summoning circle"
+  },
+  "tb_arsenal_sergeant": {
+    "look": "arsenal sergeant, broad armored soldier in olive and sand plate armor, oversized pauldrons, bandolier of shells across the chest, a heavy ammo backpack, helmet with a narrow visor slit",
+    "weapon": "a huge belt-fed drum cannon carried two-handed",
+    "glow": "orange muzzle heat and a red targeting dot on the helmet",
+    "atk": "shouldering the drum cannon and firing a heavy burst",
+    "cast": "slamming a fresh drum magazine home and racks of shells rising behind him"
+  },
+  "tb_scrap_warlord": {
+    "look": "scrap warlord, a six-legged scrap crawler chassis welded from car parts and armor plates, a small warlord welded into an open cockpit on top, exhaust stacks and a magnet fork rack on the back",
+    "weapon": "a huge two-pronged scrap magnet fork on a winch arm",
+    "glow": "rust-orange sparks from weld seams and a dirty yellow cockpit lamp",
+    "atk": "stomping forward on six legs and driving the magnet fork down",
+    "cast": "craning the magnet fork up, scrap debris lifting and orbiting the fork"
+  },
+  "tb_bridge_raider": {
+    "look": "bridge raider, wiry human in a torn orange jumpsuit with rope harness and spiked shoulder strap, gas-mask goggles, a coil of chain over one shoulder, bandaged forearms",
+    "weapon": "a heavy boat hook on a chain, plus a length of pipe",
+    "glow": "a single red goggle lens",
+    "atk": "lassoing the hook forward and yanking it back",
+    "cast": "swinging the chain overhead and slamming it into the ground to call a raider camp"
+  },
+  "tb_bunker_commander": {
+    "look": "bunker commander, stocky soldier in grey-green bunker armor, tank-tread greaves, heavy helmet with a periscope visor, ammo belts wrapped across the chest, a field radio on the back",
+    "weapon": "a long service rifle with an underslung launcher",
+    "glow": "pale blue periscope visor light",
+    "atk": "kneeling slightly and firing a precise rifle shot",
+    "cast": "raising a flare pistol and calling an artillery grid on the radio"
+  },
+  "tb_castle_tyrant": {
+    "look": "hollow throne tyrant, towering armored knight in blackened iron with dull gold trim, a jagged crown fused into the helm, castle battlement stone grown over one shoulder, a tattered crimson cape",
+    "weapon": "a long royal greatsword held in both gauntlets",
+    "glow": "crimson light in the crown and the helm's eye slits",
+    "atk": "raising the greatsword overhead and cleaving straight down",
+    "cast": "planting the sword point-down, a crimson ring of royal light spreading out"
+  },
+  "tb_bell_bishop": {
+    "look": "bell bishop, figure entirely wrapped in a bell-shaped bronze and dark-wood robe, a tall pointed mitre, a heavy broken bronze bell growing out of the back, long sleeves hiding the hands",
+    "weapon": "a long-handled censer swinging on a chain",
+    "glow": "amber ember light inside the censer and a crack in the bell",
+    "atk": "swinging the censer in a wide horizontal arc",
+    "cast": "raising both arms, the broken bell tolling and amber sound rings expanding"
+  },
+  "tb_mine_foreman": {
+    "look": "mine foreman, thick mutant miner with a hunched back, soot-black and dust-brown hide, a hard hat with a failing headlamp, hydraulic drill rig bolted to one arm, rib cage of coal lumps",
+    "weapon": "a giant industrial drill mounted on the right arm",
+    "glow": "a warm yellow headlamp beam and red drill heat",
+    "atk": "revving the drill and lunging forward with it",
+    "cast": "slamming the drill into the ground, rock spikes erupting around him"
+  },
+  "tb_flood_colossus": {
+    "look": "flood colossus, massive stone-and-concrete dam golem, cracked masonry hide covered in moss and dripping water, a rusted ship's wheel embedded in the chest, rebar spikes, no visible head, three small silt eyes on the shoulder mound",
+    "weapon": "no weapon, two enormous stone fists",
+    "glow": "cold teal light leaking through the chest cracks",
+    "atk": "raising both fists overhead and slamming them down",
+    "cast": "planting both feet, water bursting from the chest and a surge wave rolling forward"
+  },
+  "tb_fog_wraith": {
+    "look": "fog wraith, tall gaunt pale ghost woman in a long ragged white shroud, long black hair floating, hollow dark eyes, thin arms, mist trailing from the hem",
+    "weapon": "a small rusted fog lantern hanging from one hand",
+    "glow": "pale cold blue lantern light",
+    "atk": "reaching out with one long arm, fingers spread, mist claws forming",
+    "cast": "raising the lantern, thick fog pouring out and hiding the body"
+  },
+  "tb_dockmaster": {
+    "look": "the dockmaster, huge barrel-chested bearded human in a stained apron and flat cap, rolled sleeves, rope belt, rubber boots, a pipe in his mouth",
+    "weapon": "a long gaff hook in one hand and a coil of mooring chain in the other",
+    "glow": "a dull teal glow from a lantern hooked to his belt",
+    "atk": "stomping in and swinging the gaff hook in a hooking arc",
+    "cast": "hurling the mooring chain forward, chain links whipping across the ground"
+  },
+  "tb_drydock_rig": {
+    "look": "drydock rig, heavy blue-grey gantry walker on four hydraulic legs, a boxy work deck as a torso, a winch drum on the back, a crane gantry arm over one shoulder, riveted plating",
+    "weapon": "a heavy winch crane arm with a hook block",
+    "glow": "pale cyan work lights on the deck",
+    "atk": "swinging the crane arm down like a wrecking weight",
+    "cast": "spinning the winch drum, cables whipping out and anchors dropping"
+  },
+  "tb_gravity_eye": {
+    "look": "gravity eye, a giant blue iris eyeball floating inside a broken ring of carved ancient stone, orbiting rock chunks circling slowly, stone crown shards floating above, no limbs",
+    "weapon": "no weapon, gravitational force only",
+    "glow": "bright cyan iris light and a violet gravity halo",
+    "atk": "the eye narrowing, stone chunks flung forward as a volley",
+    "cast": "the eye opening wide, a violet gravity well collapsing in front of it"
+  },
+  "tb_grey_harbor": {
+    "look": "grey harbour crane, an industrial harbour crane on two heavy legs, a revolving column torso, two asymmetric booms, a ring of harbour bells at the centre, a small driver cabin, grey-blue steel",
+    "weapon": "the twin booms themselves, tipped with hook and counterweight",
+    "glow": "a pale yellow cabin lamp and the bell ring",
+    "atk": "swinging both booms down together in a pincer slam",
+    "cast": "the harbour bell ring tolling, pale yellow sound rings rolling forward"
+  },
+  "tb_highway_king": {
+    "look": "highway king, a leather-clad human fused into a one-wheeled motorcycle chariot, huge spoked wheel under him, red bandana and spiked visor, exhaust pipes over the shoulders, chain belts, a fur collar",
+    "weapon": "a motorized chain-flail held over the wheel",
+    "glow": "red tail-light glow from the engine block and visor",
+    "atk": "revving the wheel and doing a fast forward charge",
+    "cast": "cracking the chain-flail, exhaust jets blasting from the back"
+  },
+  "tb_hotel_nightmare": {
+    "look": "the guest of room 13, a whole walking hotel facade: brick wall body with lit windows, a red-curtained doorway as a mouth, a brass room-number plate, gargoyle heads on the shoulders, roof signage on top",
+    "weapon": "no weapon, two stone gargoyle arms",
+    "glow": "warm red-orange light from the windows and the doorway mouth",
+    "atk": "the doorway swinging open and a swarm of room keys shooting out",
+    "cast": "the facade opening up, red curtains spilling out and a room corridor unfolding"
+  },
+  "tb_hotel_clerk": {
+    "look": "night clerk, elegant pale ghost in a purple hotel uniform with gold piping, high collar, slicked hair, hollow eyes, long coattails, a small bell on the glove",
+    "weapon": "a brass service bell in one hand and a room key ring in the other",
+    "glow": "violet glow from the uniform piping and the bell",
+    "atk": "ringing the service bell and lunging with the key ring",
+    "cast": "raising the bell, violet light opening ghost room doors around him"
+  },
+  "tb_strait_howler": {
+    "look": "strait howler, blue-white quadruped sea beast, sleek wet hide, a long seal-like neck, a wide mouth full of needle tusks, ragged fin frills along the spine, bone flute hanging at the throat",
+    "weapon": "no weapon, tusks and claws",
+    "glow": "pale blue bioluminescent dots along the spine",
+    "atk": "crouching and lunging forward with a tusk bite",
+    "cast": "throwing its head back and howling, blue sound rings blasting forward"
+  },
+  "tb_librarian": {
+    "look": "the librarian, tall robed archivist in faded gold and parchment-white, four slender arms, a brass reading lamp for a head with a single lens, floating pages and book spines orbiting the body",
+    "weapon": "a heavy iron book-binding clamp in one hand",
+    "glow": "warm amber lamp light from the head lens and floating pages",
+    "atk": "swinging the binding clamp down while pages slash forward",
+    "cast": "all four arms raised, orbiting pages forming a spinning spiral"
+  },
+  "tb_lighthouse_keeper": {
+    "look": "the lighthouse keeper, stooped human in a heavy navy keeper's coat and wool cap, glowing rotating lantern room grown where the head should be, brass fittings and glass panes, oil-stained gloves",
+    "weapon": "a long brass lamp hook in one hand",
+    "glow": "bright golden beam light from the head lantern",
+    "atk": "swinging the lamp hook forward in a wide arc",
+    "cast": "the head lantern rotating fast, a golden searchlight beam sweeping the arena"
+  },
+  "tb_iron_colonel": {
+    "look": "iron colonel, tall officer in a blood-red greatcoat with gold epaulettes and a chest full of medals, peaked cap, half his lower body replaced by a tracked tank base, a sabre at the hip",
+    "weapon": "an engraved officer's pistol and a sabre",
+    "glow": "red signal glow from the cap badge and shell casings",
+    "atk": "snapping the sabre forward in a precise thrust",
+    "cast": "raising the pistol and calling an artillery grid with a whistle"
+  },
+  "tb_reactor_priest": {
+    "look": "reactor priest, tall figure in a heavy white and pale-green radiation robe, a lead-lined hood with a blank gold mask, glowing fuel rod bundles forming a halo behind the shoulders, rubber gloves",
+    "weapon": "a long censer on a chain radiating green light",
+    "glow": "sickly green fuel-rod halo and censer",
+    "atk": "swinging the glowing censer forward in a wide arc",
+    "cast": "both arms raised, the fuel rod halo flaring and green radiation rings pulsing out"
+  },
+  "tb_paper_press": {
+    "look": "press roller III, a squat industrial printing press machine, two massive brown steel rollers as a torso, rows of gear teeth, a paper feed slot like a mouth, ink-stained plates, stubby piston legs",
+    "weapon": "the two heavy rollers",
+    "glow": "faint amber glow from the ink plates",
+    "atk": "lunging and crushing forward between the spinning rollers",
+    "cast": "the rollers spinning up, sheets of paper and ink spraying out"
+  },
+  "tb_warden": {
+    "look": "the warden, broad human jailer in grey riot armor with a faceless steel helmet, keys and shackles hanging from the belt, a heavy shield plate on one arm, heavy boots",
+    "weapon": "a pump shotgun in one hand and a ring of prison keys in the other",
+    "glow": "a dull white lamp on the helmet and a red alarm light on the chest",
+    "atk": "bracing the shield and firing the shotgun point blank",
+    "cast": "slamming the key ring down, iron cell bars erupting from the ground"
+  },
+  "tb_punk_amp": {
+    "look": "distortion amp, angular black punk mech, a stack of four speaker cabinets for a torso, spiked mohawk crest and riveted skull faceplate, cable dreadlocks, one arm ending in a guitar-neck blade",
+    "weapon": "a guitar-neck blade and a microphone-flail",
+    "glow": "hot magenta light from the speaker cones and mohawk",
+    "atk": "swinging the guitar-neck blade down in a power chord slam",
+    "cast": "speaker cones blasting, magenta sound rings rolling forward"
+  },
+  "tb_rad_colossus": {
+    "look": "radiation colossus, hulking green-glowing mutant giant, lumpy tumorous hide, a rusted yellow radiation trefoil plate bolted to the chest, exposed glowing ribs, one arm much larger than the other",
+    "weapon": "no weapon, the oversized arm",
+    "glow": "acid-green light from the exposed ribs and the trefoil plate",
+    "atk": "swinging the oversized arm down in a heavy smash",
+    "cast": "roaring, green radiation rings pulsing out from the chest"
+  },
+  "tb_red_tide": {
+    "look": "red tide mother, a bloated crimson tide creature, a bulbous coral-encrusted body with a ring of waving red tentacles, foam skirt along the base, a buoy tangled in the tentacles, barnacle plates",
+    "weapon": "the ring of tentacles",
+    "glow": "red-orange light pulsing inside the coral body",
+    "atk": "lashing a bundle of tentacles forward in a whip strike",
+    "cast": "all tentacles raised, a red tide surge rolling out along the ground"
+  },
+  "tb_caregiver": {
+    "look": "broken caregiver, a rounded white enamel care pod on four rubber wheels, big glass dome front showing a dim patient silhouette, a red cross on the roof, six thin nursing arms hanging from the sides, an IV pole with bags",
+    "weapon": "six thin nursing arms tipped with syringes, clamps and bottles",
+    "glow": "soft pale-green light from the dome and IV bags",
+    "atk": "lunging forward and stabbing with a bundle of syringes",
+    "cast": "dome glowing, warm green light pouring out and nursing arms raised"
+  },
+  "tb_assembly_overseer": {
+    "look": "assembly overseer iron jaw, heavy factory mech in dark gunmetal with orange-hot seams, a wide wedge jaw full of steel teeth, a crane hook rig over one shoulder, piston-driven legs, riveted plates",
+    "weapon": "a huge assembly crane hook on a chain",
+    "glow": "orange furnace light in the jaw and chest seams",
+    "atk": "stepping in and swinging the crane hook down",
+    "cast": "beating both fists like a metronome, orange rings pulsing and conveyor sparks rising"
+  },
+  "tb_rally_boss": {
+    "look": "rally horn, a tall broadcast tower walking on three splayed legs, a truss mast body, four stacked loudspeaker discs facing different directions, a small operator cabin in the middle, an aviation lamp on top",
+    "weapon": "no weapon, the speaker stack",
+    "glow": "blue-white light from the aviation lamp and speaker cones",
+    "atk": "leaning forward and blasting a cone of blue-white sound",
+    "cast": "all four speakers flaring, blue-white rings expanding and summoning signal flags"
+  },
+  "tb_rot_queen": {
+    "look": "rot queen, tall fungus-rotted queen, a mottled green and ochre body like decaying wood, a crown of curling roots and mushrooms, a vine-wrapped throne growing out of her back, clusters of ripe pods hanging from her arms",
+    "weapon": "a whip of thorned vine",
+    "glow": "jaundiced yellow-green glow from the hanging pods",
+    "atk": "swinging the thorned vine whip forward",
+    "cast": "arms raised, pods bursting and spore clouds blooming"
+  },
+  "tb_schoolmaster": {
+    "look": "the schoolmaster, gaunt tall human in a worn brown suit with a waistcoat and high collar, round spectacles, hair in a tight bun, a blackboard strapped to his back, chalk dust on his sleeves",
+    "weapon": "a long wooden ruler and a heavy chalk eraser",
+    "glow": "pale white chalk light on the blackboard",
+    "atk": "swinging the wooden ruler down like a cane strike",
+    "cast": "throwing the eraser, chalk-white rings and summoned blackboard barriers unfolding"
+  },
+  "tb_shadow_walker": {
+    "look": "shadow walker, extremely thin black blade-limbed figure, a shell of overlapping dark plates, no face only a horizontal glowing eye slit, four folded knife legs, spiked shoulders, ribbon-like shadow bands trailing from the back",
+    "weapon": "both arms end in long folded shadow blades",
+    "glow": "violet light in the thin eye slit and the blade edges",
+    "atk": "lunging low and slashing with both shadow blades",
+    "cast": "folding into a crouch, violet shadow ribbons swirling and blades multiplying"
+  },
+  "tb_shipwright": {
+    "look": "the shipwright, burly riveted mech in blue-grey shipyard steel, a welder's mask face with one bright lens, a massive rivet hammer arm, an oxy-torch on the other arm, a keel-frame rig on the back",
+    "weapon": "a giant rivet hammer and an oxy-torch nozzle",
+    "glow": "blue-white welding arc light from the torch",
+    "atk": "swinging the rivet hammer in a heavy overhead blow",
+    "cast": "the oxy-torch flaring, a keel frame rising and welding sparks spraying"
+  },
+  "tb_skyline_baron": {
+    "look": "skyline baron, lopsided nobleman in a gold-trimmed green uniform and tall top hat, one enormous armored mech arm with a tower-crane counterweight, one shrunken thin arm with a pincer, a fur collar",
+    "weapon": "the giant right arm and the small left pincer",
+    "glow": "gold monocle light and a green glow from the giant arm's vents",
+    "atk": "raising the giant arm overhead and dropping it in a crushing slam",
+    "cast": "the giant arm venting, gold light flaring, debris and chandeliers falling"
+  },
+  "tb_helios": {
+    "look": "helios core, a golden solar obelisk tower, stepped base, tapering faceted body with etched sun glyphs, two thin light-sail panels hinged on the sides, a burning sun disc head with corona spikes",
+    "weapon": "no weapon, light sails and sun disc",
+    "glow": "fierce golden-white sun light from the disc head",
+    "atk": "the sun disc focusing, firing a thin golden photon lance",
+    "cast": "light sails unfolding and rotating, golden flare rings expanding"
+  },
+  "tb_orbit_judge": {
+    "look": "orbit judge, tall slender figure in a white and pale-blue orbital pressure suit, a smooth reflective helmet with a narrow visor, a big orbital ring floating behind the shoulders, thin thruster boots, a judge's gavel",
+    "weapon": "a heavy steel gavel",
+    "glow": "cold white-blue visor light and a ring of blue thruster glow",
+    "atk": "raising the gavel and slamming it down",
+    "cast": "spreading both arms, the orbital ring spinning and dropping a falling debris column"
+  },
+  "tb_arena_champion": {
+    "look": "arena champion, huge rust-and-bronze gladiator brute, horned helmet with an iron cage faceplate, massively wide shoulders with riveted plate armor, thick shackled legs, a tattered red champion sash",
+    "weapon": "a spiked cestus fist and a short heavy cleaver",
+    "glow": "orange glow in the helmet's eye cage",
+    "atk": "stepping in and throwing a huge spiked haymaker",
+    "cast": "beating the chest, the arena bell ringing and orange rings bursting out"
+  },
+  "tb_storm_reaper": {
+    "look": "storm reaper, lean winged mutant reaper, high folded V-shaped iron-plated wings, a long ragged ochre robe, a hood with two bright eye points, sheaves of storm grain and scrap hanging from the belt",
+    "weapon": "a long two-handed scythe with a serrated blade",
+    "glow": "pale green lightning glow along the wings and eyes",
+    "atk": "swinging the scythe in a wide reaping arc",
+    "cast": "wings spread, the scythe raised, a small tornado of scrap spinning up"
+  },
+  "tb_substation": {
+    "look": "overload transformer, insectile machine body built from blue ceramic insulators and copper coils, six thin cable legs, a bank of high-voltage bushings on the back, two long arc horns, porcelain plating",
+    "weapon": "the two arc horns and electrified forelimbs",
+    "glow": "bright electric blue arcs crawling over the coil body",
+    "atk": "lunging and jabbing with an electrified forelimb",
+    "cast": "coils charging, blue-white lightning arcing out in branching forks"
+  },
+  "tb_boiler_king": {
+    "look": "boiler king, a massive riveted brass and iron boiler for a body, a furnace door mouth glowing with fire, a small crowned pressure valve head, two pipe arms and three stubby feet, gauges and steam valves",
+    "weapon": "pipe-fist arms venting steam",
+    "glow": "hot orange furnace light from the open door mouth",
+    "atk": "swinging a pipe arm down with a steam burst",
+    "cast": "pressure valves screaming, steam and fire bursting out in a ring"
+  },
+  "tb_professor": {
+    "look": "tenured professor, small hunched figure in a patched brown tweed coat and round glasses, white wild hair, a scholar's walker rig on his back with a rack of test tubes, mechanical legs and a lectern arm",
+    "weapon": "a heavy pointer rod and a rack of volatile test tubes",
+    "glow": "green and purple chemical glow in the test tube rack",
+    "atk": "slamming the pointer rod down like a gavel",
+    "cast": "hurling test tubes, chemical green clouds bursting out"
+  },
+  "tb_vampire_count": {
+    "look": "blood count, tall aristocratic vampire in a high-collared crimson tailcoat, pale gaunt face with glowing red eyes and long fangs, a huge bat-wing cape, pointed boots, a goblet in one hand",
+    "weapon": "a long rapier and a blood goblet",
+    "glow": "deep red light in the eyes and the goblet",
+    "atk": "lunging forward in a fast rapier thrust",
+    "cast": "cape spreading into bat wings, blood lifting from the ground into swirls"
+  },
+  "tb_zero_strain": {
+    "look": "strain zero, a long segmented virus caterpillar, glossy dark-green chitin segments, clusters of syringe-tipped legs under the body, a ring of small clustered eyes at the front, thin virus spikes along the back",
+    "weapon": "syringe-tipped legs",
+    "glow": "toxic green light between the segments",
+    "atk": "rearing up and plunging the front syringe legs down",
+    "cast": "segments swelling, green infection clouds venting from the back"
+  },
+  "tb_forest_hollow": {
+    "look": "hollow of the woods, a huge dead hollow tree trunk body with a black knothole single eye, jagged wood-loan teeth in a split trunk mouth, branching antler deadwood on top, hanging dead vines, bark and moss",
+    "weapon": "the long root claws and antler branches",
+    "glow": "pale amber light deep inside the knothole eye",
+    "atk": "swinging a heavy branch arm down in a wooden smash",
+    "cast": "the knothole eye flaring, roots and thorns erupting from the ground"
+  }
+}

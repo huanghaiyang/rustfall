@@ -1,0 +1,359 @@
+{
+  "tb_data_archon": {
+    "file": "sprites/boss/tb_data_archon.png",
+    "w": 272,
+    "h": 336,
+    "logicalW": 136,
+    "logicalH": 168
+  },
+  "tb_flood_colossus": {
+    "file": "sprites/boss/tb_flood_colossus.png",
+    "w": 336,
+    "h": 392,
+    "logicalW": 168,
+    "logicalH": 196
+  },
+  "tb_helios": {
+    "file": "sprites/boss/tb_helios.png",
+    "w": 280,
+    "h": 344,
+    "logicalW": 140,
+    "logicalH": 172
+  },
+  "tb_acid_mother": {
+    "file": "sprites/boss/tb_acid_mother.png",
+    "w": 344,
+    "h": 396,
+    "logicalW": 172,
+    "logicalH": 198
+  },
+  "tb_arena_champion": {
+    "file": "sprites/boss/tb_arena_champion.png",
+    "w": 308,
+    "h": 364,
+    "logicalW": 154,
+    "logicalH": 182
+  },
+  "tb_arsenal_sergeant": {
+    "file": "sprites/boss/tb_arsenal_sergeant.png",
+    "w": 296,
+    "h": 356,
+    "logicalW": 148,
+    "logicalH": 178
+  },
+  "tb_assembly_overseer": {
+    "file": "sprites/boss/tb_assembly_overseer.png",
+    "w": 300,
+    "h": 360,
+    "logicalW": 150,
+    "logicalH": 180
+  },
+  "tb_bell_bishop": {
+    "file": "sprites/boss/tb_bell_bishop.png",
+    "w": 288,
+    "h": 352,
+    "logicalW": 144,
+    "logicalH": 176
+  },
+  "tb_boiler_king": {
+    "file": "sprites/boss/tb_boiler_king.png",
+    "w": 332,
+    "h": 384,
+    "logicalW": 166,
+    "logicalH": 192
+  },
+  "tb_bridge_raider": {
+    "file": "sprites/boss/tb_bridge_raider.png",
+    "w": 292,
+    "h": 352,
+    "logicalW": 146,
+    "logicalH": 176
+  },
+  "tb_bunker_commander": {
+    "file": "sprites/boss/tb_bunker_commander.png",
+    "w": 304,
+    "h": 364,
+    "logicalW": 152,
+    "logicalH": 182
+  },
+  "tb_caregiver": {
+    "file": "sprites/boss/tb_caregiver.png",
+    "w": 280,
+    "h": 344,
+    "logicalW": 140,
+    "logicalH": 172
+  },
+  "tb_castle_tyrant": {
+    "file": "sprites/boss/tb_castle_tyrant.png",
+    "w": 316,
+    "h": 372,
+    "logicalW": 158,
+    "logicalH": 186
+  },
+  "tb_curator": {
+    "file": "sprites/boss/tb_curator.png",
+    "w": 292,
+    "h": 352,
+    "logicalW": 146,
+    "logicalH": 176
+  },
+  "tb_dockmaster": {
+    "file": "sprites/boss/tb_dockmaster.png",
+    "w": 300,
+    "h": 360,
+    "logicalW": 150,
+    "logicalH": 180
+  },
+  "tb_drydock_rig": {
+    "file": "sprites/boss/tb_drydock_rig.png",
+    "w": 344,
+    "h": 396,
+    "logicalW": 172,
+    "logicalH": 198
+  },
+  "tb_fog_wraith": {
+    "file": "sprites/boss/tb_fog_wraith.png",
+    "w": 292,
+    "h": 356,
+    "logicalW": 146,
+    "logicalH": 178
+  },
+  "tb_forest_hollow": {
+    "file": "sprites/boss/tb_forest_hollow.png",
+    "w": 300,
+    "h": 360,
+    "logicalW": 150,
+    "logicalH": 180
+  },
+  "tb_gravity_eye": {
+    "file": "sprites/boss/tb_gravity_eye.png",
+    "w": 296,
+    "h": 356,
+    "logicalW": 148,
+    "logicalH": 178
+  },
+  "tb_grey_harbor": {
+    "file": "sprites/boss/tb_grey_harbor.png",
+    "w": 328,
+    "h": 380,
+    "logicalW": 164,
+    "logicalH": 190
+  },
+  "tb_highway_king": {
+    "file": "sprites/boss/tb_highway_king.png",
+    "w": 284,
+    "h": 348,
+    "logicalW": 142,
+    "logicalH": 174
+  },
+  "tb_hotel_clerk": {
+    "file": "sprites/boss/tb_hotel_clerk.png",
+    "w": 276,
+    "h": 344,
+    "logicalW": 138,
+    "logicalH": 172
+  },
+  "tb_hotel_nightmare": {
+    "file": "sprites/boss/tb_hotel_nightmare.png",
+    "w": 304,
+    "h": 364,
+    "logicalW": 152,
+    "logicalH": 182
+  },
+  "tb_iron_colonel": {
+    "file": "sprites/boss/tb_iron_colonel.png",
+    "w": 320,
+    "h": 372,
+    "logicalW": 160,
+    "logicalH": 186
+  },
+  "tb_librarian": {
+    "file": "sprites/boss/tb_librarian.png",
+    "w": 276,
+    "h": 344,
+    "logicalW": 138,
+    "logicalH": 172
+  },
+  "tb_lighthouse_keeper": {
+    "file": "sprites/boss/tb_lighthouse_keeper.png",
+    "w": 280,
+    "h": 348,
+    "logicalW": 140,
+    "logicalH": 174
+  },
+  "tb_mine_foreman": {
+    "file": "sprites/boss/tb_mine_foreman.png",
+    "w": 304,
+    "h": 360,
+    "logicalW": 152,
+    "logicalH": 180
+  },
+  "tb_observer": {
+    "file": "sprites/boss/tb_observer.png",
+    "w": 300,
+    "h": 364,
+    "logicalW": 150,
+    "logicalH": 182
+  },
+  "tb_orbit_judge": {
+    "file": "sprites/boss/tb_orbit_judge.png",
+    "w": 264,
+    "h": 320,
+    "logicalW": 132,
+    "logicalH": 160
+  },
+  "tb_paper_press": {
+    "file": "sprites/boss/tb_paper_press.png",
+    "w": 316,
+    "h": 364,
+    "logicalW": 158,
+    "logicalH": 182
+  },
+  "tb_prime_core": {
+    "file": "sprites/boss/tb_prime_core.png",
+    "w": 328,
+    "h": 380,
+    "logicalW": 164,
+    "logicalH": 190
+  },
+  "tb_professor": {
+    "file": "sprites/boss/tb_professor.png",
+    "w": 288,
+    "h": 352,
+    "logicalW": 144,
+    "logicalH": 176
+  },
+  "tb_proto_mind": {
+    "file": "sprites/boss/tb_proto_mind.png",
+    "w": 284,
+    "h": 348,
+    "logicalW": 142,
+    "logicalH": 174
+  },
+  "tb_punk_amp": {
+    "file": "sprites/boss/tb_punk_amp.png",
+    "w": 300,
+    "h": 360,
+    "logicalW": 150,
+    "logicalH": 180
+  },
+  "tb_rad_colossus": {
+    "file": "sprites/boss/tb_rad_colossus.png",
+    "w": 340,
+    "h": 392,
+    "logicalW": 170,
+    "logicalH": 196
+  },
+  "tb_rally_boss": {
+    "file": "sprites/boss/tb_rally_boss.png",
+    "w": 320,
+    "h": 376,
+    "logicalW": 160,
+    "logicalH": 188
+  },
+  "tb_reactor_priest": {
+    "file": "sprites/boss/tb_reactor_priest.png",
+    "w": 320,
+    "h": 376,
+    "logicalW": 160,
+    "logicalH": 188
+  },
+  "tb_red_tide": {
+    "file": "sprites/boss/tb_red_tide.png",
+    "w": 324,
+    "h": 376,
+    "logicalW": 162,
+    "logicalH": 188
+  },
+  "tb_rot_queen": {
+    "file": "sprites/boss/tb_rot_queen.png",
+    "w": 312,
+    "h": 372,
+    "logicalW": 156,
+    "logicalH": 186
+  },
+  "tb_schoolmaster": {
+    "file": "sprites/boss/tb_schoolmaster.png",
+    "w": 284,
+    "h": 348,
+    "logicalW": 142,
+    "logicalH": 174
+  },
+  "tb_scrap_warlord": {
+    "file": "sprites/boss/tb_scrap_warlord.png",
+    "w": 296,
+    "h": 356,
+    "logicalW": 148,
+    "logicalH": 178
+  },
+  "tb_shadow_walker": {
+    "file": "sprites/boss/tb_shadow_walker.png",
+    "w": 288,
+    "h": 352,
+    "logicalW": 144,
+    "logicalH": 176
+  },
+  "tb_shipwright": {
+    "file": "sprites/boss/tb_shipwright.png",
+    "w": 312,
+    "h": 368,
+    "logicalW": 156,
+    "logicalH": 184
+  },
+  "tb_skyline_baron": {
+    "file": "sprites/boss/tb_skyline_baron.png",
+    "w": 276,
+    "h": 340,
+    "logicalW": 138,
+    "logicalH": 170
+  },
+  "tb_storm_reaper": {
+    "file": "sprites/boss/tb_storm_reaper.png",
+    "w": 304,
+    "h": 360,
+    "logicalW": 152,
+    "logicalH": 180
+  },
+  "tb_strait_howler": {
+    "file": "sprites/boss/tb_strait_howler.png",
+    "w": 308,
+    "h": 364,
+    "logicalW": 154,
+    "logicalH": 182
+  },
+  "tb_substation": {
+    "file": "sprites/boss/tb_substation.png",
+    "w": 284,
+    "h": 352,
+    "logicalW": 142,
+    "logicalH": 176
+  },
+  "tb_swamp_maw": {
+    "file": "sprites/boss/tb_swamp_maw.png",
+    "w": 336,
+    "h": 384,
+    "logicalW": 168,
+    "logicalH": 192
+  },
+  "tb_vampire_count": {
+    "file": "sprites/boss/tb_vampire_count.png",
+    "w": 296,
+    "h": 360,
+    "logicalW": 148,
+    "logicalH": 180
+  },
+  "tb_warden": {
+    "file": "sprites/boss/tb_warden.png",
+    "w": 300,
+    "h": 356,
+    "logicalW": 150,
+    "logicalH": 178
+  },
+  "tb_zero_strain": {
+    "file": "sprites/boss/tb_zero_strain.png",
+    "w": 316,
+    "h": 368,
+    "logicalW": 158,
+    "logicalH": 184
+  }
+}
