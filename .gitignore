@@ -12,3 +12,8 @@ screenshots-v3/
 screenshots-v4/
 results/
 .learn/
+.tmp/
+# 本机 ComfyUI 环境 / 模型权重（体积极大，不入库）
+.tools/
+.chrome-profile/
+.chrome-profile2/
