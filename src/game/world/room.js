@@ -4,7 +4,8 @@ import { TS } from '../config.js'
 import { T } from './tilemap.js'
 import { hash2 } from '../render/rng.js'
 import { getBiomeArt, getSkyArt, getStarField, getSunArt, getMoonArt } from '../render/art/world.js'
-import { getThemeBackdrop } from '../render/art/backdrops.js'
+import { getThemeBackdrop, getSceneBackdrop } from '../render/art/backdrops.js'
+import { getRoomScene } from './scene-data.js'
 import { Surf, mix } from '../render/art/core.js'
 import { PAL } from '../render/palette.js'
 import { getPropArt } from '../render/art/props.js'
@@ -195,8 +196,18 @@ export class Room {
         themeBd = null
       }
     }
+    // 普通关卡：按关卡名取场景背景（复用对应地标画法 + 本关配色）
+    const scene = this.data.roomId ? getRoomScene(this.data.roomId) : null
+    if (!themeBd && scene) {
+      try {
+        themeBd = getSceneBackdrop(this.data.roomId)
+      } catch (e) {
+        themeBd = null
+      }
+    }
     if (themeBd) {
-      addLandscape(themeBd, 0.4, 0xffffff, 1.0, -6)
+      // 室内关背景本身已是建筑内部，只做轻微压暗，避免整幅糊成黑色
+      addLandscape(themeBd, 0.4, scene?.indoor ? 0xbfb8aa : 0xffffff, 1.0, -6)
     } else {
       addLandscape(art?.far, 0.88, 0xd9c9a8, 0.95, 0)
       addLandscape(art?.mid, 0.7, 0xfff0d8, 0.98, 0)
@@ -574,6 +585,13 @@ export class Room {
     this.tileGeo = tileGeo
     const groundMat = new THREE.MeshBasicMaterial({ map: this.groundTex, toneMapped: false })
     const topMat = new THREE.MeshBasicMaterial({ map: this.groundTopTex, toneMapped: false })
+    // 关卡地面染色：逐关冷暖不同，远看就能区分场景
+    const scene = this.data.roomId ? getRoomScene(this.data.roomId) : null
+    if (scene?.tint) {
+      const c = new THREE.Color(scene.tint).lerp(new THREE.Color(0xffffff), 0.45)
+      groundMat.color.copy(c)
+      topMat.color.copy(c)
+    }
     this.groundMat = groundMat
     this.topMat = topMat
     instFor(buckets.solid, tileGeo, groundMat, (h, deep) => (deep ? 0.17 + h * 0.12 : 0.6 + h * 0.24))

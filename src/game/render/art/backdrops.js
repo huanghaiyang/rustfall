@@ -19,6 +19,7 @@ import { PAL } from '../palette.js'
 import { Surf, mix, strSeed, mulberry32, bayerAt, setArtModule } from './core.js'
 import { hash2 } from '../rng.js'
 import { getTheme } from '../../world/themes.js'
+import { getRoomScene } from '../../world/scene-data.js'
 
 setArtModule('backdrops')
 
@@ -504,6 +505,282 @@ function paintFog(s, o) {
       s.px(x, y, c, 1)
     }
   }
+}
+
+/* ============================================================================
+ * 4b. 室内全景：顶棚 / 墙板 / 窗格 / 管线 / 地砖
+ * ----------------------------------------------------------------------------
+ * INDOOR 房间不再复用室外天际线，整幅画成建筑内部：
+ *   · 顶棚 + 横梁 + 管线封住天空，顶部不留天光；
+ *   · 上半墙与脏旧护墙板两段，腰线用本关 accent 压暗；
+ *   · 一排窗：亮窗 / 破窗 / 钉木板，窗外只留剪影；
+ *   · 工业军事多管线与警示条，民用恐怖多海报与挂钟。
+ * 像素 alpha 全为 1，暗部交给 liftDarkPixels 统一抬升。
+ * ========================================================================== */
+function drawIndoorWindow(s, o, x, y, w, h, lit, rng, frame, wallHi) {
+  const ac = o.accent
+  s.rect(x - 3, y - 3, w + 6, h + 6, mix(wallHi, PAL.void, 0.34))
+  if (lit) {
+    const topC = mix(mix(ac, PAL.dustLight, 0.55), PAL.white, 0.3)
+    const botC = mix(ac, PAL.void, 0.22)
+    for (let j = 0; j < h; j++) {
+      const t = j / Math.max(1, h - 1)
+      s.rect(x, y + j, w, 1, mix(topC, botC, t))
+    }
+    // 窗外远景剪影：只 1~3 块，避免抢镜
+    const sk = mix(ac, PAL.void, 0.62)
+    const base = y + h
+    for (let i = 0; i < 3; i++) {
+      const bw = 12 + Math.floor(rng() * 22)
+      const bh = 8 + Math.floor(rng() * Math.max(6, h * 0.4))
+      const bx = x + Math.floor(rng() * Math.max(1, w - bw))
+      s.rect(bx, base - bh, bw, bh, sk)
+      if (rng() > 0.6) s.rect(bx + (bw >> 1), base - bh - 6, 1, 6, sk)
+    }
+    // 玻璃反光
+    for (let i = 0; i < 3; i++) {
+      const lx = x + 6 + rng() * Math.max(1, w - 12)
+      s.line(lx, y + 4, lx + 8, y + 16, mix(topC, PAL.white, 0.2), 1)
+    }
+    if (rng() > 0.72) {
+      const bx = x + w - 14 - rng() * 10
+      const by = y + 6 + rng() * 14
+      s.rect(bx, by, 8, 7, mix(ac, PAL.void, 0.55))
+      s.line(bx, by, bx + 5, by + 8, mix(ac, PAL.void, 0.5), 1)
+    }
+  } else {
+    s.rect(x, y, w, h, mix(wallHi, PAL.void, 0.58))
+    // 钉死的木板
+    for (let yy = y + 4; yy < y + h - 2; yy += 12) {
+      const bw = Math.min(w, 30 + Math.floor(rng() * 26))
+      s.rect(x + 1, yy, bw, 8, mix(wallHi, PAL.rustDark, 0.3))
+      s.rect(x + 1, yy, bw, 1, mix(wallHi, PAL.dust, 0.15))
+    }
+  }
+  // 窗棂 + 边框
+  s.rect(x + Math.floor(w / 2) - 1, y, 2, h, frame)
+  s.rect(x, y + Math.floor(h * 0.44), w, 2, frame)
+  s.rect(x, y, 2, h, frame)
+  s.rect(x + w - 2, y, 2, h, frame)
+  // 窗台 + 投影
+  s.rect(x - 4, y + h + 2, w + 8, 5, mix(wallHi, PAL.void, 0.22))
+  s.rect(x - 4, y + h + 2, w + 8, 1, mix(wallHi, PAL.white, 0.12))
+  s.dith(x - 2, y + h + 7, w + 4, 4, mix(wallHi, PAL.void, 0.3), 0.5)
+}
+
+function paintIndoor(s, o) {
+  const st = o.st
+  const ac = o.accent
+  const fam = o.family
+  const rng = mulberry32(o.seed ^ 0x3ac1)
+  const CEIL = 92
+  const WAIN = 340
+  const BASE = 452
+
+  const industrial =
+    fam === 'industrial' || fam === 'military' || fam === 'punk' || fam === 'tech' || fam === 'science'
+  const civic =
+    fam === 'civic' || fam === 'ancient' || fam === 'horror' || fam === 'gothic' || fam === 'anomaly'
+
+  const wallHi = mix(mix(st.far, st.horizon, 0.46), PAL.dust, 0.1)
+  const wallMid = mix(wallHi, PAL.void, 0.14)
+  const wallLo = mix(wallHi, PAL.void, 0.34)
+  const ceilC = mix(st.top, wallHi, 0.16)
+  const trim = mix(ac, PAL.void, 0.55)
+  const frame = mix(wallHi, PAL.void, 0.5)
+
+  // —— 顶棚：暗到略亮，横向梁 + 支架 ——
+  for (let y = 0; y < CEIL; y++) {
+    const t = y / (CEIL - 1)
+    const row = mix(mix(ceilC, PAL.void, 0.22), ceilC, t)
+    for (let x = 0; x < W; x++) {
+      const k = bayerAt(x, y)
+      s.set(x, y, k > 0.82 ? mix(row, PAL.dust, 0.1) : k < 0.18 ? mix(row, PAL.void, 0.16) : row)
+    }
+  }
+  const beamC = mix(ceilC, PAL.void, 0.42)
+  for (let x = 0; x < W; x += 4) {
+    s.rect(x, 40, 4, 12, beamC)
+    s.rect(x, 40, 4, 1, mix(beamC, PAL.white, 0.1))
+  }
+  for (let x = 34; x < W; x += 152) s.rect(x, 0, 7, 40, mix(beamC, PAL.void, 0.2))
+  // 顶棚管线（工业/科技更密）
+  const pipeN = industrial ? 3 : 1
+  for (let p = 0; p < pipeN; p++) {
+    const y = 62 + p * 6
+    const c = p % 2 ? mix(PAL.rust, wallHi, 0.45) : mix(wallHi, PAL.void, 0.28)
+    s.rect(0, y, W, 3, c)
+    s.rect(0, y, W, 1, mix(c, PAL.white, 0.12))
+    for (let x = 20; x < W; x += 116) {
+      s.rect(x, y - 2, 5, 7, mix(c, PAL.void, 0.2))
+      if (industrial) s.px(x + 2, y + 5, mix(ac, PAL.void, 0.4))
+    }
+  }
+  // 顶棚压边（与墙面分界）
+  s.rect(0, 84, W, 8, mix(ceilC, PAL.void, 0.3))
+  s.rect(0, 84, W, 1, mix(ceilC, PAL.white, 0.08))
+  s.rect(0, 91, W, 1, mix(PAL.void, wallHi, 0.12))
+
+  // —— 上半墙 ——
+  for (let y = CEIL; y < WAIN; y++) {
+    const t = (y - CEIL) / (WAIN - CEIL)
+    const row = mix(wallHi, wallMid, t)
+    for (let x = 0; x < W; x++) {
+      const k = bayerAt(x, y)
+      s.set(x, y, k > 0.86 ? mix(row, PAL.dust, 0.08) : k < 0.16 ? mix(row, PAL.void, 0.14) : row)
+    }
+  }
+  for (let x = 24; x < W; x += 128) {
+    s.rect(x, CEIL, 1, WAIN - CEIL, mix(wallMid, PAL.void, 0.2))
+    s.rect(x + 1, CEIL, 1, WAIN - CEIL, mix(wallMid, PAL.white, 0.05))
+  }
+  // 锈水痕
+  for (let i = 0; i < 26; i++) {
+    const x = rng() * W
+    const y = CEIL + rng() * 60
+    const len = 30 + rng() * 150
+    s.rect(x, y, 1 + rng() * 2, len, mix(wallMid, PAL.rustDark, 0.16 + rng() * 0.2))
+  }
+
+  // —— 窗（工业/军事为高窗小窗，民用为落地大窗）——
+  // 窗行必须落在屏幕可见的中段：贴图 y 越大越靠近地面，图底只到地面上方 6px。
+  const smallWin = industrial
+  const winW = smallWin ? 46 : 84
+  const winH = smallWin ? 58 : 110
+  const winY = smallWin ? 214 : 226
+  const step = winW + (smallWin ? 116 : 148)
+  let wx = 34 + Math.floor(rng() * 60)
+  for (let i = 0; i < 10 && wx + winW < W - 20; i++) {
+    // 前两扇必定出现，保证任何关都有可读的窗光
+    const show = i < 2 || rng() < (smallWin ? 0.68 : 0.9)
+    if (show) {
+      const lit = i < 2 ? rng() < 0.85 : rng() < 0.75
+      drawIndoorWindow(s, o, wx, winY, winW, winH, lit, rng, frame, wallHi)
+      // 亮窗下积尘光斑
+      if (lit) {
+        for (let j = 0; j < 70; j++) {
+          const yy = winY + winH + 8 + rng() * 110
+          const xx = wx + (rng() - 0.5) * (winW * 1.5)
+          s.px(xx, yy, mix(ac, PAL.dust, 0.4))
+        }
+      }
+    }
+    wx += step + Math.floor(rng() * 30)
+  }
+
+  // —— 墙面小物：海报 / 挂钟 / 通风口 ——
+  if (civic || fam === 'punk') {
+    const n = 2 + Math.floor(rng() * 3)
+    const paper = mix(PAL.dustLight, PAL.white, 0.32)
+    for (let i = 0; i < n; i++) {
+      const pw = 20 + Math.floor(rng() * 22)
+      const ph = 26 + Math.floor(rng() * 22)
+      const px0 = 20 + rng() * (W - 60)
+      const py0 = WAIN - 160 + rng() * 100
+      const ink = mix(ac, PAL.void, 0.34)
+      s.rect(px0 - 2, py0 - 2, pw + 4, ph + 4, mix(wallMid, PAL.void, 0.5))
+      s.rect(px0, py0, pw, ph, mix(paper, ac, 0.22))
+      s.rect(px0, py0, pw, 6, ink)
+      s.rect(px0 + 3, py0 + 10, pw - 8, 2, ink)
+      s.rect(px0 + 3, py0 + 15, pw - 15, 1, mix(ink, paper, 0.5))
+      s.rect(px0 + 4, py0 + 20, 6, 6, ink)
+      s.rect(px0 + 13, py0 + 20, 4, 4, mix(ink, paper, 0.3))
+      // 撕角 / 钉子
+      s.rect(px0 + pw - 5, py0 + ph - 5, 4, 4, mix(wallMid, PAL.void, 0.5))
+      s.px(px0 + 2, py0 + 2, mix(PAL.white, PAL.void, 0.35))
+      s.px(px0 + pw - 3, py0 + 2, mix(PAL.white, PAL.void, 0.35))
+    }
+  }
+  if (rng() > 0.45) {
+    const cx = 100 + rng() * (W - 200)
+    const cy = 210 + rng() * 60
+    s.disc(cx, cy, 15, mix(wallHi, PAL.void, 0.42))
+    s.disc(cx, cy, 12, mix(ac, PAL.dust, 0.35))
+    s.disc(cx, cy, 11, mix(wallMid, PAL.dust, 0.15))
+    s.line(cx, cy, cx, cy - 6, mix(PAL.void, wallMid, 0.2), 1)
+    s.line(cx, cy, cx + 4, cy + 2, mix(PAL.void, wallMid, 0.2), 1)
+    s.px(cx, cy, mix(PAL.void, wallMid, 0.2))
+  }
+  if (industrial) {
+    for (let i = 0; i < 3; i++) {
+      const vx = 40 + rng() * (W - 120)
+      const vy = CEIL + 24 + rng() * 56
+      const vw = 34
+      const vh = 20
+      s.rect(vx, vy, vw, vh, mix(wallMid, PAL.void, 0.3))
+      for (let yy = vy + 2; yy < vy + vh - 1; yy += 3) {
+        s.rect(vx + 2, yy, vw - 4, 1, mix(wallMid, PAL.void, 0.55))
+      }
+      s.rect(vx, vy, vw, 1, mix(wallMid, PAL.white, 0.08))
+    }
+  }
+
+  // —— 护墙板 + 腰线 ——
+  for (let y = WAIN; y < BASE; y++) {
+    const t = (y - WAIN) / (BASE - WAIN)
+    const row = mix(wallLo, mix(wallLo, PAL.void, 0.1), t)
+    for (let x = 0; x < W; x++) {
+      const k = bayerAt(x, y)
+      s.set(x, y, k > 0.9 ? mix(row, PAL.dust, 0.08) : k < 0.12 ? mix(row, PAL.void, 0.18) : row)
+    }
+  }
+  s.rect(0, WAIN, W, 3, trim)
+  s.rect(0, WAIN, W, 1, mix(trim, PAL.white, 0.14))
+  s.rect(0, WAIN + 3, W, 1, mix(PAL.void, wallLo, 0.15))
+  for (let y = WAIN + 22; y < BASE; y += 18) {
+    s.rect(0, y, W, 1, mix(wallLo, PAL.void, 0.28))
+    s.rect(0, y + 1, W, 1, mix(wallLo, PAL.white, 0.05))
+  }
+  if (industrial) {
+    // 警示斜条（断续，避免整条纯色）
+    for (let i = 0; i < 5; i++) {
+      const sx = rng() * W
+      const sw = 70 + rng() * 90
+      for (let xx = sx; xx < sx + sw; xx++) {
+        const band = ((xx - sx + 8) % 16) < 8
+        if (bayerAt(xx, WAIN + 8) > 0.25) {
+          s.rect(xx, WAIN + 6, 1, 8, band ? mix(ac, PAL.void, 0.4) : mix(PAL.void, wallLo, 0.2))
+        }
+      }
+    }
+  }
+
+  // —— 踢脚 + 地砖 ——
+  s.rect(0, BASE - 8, W, 8, mix(wallLo, PAL.void, 0.35))
+  s.rect(0, BASE - 8, W, 1, mix(wallLo, PAL.white, 0.1))
+  const deep = mix(st.ground, PAL.void, 0.4)
+  for (let y = BASE; y < H; y++) {
+    const t = (y - BASE) / (H - BASE)
+    const row = mix(mix(st.ground, PAL.dust, 0.12), deep, t)
+    for (let x = 0; x < W; x++) s.set(x, y, row)
+  }
+  for (let r = 0, y = BASE; y < H + 22; r++, y += 22) {
+    const off = r % 2 ? 22 : 0
+    s.rect(0, y, W, 1, mix(deep, PAL.void, 0.24))
+    for (let xx = off; xx < W; xx += 44) {
+      s.rect(xx, y, 1, 22, mix(deep, PAL.void, 0.3))
+      if (hash2(xx, r, o.seed) > 0.55) s.rect(xx + 3, y + 3, 36, 1, mix(deep, PAL.dust, 0.1))
+    }
+  }
+
+  // —— 空气感：尘埃 + 两侧压暗 ——
+  for (let i = 0; i < 240; i++) {
+    const xx = rng() * W
+    const yy = CEIL + rng() * (H - CEIL)
+    s.px(xx, yy, mix(ac, PAL.dustLight, 0.4))
+  }
+  for (let x = 0; x < 48; x++) {
+    const dens = (1 - x / 48) * 0.3
+    for (let y = 0; y < H; y++) if (bayerAt(x, y) < dens) s.px(x, y, mix(wallLo, PAL.void, 0.4))
+  }
+  for (let x = W - 48; x < W; x++) {
+    const dens = ((x - (W - 48)) / 48) * 0.3
+    for (let y = 0; y < H; y++) if (bayerAt(x, y) < dens) s.px(x, y, mix(wallLo, PAL.void, 0.4))
+  }
+
+  s.tint(PAL.void, 0.07)
+  s.tint(ac, 0.015)
+  liftDarkPixels(s)
 }
 
 /* ============================================================================
@@ -3010,6 +3287,50 @@ export function getThemeBackdrop(themeId) {
   tex.userData.family = family
   tex.userData.water = o.water
   CACHE.set(themeId, tex)
+  return tex
+}
+
+/**
+ * 关卡背景：非主题房间按 scene.painter 复用对应主题地标画法，
+ * 再用本关 accent 给天空 / 雾 / 地面染色，并用 roomId 做随机种子。
+ * 同一画家在不同关卡也会呈现不同的天色与轮廓分布。
+ */
+export function getSceneBackdrop(roomId) {
+  if (!roomId) return null
+  const key = 'scene:' + roomId
+  const hit = CACHE.get(key)
+  if (hit) return hit
+  const scene = getRoomScene(roomId)
+  if (!scene) return null
+  const painter = scene.painter || 'highway'
+  const family = FAMILY_BY_ID[painter] || 'city'
+  const accentHex = '#' + (scene.accent >>> 0).toString(16).padStart(6, '0')
+  const base = STYLE[family] || STYLE.city
+  const st = {}
+  for (const k of ['top', 'horizon', 'far', 'mid', 'ground', 'fog']) {
+    st[k] = mix(base[k], accentHex, 0.09)
+  }
+  const o = {
+    theme: { id: painter, variant: 'scene', name: roomId },
+    family,
+    st,
+    accent: accentHex,
+    seed: strSeed(roomId + '|' + painter),
+    water: WATER_IDS.has(painter) || scene.arch === 'basin',
+  }
+  const s = new Surf(W, H, o.seed, 'backdrop')
+  if (scene.indoor) paintIndoor(s, o)
+  else paintTheme(s, o, family)
+  const tex = s.tex(2)
+  tex.name = 'scene-backdrop:' + roomId
+  tex.wrapS = THREE.RepeatWrapping
+  tex.wrapT = THREE.ClampToEdgeWrapping
+  tex.userData.themeId = null
+  tex.userData.sceneId = roomId
+  tex.userData.indoor = !!scene.indoor
+  tex.userData.family = family
+  tex.userData.water = o.water
+  CACHE.set(key, tex)
   return tex
 }
 

@@ -92,6 +92,9 @@ export const A = {
     const g = game()
     safe(() => g?.markArchiveRead(id))
   },
+  selectMonster(id) {
+    G.ui.selectedMonster = id
+  },
 
   // —— 对话 ——
   chooseDialogue(i) {

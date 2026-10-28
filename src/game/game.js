@@ -42,6 +42,7 @@ import { bindGame } from './ui-actions.js'
 import { addXp, initGrowth, spendGrowth as applyGrowthPoint } from './systems/growth.js'
 import { injectEasterEggs, handleEgg } from './world/easter-eggs.js'
 import { getTheme } from './world/themes.js'
+import { getRoomScene } from './world/scene-data.js'
 import { getProp } from './world/props-data.js'
 import { createChaosAI } from './systems/chaos-ai.js'
 import { createLighting } from './systems/lighting.js'
@@ -419,6 +420,12 @@ export class Game {
     gen.biome = spec.biome || regionBiome
     gen.label = spec.label || roomId
     this.applyThemeRoom(gen, spec)
+    // 普通关卡的环境（雾 / 暗）由关卡场景提供；主题房已有自己的 env
+    const scene = spec.theme ? null : getRoomScene(roomId)
+    if (scene) {
+      gen.sceneId = roomId
+      if (scene.env) gen.env = { ...(gen.env || {}), ...scene.env }
+    }
     this.ensureQuestItems(gen, regionId, roomId)
     try {
       decorateTerrain(gen)

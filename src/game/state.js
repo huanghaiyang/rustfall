@@ -123,7 +123,7 @@ export const G = reactive({
 
   // UI
   ui: {
-    panel: null, // inventory | quests | archive | mods | help | chassis | map | growth | level
+    panel: null, // inventory | quests | archive | mods | help | chassis | map | growth | level | bestiary
     inventoryTab: 'all',
     levelRegion: null,
     padCapture: false,
@@ -131,6 +131,7 @@ export const G = reactive({
     selectedItem: null,
     selectedQuest: null,
     selectedArchive: null,
+    selectedMonster: null,
     toolBeltOpen: false,
     stack: [],
     showCompass: false,

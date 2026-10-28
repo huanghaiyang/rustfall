@@ -29,6 +29,7 @@ import {
   layerBands,
   countChannels as countChannelsOf,
 } from './features.js'
+import { applyScene } from '../scene-terrain.js'
 
 // 四个 biome 与自检脚本都从本模块取这些基础工具，这里统一再导出
 export { clamp }
@@ -1825,6 +1826,12 @@ export function placeExtras(ctx) {
 /** 组装最终契约对象 */
 export function buildRoom(ctx, extra = {}) {
   const { w, h, spec } = ctx
+  // 关卡场景：按房间名施工专属地形骨架 + 标志性放置物（只往空气里加结构）
+  try {
+    applyScene(ctx)
+  } catch (e) {
+    ctx.notes.push({ type: 'gen-error', where: 'scene', error: String(e && e.message ? e.message : e) })
+  }
   // 兜底：保证 3 层站立面 / 2 个竖向通道 / 1 个隐藏壁龛（不移动已有地面）
   let qualityFallback = null
   try {

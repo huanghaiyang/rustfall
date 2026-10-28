@@ -20,6 +20,7 @@ import DayNightHud from './components/DayNightHud.vue'
 import GamepadHint from './components/GamepadHint.vue'
 import ModManager from './components/panels/ModManager.vue'
 import ArchivePanel from './components/panels/ArchivePanel.vue'
+import BestiaryPanel from './components/panels/BestiaryPanel.vue'
 import ToolBelt from './components/panels/ToolBelt.vue'
 import NotificationFeed from './components/panels/NotificationFeed.vue'
 import CompanionPanel from './components/panels/CompanionPanel.vue'
@@ -139,6 +140,9 @@ if (import.meta.hot) {
     <div v-if="G.ui.panel === 'archive'" class="overlay z-panel">
       <ArchivePanel />
     </div>
+    <div v-if="G.ui.panel === 'bestiary'" class="overlay z-panel">
+      <BestiaryPanel />
+    </div>
     <div v-if="G.ui.panel === 'mods'" class="overlay z-panel">
       <ModManager />
     </div>
@@ -169,6 +173,7 @@ if (import.meta.hot) {
       @settings="A.openPanel('settings')"
       @help="A.openPanel('help')"
       @levels="A.openPanel('level')"
+      @bestiary="A.openPanel('bestiary')"
     />
 
     <div v-if="showChassisPicker || G.phase === 'chassis'" class="overlay z-chassis">
@@ -184,6 +189,7 @@ if (import.meta.hot) {
       @settings="A.openPanel('settings')"
       @quests="A.openPanel('quests')"
       @archive="A.openPanel('archive')"
+      @bestiary="A.openPanel('bestiary')"
       @companions="A.openPanel('companions')"
       @growth="A.openPanel('growth')"
       @levels="A.openPanel('level')"

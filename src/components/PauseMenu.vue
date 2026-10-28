@@ -12,6 +12,7 @@ defineEmits([
   'volume',
   'quests',
   'archive',
+  'bestiary',
   'companions',
   'growth',
   'levels',
@@ -54,6 +55,7 @@ defineEmits([
         <button class="btn primary" @click="$emit('resume')">继 续</button>
         <button class="btn" @click="$emit('quests')">任 务</button>
         <button class="btn" @click="$emit('archive')">档 案</button>
+        <button class="btn" @click="$emit('bestiary')">图 鉴</button>
         <button class="btn" @click="$emit('companions')">同 伴</button>
         <button class="btn" @click="$emit('growth')">成 长</button>
         <button class="btn" @click="$emit('help')">操 作</button>

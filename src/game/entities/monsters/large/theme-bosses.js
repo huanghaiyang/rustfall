@@ -1169,7 +1169,8 @@ for (const cfg of THEME_BOSS_DEFS) {
     xp: 240,
     gravity: 2000,
     elite: true,
-    artId: cfg.artId,
+    // 每只 BOSS 用自己 id 取名独占立绘（render/art/theme-boss-art.js），不再复用旧大怪 artId
+    artId: cfg.id,
     accent: cfg.accent,
     moves: cfg.moves,
     summonIds: cfg.summonIds,

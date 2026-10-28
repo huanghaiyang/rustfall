@@ -19,6 +19,7 @@
 
 import { PAL } from '../palette.js'
 import { Surf, mix, shade, mulberry32 } from './core.js'
+import { THEME_BOSS_LARGE_DEFS } from './theme-boss-art.js'
 
 const TAU = Math.PI * 2
 
@@ -852,8 +853,13 @@ const LARGE_WARM = {
   esper_berserk: PAL.toxicDark,
 }
 
+/** 大怪美术定义：7 只固有大型敌人 + 51 只主题 BOSS（各自独占立绘）。 */
+function largeDefOf(id) {
+  return LARGE_DEFS[id] || THEME_BOSS_LARGE_DEFS[id] || null
+}
+
 function largeFrame(id, P) {
-  const def = LARGE_DEFS[id]
+  const def = largeDefOf(id)
   const s = new Surf(def.w, def.h, def.seed + (P.i || 0) * 41, 'large-monsters')
   P.g = []
   def.draw(s, P)
@@ -865,8 +871,8 @@ function largeFrame(id, P) {
     if (s.a(x, y) < 200) continue
     s.px(x, y, r() < 0.5 ? PAL.rustDark : PAL.dust, 0.9)
   }
-  s.edges(mix(PAL.white, LARGE_WARM[id], 0.5), PAL.void, 0.3, 0.45)
-  s.outline(LARGE_OUTLINE[id])
+  s.edges(mix(PAL.white, def.warm || LARGE_WARM[id], 0.5), PAL.void, 0.3, 0.45)
+  s.outline(def.outline || LARGE_OUTLINE[id])
   if (P.hurt) {
     s.tint(PAL.neonRed, 0.26, true)
     for (let k = 0; k < 14; k++) {
@@ -880,11 +886,11 @@ function largeFrame(id, P) {
 
 /** 大型死亡帧：k=0 崩塌中 / k=1 彻底垮成一堆。 */
 function largeDead(id, k) {
-  const def = LARGE_DEFS[id]
+  const def = largeDefOf(id)
   const s = new Surf(def.w, def.h, def.seed + 300 + k * 23, 'large-monsters')
   const g = s.h - 1
   const cx = def.w * 0.46
-  const warm = LARGE_WARM[id]
+  const warm = def.warm || LARGE_WARM[id]
   const body = mix(PAL.ashPale, warm, 0.35)
   const bodyD = mix(body, PAL.void, 0.4)
   s.shadow(cx, g - 2, def.w * 0.34, 4, 0.7)
@@ -909,7 +915,7 @@ function largeDead(id, k) {
   }
   s.speck(0, 0, s.w, s.h, PAL.rustDark, 0.05, 0.8)
   s.edges(mix(PAL.white, warm, 0.4), PAL.void, 0.28, 0.45)
-  s.outline(LARGE_OUTLINE[id])
+  s.outline(def.outline || LARGE_OUTLINE[id])
   s.tint(PAL.void, k === 0 ? 0.16 : 0.24, true)
   s.glow(cx + 4, g - h * 0.4, 10, PAL.neonWarm, 0.9)
   return s.tex()
@@ -918,8 +924,8 @@ function largeDead(id, k) {
 const LARGE_CACHE = new Map()
 
 function buildLarge(id) {
-  const key = LARGE_DEFS[id] ? id : 'junk_golem'
-  const def = LARGE_DEFS[key]
+  const key = largeDefOf(id) ? id : 'junk_golem'
+  const def = largeDefOf(key)
   const frames = {
     idle: [largeFrame(key, { anim: 'idle', i: 0 }), largeFrame(key, { anim: 'idle', i: 1 })],
     move: [0, 1, 2].map((i) => largeFrame(key, { anim: 'move', i })),
@@ -944,6 +950,19 @@ export function getLargeMonsterArt(id) {
   return art
 }
 
+const LARGE_IDLE_CACHE = new Map()
+
+/** 单帧 idle 立绘：图鉴 / 列表用，避免为每只 BOSS 预构建整套帧。 */
+export function getLargeMonsterIdle(id) {
+  const key = largeDefOf(id) ? String(id || '') : 'junk_golem'
+  let tex = LARGE_IDLE_CACHE.get(key)
+  if (!tex) {
+    tex = largeFrame(key, { anim: 'idle', i: 0 })
+    LARGE_IDLE_CACHE.set(key, tex)
+  }
+  return tex
+}
+
 /** 预载 4 种大型敌人。 */
 export function preloadLargeArt() {
   for (const id of LARGE_MONSTER_IDS) getLargeMonsterArt(id)
@@ -953,5 +972,6 @@ export function preloadLargeArt() {
 /** 清缓存。 */
 export function clearLargeMonsterCache() {
   LARGE_CACHE.clear()
+  LARGE_IDLE_CACHE.clear()
 }
 

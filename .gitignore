@@ -3,6 +3,7 @@ dist/
 .npm-cache/
 .chrome-profile/
 *.log
+*.out.txt
 .DS_Store
 # 生成物 / 截图不入库（可用 scripts 重新生成）
 screenshots/
