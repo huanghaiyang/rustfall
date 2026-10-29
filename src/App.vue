@@ -27,6 +27,8 @@ import CompanionPanel from './components/panels/CompanionPanel.vue'
 import GrowthPanel from './components/panels/GrowthPanel.vue'
 import LevelPicker from './components/panels/LevelPicker.vue'
 import BossTestPanel from './components/panels/BossTestPanel.vue'
+import SpriteEditorPanel from './components/panels/SpriteEditor/SpriteEditorPanel.vue'
+import RoomEditorPanel from './components/panels/RoomEditor/RoomEditorPanel.vue'
 import { installGamepadUi } from './game/gamepad-ui.js'
 import { loadBossPortraits } from './game/render/art/boss-portraits.js'
 
@@ -173,6 +175,12 @@ if (import.meta.hot) {
     <div v-if="G.ui.panel === 'help'" class="overlay z-panel">
       <HelpOverlay @close="A.closePanel()" />
     </div>
+    <div v-if="G.ui.panel === 'sprite_editor'" class="overlay z-panel">
+      <SpriteEditorPanel @close="A.closePanel()" />
+    </div>
+    <div v-if="G.ui.panel === 'room_editor'" class="overlay z-panel">
+      <RoomEditorPanel @close="A.closePanel()" />
+    </div>
 
     <TitleScreen
       v-if="G.phase === 'title' && !showChassisPicker && !G.ui.panel"
@@ -187,6 +195,8 @@ if (import.meta.hot) {
       @levels="A.openPanel('level')"
       @boss-test="A.openPanel('boss_test')"
       @bestiary="A.openPanel('bestiary')"
+      @sprite-editor="A.openPanel('sprite_editor')"
+      @room-editor="A.openPanel('room_editor')"
     />
 
     <div v-if="showChassisPicker || G.phase === 'chassis'" class="overlay z-chassis">
@@ -207,6 +217,8 @@ if (import.meta.hot) {
       @growth="A.openPanel('growth')"
       @levels="A.openPanel('level')"
       @boss-test="A.openPanel('boss_test')"
+      @sprite-editor="A.openPanel('sprite_editor')"
+      @room-editor="A.openPanel('room_editor')"
       @restart="A.restartRun"
       @title="onTitle"
       @mute="A.toggleMute"

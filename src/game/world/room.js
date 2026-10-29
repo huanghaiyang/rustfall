@@ -214,9 +214,65 @@ export class Room {
       addLandscape(art?.near, 0.48, 0x6a5c4a, 0.98, 0)
     }
 
+    // 房间编辑器的自定义背景层叠加在 biome 背景之上
+    this.buildUserBgLayers(group, layers)
+
     this.bgLayers = layers
     this.buildSkyLayers(group)
     return group
+  }
+
+  /**
+   * 房间编辑器写入的自定义背景层（localStorage rustfall.bgedits.v1）。
+   * 层结构：{ id, name, parallax, opacity, tint, yOff, img:{ src(dataURL), w, h, x, y(tile), scale } }
+   * user 标记的层在 updateBackground 走锚点分支：parallax 0=贴近地形，1=锁定镜头。
+   */
+  buildUserBgLayers(group, layers) {
+    let table = null
+    try {
+      table = JSON.parse(localStorage.getItem('rustfall.bgedits.v1') || '{}')
+    } catch (e) {
+      table = null
+    }
+    const list = table?.[`${this.data.regionId}:${this.data.roomId}`]?.layers
+    if (!Array.isArray(list) || !list.length) return
+    for (const l of list) {
+      if (!l?.img?.src) continue
+      const scale = Math.max(0.05, l.img.scale || 1)
+      const w = Math.max(1, (l.img.w || 1) * scale)
+      const h = Math.max(1, (l.img.h || 1) * scale)
+      const tex = new THREE.Texture()
+      tex.wrapS = THREE.ClampToEdgeWrapping
+      tex.wrapT = THREE.ClampToEdgeWrapping
+      const img = new Image()
+      img.onload = () => {
+        tex.image = img
+        tex.needsUpdate = true
+      }
+      img.src = l.img.src
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        opacity: Math.max(0, Math.min(1, l.opacity ?? 1)),
+        color: new THREE.Color(l.tint || '#ffffff'),
+        depthWrite: false,
+        toneMapped: false,
+      })
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat)
+      const cx0 = (l.img.x || 0) * TS
+      const cy0 = (l.img.y || 0) * TS
+      mesh.position.set(cx0, -(cy0 + (l.yOff || 0)), Z.far)
+      group.add(mesh)
+      layers.push({
+        mesh,
+        p: Math.max(0, Math.min(1, l.parallax ?? 0.6)),
+        mat,
+        texW: w,
+        texH: h,
+        yOff: l.yOff || 0,
+        user: { x: cx0, y: cy0 },
+      })
+    }
   }
 
   /** 日夜天空：渐变底 + 星野 + 三层云 + 天气幕 */
@@ -499,6 +555,13 @@ export class Room {
       if (l.sky) {
         l.mesh.position.x = cx
         l.mesh.position.y = cy - 220
+        continue
+      }
+      if (l.user) {
+        // 自定义背景层：锚定世界坐标，p=0 与地形同步，p→1 逐渐锁定镜头
+        l.mesh.position.x = l.user.x * (1 - l.p) + cx * l.p
+        l.mesh.position.z = Z.far + (1 - l.p) * 40
+        l.mesh.position.y = -(l.user.y + l.yOff) - (cy + this.bgBaseY) * 0.04
         continue
       }
       l.mesh.position.x = cx * l.p

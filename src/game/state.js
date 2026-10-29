@@ -123,7 +123,7 @@ export const G = reactive({
 
   // UI
   ui: {
-    panel: null, // inventory | quests | archive | mods | help | chassis | map | growth | level | bestiary
+    panel: null, // inventory | quests | archive | mods | help | chassis | map | growth | level | bestiary | sprite_editor
     inventoryTab: 'all',
     levelRegion: null,
     padCapture: false,

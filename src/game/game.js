@@ -128,6 +128,9 @@ export class Game {
     this.lastShelter = { regionId: 'city', roomId: 'city_shelter' }
     this.roomCache = new Map()
     this.terrainEdits = loadTerrainEdits()
+    // 房间编辑器在运行中改动地形 → 热更新到当前房间
+    this._onTerrainPatch = (e) => this.applyTerrainPatch(e.detail)
+    window.addEventListener('rustfall:terrain-patch', this._onTerrainPatch)
     this.hintShelter = false
     this.hintFull = false
     this.scanFx = []
@@ -1042,7 +1045,7 @@ export class Game {
       G.ui.panel = G.ui.panel === 'help' ? null : 'help'
       this.sfx('uiClick')
     }
-    if (input.wasPressed('pause')) {
+    if (input.wasPressed('pause') && G.ui.panel !== 'sprite_editor') {
       if (G.phase === 'playing' && G.dialogue.active) {
         this.dialogue.close()
         this.sfx('uiClick')
@@ -2630,6 +2633,29 @@ export class Game {
     writeTerrainEdits(this.terrainEdits)
   }
 
+  /**
+   * 房间编辑器热补丁：编辑器改了某格地形后立刻生效，
+   * 不用等下次进房（同时写回 localStorage，避免存档时把编辑器的改动覆盖掉）。
+   */
+  applyTerrainPatch(detail) {
+    if (!detail?.key || !detail.tiles) return
+    if (detail.clear) {
+      delete this.terrainEdits[detail.key]
+      writeTerrainEdits(this.terrainEdits)
+      this.roomCache.delete(detail.key)
+      return
+    }
+    const edit = { ...(this.terrainEdits[detail.key] || {}), ...detail.tiles }
+    this.terrainEdits[detail.key] = edit
+    writeTerrainEdits(this.terrainEdits)
+    const cached = this.roomCache.get(detail.key)
+    if (!cached?.map) return
+    for (const [tile, type] of Object.entries(detail.tiles)) {
+      const [tx, ty] = tile.split(',').map(Number)
+      cached.map.set(tx, ty, type)
+    }
+  }
+
   // ================================================================ 扫描特效
   scanPulseFx(x, y) {
     const mat = new THREE.MeshBasicMaterial({
@@ -2669,6 +2695,7 @@ export class Game {
   dispose() {
     cancelAnimationFrame(this.raf)
     window.removeEventListener('resize', this.onResize)
+    window.removeEventListener('rustfall:terrain-patch', this._onTerrainPatch)
     this.input.detach()
     if (this.room) {
       this.room.dispose()
