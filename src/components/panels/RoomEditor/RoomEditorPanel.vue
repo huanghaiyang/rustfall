@@ -17,6 +17,10 @@ import {
   tileEditCount,
   propCount,
   bgLayerCount,
+  projectStatus,
+  publish,
+  setDraft,
+  isDraft,
 } from '../../../game/editor/room-store.js'
 import RoomCanvas from './RoomCanvas.vue'
 import RoomInspector from './RoomInspector.vue'
@@ -154,9 +158,17 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="rm-group">
+        <!-- 状态徽标 -->
+        <span class="rm-status" :class="isDraft() ? 'draft' : 'published'">
+          <span class="rm-status-dot" />
+          {{ isDraft() ? '草稿' : '已发布' }}
+        </span>
         <button class="rm-btn" @click="projInput?.click()">导入工程</button>
         <button class="rm-btn" @click="onExport">导出工程</button>
-        <button class="rm-btn primary" @click="saveProject()">保存</button>
+        <!-- 草稿模式 → 主按钮「发布」；已发布 → 次按钮「保存草稿」 -->
+        <button v-if="isDraft()" class="rm-btn primary" @click="publish()" :title="'把当前草稿一次性推送到游戏运行时'">发布</button>
+        <button v-else class="rm-btn" @click="setDraft()" :title="'切到草稿模式，后续编辑不影响游戏运行时'">保存草稿</button>
+        <button class="rm-btn" @click="saveProject()">保存工程</button>
         <button class="rm-btn danger" @click="onClearAll">清空全部</button>
       </div>
 
@@ -306,6 +318,39 @@ onBeforeUnmount(() => {
 .rm-btn.danger:hover {
   border-color: var(--c-danger, #c8553f);
   color: var(--c-danger, #c8553f);
+}
+.rm-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 2px;
+  font-size: 11px;
+  border: 1px solid;
+  margin-right: 6px;
+  font-family: inherit;
+}
+.rm-status.published {
+  border-color: var(--c-neon, #6ff0d0);
+  color: var(--c-neon, #6ff0d0);
+  background: rgba(111, 240, 208, 0.08);
+}
+.rm-status.draft {
+  border-color: var(--c-bone-dark, #8a8272);
+  color: var(--c-bone-dark, #8a8272);
+  background: rgba(138, 130, 114, 0.08);
+}
+.rm-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.rm-status.published .rm-status-dot {
+  background: var(--c-neon, #6ff0d0);
+  box-shadow: 0 0 4px var(--c-neon, #6ff0d0);
+}
+.rm-status.draft .rm-status-dot {
+  background: var(--c-bone-dark, #8a8272);
 }
 .rm-tools {
   border-left: 1px solid var(--c-steel, #3a444b);

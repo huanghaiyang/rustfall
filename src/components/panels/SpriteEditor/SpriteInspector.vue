@@ -21,6 +21,8 @@ import {
   applyFamilyShapes,
   ROLE_LIST,
   MONSTER_LIST,
+  BOSS_LIST,
+  findEntityDef,
   SPRITE_FAMILIES,
   saveProject,
 } from '../../../game/editor/sprite-store.js'
@@ -40,6 +42,14 @@ const parentOptions = computed(() => {
   if (!sprite.value || !bone.value) return []
   return sprite.value.bones.filter((b) => b.id !== bone.value.id)
 })
+
+/** 当前绑定参考（怪物侧含 BOSS） */
+const refInfo = computed(() =>
+  sprite.value?.refId ? findEntityDef(sprite.value.kind, sprite.value.refId) : null
+)
+const refIsBoss = computed(() => !!refInfo.value?.boss)
+const refIsElite = computed(() => !!refInfo.value?.def?.elite)
+const refHitbox = computed(() => refInfo.value?.def?.hitbox || [])
 
 function commit() {
   saveProject()
@@ -148,14 +158,19 @@ function applyBoth() {
                 {{ m.name }} · {{ m.id }} {{ m.elite ? '★' : '' }}
               </option>
             </optgroup>
+            <optgroup v-if="sprite.kind === 'monster'" label="BOSS">
+              <option v-for="b in BOSS_LIST" :key="b.id" :value="b.id">
+                {{ b.name }} · {{ b.id }} ★
+              </option>
+            </optgroup>
           </select>
         </div>
         <div class="si-hint" v-if="sprite.refId && sprite.kind === 'role'">
           参考机体命中箱 {{ (ROLE_LIST.find((r) => r.id === sprite.refId)?.hitbox || []).join('×') }}
         </div>
         <div class="si-hint" v-if="sprite.refId && sprite.kind === 'monster'">
-          参考怪物 {{ MONSTER_LIST.find((m) => m.id === sprite.refId)?.elite ? '精英' : '普通' }} ·
-          命中箱 {{ (MONSTER_LIST.find((m) => m.id === sprite.refId)?.hitbox || []).join('×') || '—' }}
+          参考怪物 {{ refIsBoss ? 'BOSS' : (refIsElite ? '精英' : '普通') }} ·
+          命中箱 {{ (refHitbox || []).join('×') || '—' }}
         </div>
         <div class="si-tpl-btns">
           <button class="se-btn se-tpl-btn" @click="applyBones" :disabled="sprite.family === 'unknown'">套用骨骼模板</button>

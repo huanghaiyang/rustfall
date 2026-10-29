@@ -21,6 +21,8 @@
 
 import { reactive } from 'vue'
 import Content, { KIND } from '../core/registry.js'
+import { MONSTER_IDS } from '../entities/monsters/index.js'
+import { LARGE_IDS } from '../entities/monsters/large/index.js'
 
 const KEY = 'rustfall.spriteeditor.v1'
 
@@ -259,15 +261,28 @@ function _fillRegistry() {
         artId: c.artId || c.id,
       })
     }
+    const mkMonster = (m, boss) => ({
+      id: m.id,
+      name: m.name || m.id,
+      biome: m.biome || [],
+      elite: !!m.elite,
+      boss,
+      hitbox: m.hitbox || m.size || [20, 24],
+    })
+    const all = Content.all(KIND.MONSTER)
+    const byId = new Map(all.map((m) => [m.id, m]))
     MONSTER_LIST.length = 0
-    for (const m of Content.all(KIND.MONSTER)) {
-      MONSTER_LIST.push({
-        id: m.id,
-        name: m.name || m.id,
-        biome: m.biome || [],
-        elite: !!m.elite,
-        hitbox: m.hitbox || [20, 24],
-      })
+    BOSS_LIST.length = 0
+    // 常规小怪（按官方顺序）；rm_* 是关卡专属小怪（几百条），不入列
+    for (const id of MONSTER_IDS) {
+      if (id.startsWith('rm_')) continue
+      const m = byId.get(id)
+      if (m) MONSTER_LIST.push(mkMonster(m, false))
+    }
+    // 大型 / BOSS（含主题站 BOSS tb_*）
+    for (const id of LARGE_IDS) {
+      const m = byId.get(id)
+      if (m) BOSS_LIST.push(mkMonster(m, true))
     }
     _registryLoaded = true
   } catch (e) {
@@ -276,11 +291,14 @@ function _fillRegistry() {
 }
 
 let _registryLoaded = false
-export const ROLE_LIST = []  // { id, name, family, hitbox:[w,h], color, artId }
-export const MONSTER_LIST = []  // { id, name, biome, elite, hitbox:[w,h] }
+// 用 reactive 数组：注册表可能在模块初始化之后才填充完，
+// loadRegistry() 重填时左栏列表需要跟着刷新。
+export const ROLE_LIST = reactive([])  // { id, name, family, hitbox:[w,h], color, artId }
+export const MONSTER_LIST = reactive([])  // { id, name, biome, elite, boss:false, hitbox:[w,h] }
+export const BOSS_LIST = reactive([])  // { id, name, biome, elite, boss:true, hitbox:[w,h] }
 
 export function loadRegistry() {
-  if (_registryLoaded) return
+  // 允许重复填充：模块初始化时注册表可能还没就绪（chassis 由 content 总入口注册）
   _fillRegistry()
 }
 // ESM 初始化时立刻填充一次
@@ -290,12 +308,15 @@ export function registryIsLoaded() { return _registryLoaded }
 
 /** 根据 refId + kind 自动猜测 family */
 export function guessFamilyFromRef(kind, refId) {
-  const list = kind === 'role' ? ROLE_LIST : MONSTER_LIST
-  const def = list.find((d) => d.id === refId)
-  if (!def) return null
   if (kind === 'role') {
+    const def = ROLE_LIST.find((d) => d.id === refId)
+    if (!def) return null
     return FAMILY_FROM_CHASSIS[def.family] || 'biped'
   }
+  // 怪物：BOSS 一律 boss 族
+  if (BOSS_LIST.some((d) => d.id === refId)) return 'boss'
+  const def = MONSTER_LIST.find((d) => d.id === refId)
+  if (!def) return null
   // 怪物：按 id 关键字归类
   const id = def.id.toLowerCase()
   if (id.includes('fly') || id.includes('wing') || id.includes('drone')) return 'flyer'
@@ -305,10 +326,15 @@ export function guessFamilyFromRef(kind, refId) {
   return 'minion'
 }
 
+const STATUS = { PUBLISHED: 'published', DRAFT: 'draft' }
+
 function emptyProject() {
   return {
-    version: 1,
+    version: 2,
     name: '未命名工程',
+    status: STATUS.PUBLISHED,
+    updatedAt: null,
+    publishedAt: null,
     sheets: [],
     sprites: [],
     effects: [],
@@ -328,6 +354,8 @@ export const SE = reactive({
     shapeId: '',
     effectId: '',
     tool: 'select', // select | frame | bone | rect | circle | poly | grip | cast
+    /** 当前选中的游戏内目标（角色 / 怪物 / BOSS）——先选目标再导入精灵图 */
+    target: { kind: '', refId: '', boss: false },
   },
   view: {
     zoom: 1,
@@ -445,6 +473,7 @@ export function boneTransforms(sprite, pose) {
 
 export function saveProject() {
   try {
+    SE.project.updatedAt = new Date().toISOString()
     localStorage.setItem(KEY, JSON.stringify(SE.project))
     return true
   } catch (e) {
@@ -461,6 +490,10 @@ export function loadProject() {
     if (!data || !Array.isArray(data.sheets)) return false
     const p = emptyProject()
     p.name = data.name || p.name
+    // 向后兼容：旧工程没有 status，按 published 处理
+    p.status = data.status || STATUS.PUBLISHED
+    p.updatedAt = data.updatedAt || null
+    p.publishedAt = data.publishedAt || null
     p.sheets = (data.sheets || []).map((s) => ({
       id: s.id || uid('sh'),
       name: s.name || '精灵图',
@@ -696,10 +729,10 @@ export function addSprite(sheetId, rect, opts = {}) {
   let familyFinal = family
   let refId = opts.refId || ''
   if (opts.refId) {
-    familyFinal = guessFamilyFromRef(kind, opts.refId) || family
-    const list = kind === 'role' ? ROLE_LIST : MONSTER_LIST
-    const def = list.find((d) => d.id === opts.refId)
-    if (def) {
+    const found = findEntityDef(kind, opts.refId)
+    familyFinal = opts.family || guessFamilyFromRef(kind, opts.refId) || family
+    if (found) {
+      const def = found.def
       name = def.name || name
       if (def.hitbox) { w = def.hitbox[0] || w; h = def.hitbox[1] || h }
     }
@@ -742,6 +775,87 @@ export function removeSprite(id) {
 }
 
 // ============================================================================
+// 目标选择（角色 / 怪物 / BOSS → 先选目标，再上传精灵图）
+// ============================================================================
+
+/** 按 kind + refId 找实体定义（怪物侧含 BOSS 列表） */
+export function findEntityDef(kind, refId) {
+  if (!refId) return null
+  if (kind === 'role') {
+    const d = ROLE_LIST.find((x) => x.id === refId)
+    return d ? { def: d, boss: false } : null
+  }
+  const m = MONSTER_LIST.find((x) => x.id === refId)
+  if (m) return { def: m, boss: false }
+  const b = BOSS_LIST.find((x) => x.id === refId)
+  if (b) return { def: b, boss: true }
+  return null
+}
+
+/** 某 refId 是否是 BOSS */
+export function isBossRef(refId) {
+  return !!BOSS_LIST.find((x) => x.id === refId)
+}
+
+/** 左栏分组（角色 / 怪物 / BOSS） */
+export function targetGroups() {
+  return [
+    { id: 'role', name: '角色', en: 'ROLES', kind: 'role', boss: false, items: ROLE_LIST },
+    { id: 'monster', name: '怪物', en: 'MONSTERS', kind: 'monster', boss: false, items: MONSTER_LIST },
+    { id: 'boss', name: 'BOSS', en: 'BOSSES', kind: 'monster', boss: true, items: BOSS_LIST },
+  ]
+}
+
+/** 选中目标 */
+export function setTarget(kind, refId, boss = false) {
+  SE.sel.target = { kind, refId, boss: !!boss }
+}
+
+/** 取消选中目标 */
+export function clearTarget() {
+  SE.sel.target = { kind: '', refId: '', boss: false }
+}
+
+/** 目标定义（未选中返回 null） */
+export function targetDef(target = SE.sel.target) {
+  if (!target?.refId) return null
+  return findEntityDef(target.kind, target.refId)?.def || null
+}
+
+/** 已绑定该目标的 sprite 列表 */
+export function spritesOfTarget(refId) {
+  if (!refId) return []
+  return SE.project.sprites.filter((s) => s.refId === refId)
+}
+
+/** 为目标创建 sprite（自动定族系 + 套骨骼/碰撞模板） */
+export function createSpriteForTarget(target, sheet) {
+  const sh = sheet || SE.project.sheets[0]
+  if (!sh || !target?.refId) return null
+  const kind = target.kind === 'role' ? 'role' : 'monster'
+  const found = findEntityDef(kind, target.refId)
+  let family
+  if (target.boss) family = 'boss'
+  else if (kind === 'role') family = FAMILY_FROM_CHASSIS[found?.def?.family] || 'biped'
+  else family = guessFamilyFromRef(kind, target.refId) || 'minion'
+  return addSprite(sh.id, { x: 0, y: 0 }, {
+    kind,
+    refId: target.refId,
+    family,
+    name: found?.def?.name,
+    autoBones: true,
+    autoShapes: true,
+  })
+}
+
+/** 导入精灵图：若已选目标，导入后自动为该目标创建 sprite */
+export async function importSheetForTarget(file, target, name) {
+  const sheet = await importSheetFile(file, name)
+  if (target?.refId) createSpriteForTarget(target, sheet)
+  return sheet
+}
+
+// ============================================================================
 // 专项编辑：分类 / 模板
 // ============================================================================
 
@@ -756,11 +870,13 @@ export function setSpriteRef(opts) {
   if (opts.family) sp.family = opts.family
   // 自动推导
   if (opts.kind && opts.refId) {
-    const f = guessFamilyFromRef(opts.kind, opts.refId)
-    if (f) sp.family = f
-    const list = opts.kind === 'role' ? ROLE_LIST : MONSTER_LIST
-    const def = list.find((d) => d.id === opts.refId)
-    if (def) {
+    if (!opts.family) {
+      const f = guessFamilyFromRef(opts.kind, opts.refId)
+      if (f) sp.family = f
+    }
+    const found = findEntityDef(opts.kind, opts.refId)
+    if (found) {
+      const def = found.def
       sp.name = def.name || sp.name
       if (def.hitbox) {
         sp.w = def.hitbox[0] || sp.w
@@ -1082,7 +1198,18 @@ export function applyPresetToSprite(presetId) {
 // ============================================================================
 
 export function exportProjectJson() {
-  return JSON.stringify(SE.project, null, 2)
+  return JSON.stringify({
+    version: SE.project.version,
+    name: SE.project.name,
+    status: SE.project.status,
+    updatedAt: SE.project.updatedAt,
+    publishedAt: SE.project.publishedAt,
+    exportedAt: new Date().toISOString(),
+    sheets: SE.project.sheets,
+    sprites: SE.project.sprites,
+    effects: SE.project.effects,
+    presets: SE.project.presets,
+  }, null, 2)
 }
 
 export async function importProjectJson(file) {
@@ -1090,6 +1217,9 @@ export async function importProjectJson(file) {
   const data = JSON.parse(text)
   const tmp = emptyProject()
   tmp.name = data.name || '导入工程'
+  tmp.status = data.status || STATUS.PUBLISHED
+  tmp.updatedAt = data.updatedAt || null
+  tmp.publishedAt = data.publishedAt || null
   tmp.sheets = (data.sheets || []).map((s) => ({
     id: s.id || uid('sh'),
     name: s.name || '精灵图',
@@ -1118,6 +1248,48 @@ export async function importProjectJson(file) {
   return tmp
 }
 
+// ============================================================================
+// 草稿 / 发布
+// ============================================================================
+
+import { computed } from 'vue'
+
+/** 当前状态 computed（面板顶部徽标用） */
+export const projectStatus = computed(() => SE.project.status)
+
+/** 发布精灵工程：标记 published 并通知未来的游戏加载器。
+ *  目前游戏尚未从精灵编辑器工程直接加载，发布 = 打标签 + 发 CustomEvent。
+ *  后续游戏侧实现 sprite 加载时，只需监听 rustfall:sprite-editor-published 即可。 */
+export function publish() {
+  SE.project.status = STATUS.PUBLISHED
+  SE.project.publishedAt = new Date().toISOString()
+  try {
+    window.dispatchEvent(
+      new CustomEvent('rustfall:sprite-editor-published', {
+        detail: {
+          name: SE.project.name,
+          sheets: SE.project.sheets.map((s) => ({ id: s.id, name: s.name, w: s.width, h: s.height })),
+          sprites: SE.project.sprites.map((s) => ({ id: s.id, refId: s.refId, family: s.family, kind: s.kind })),
+        },
+      })
+    )
+  } catch (e) { /* 非浏览器环境忽略 */ }
+  saveProject()
+  return true
+}
+
+/** 切到草稿模式：工程标记为 draft，后续发布可继续推送。 */
+export function setDraft() {
+  SE.project.status = STATUS.DRAFT
+  saveProject()
+  return true
+}
+
+/** 是否草稿模式 */
+export function isDraft() {
+  return SE.project.status === STATUS.DRAFT
+}
+
 export function downloadText(filename, text, type = 'application/json') {
   const blob = new Blob([text], { type })
   const url = URL.createObjectURL(blob)
@@ -1136,6 +1308,7 @@ if (typeof window !== 'undefined') {
     SE,
     ROLE_LIST,
     MONSTER_LIST,
+    BOSS_LIST,
     SPRITE_FAMILIES,
     FAMILY_SHAPE_TEMPLATES,
     addSheet,
@@ -1162,5 +1335,18 @@ if (typeof window !== 'undefined') {
     bonesForFamily,
     shapesForFamily,
     guessFamilyFromRef,
+    targetGroups,
+    setTarget,
+    clearTarget,
+    targetDef,
+    spritesOfTarget,
+    createSpriteForTarget,
+    importSheetForTarget,
+    findEntityDef,
+    isBossRef,
+    publish,
+    setDraft,
+    isDraft,
+    get projectStatus() { return projectStatus.value },
   }
 }

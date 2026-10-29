@@ -67,12 +67,22 @@ const BASE_PARAMS = new Map()
 // 全局状态
 // ============================================================================
 
+// 是否把编辑推送到游戏运行时通道（terrain / bg / CustomEvent）。
+// 草稿模式：编辑器里编辑只改 RE.project，不动运行时；publish() 时一次性推送。
+let _runtimePushesEnabled = true
+
+/** 工程状态：published=已发布 / draft=草稿 / mixed=部分发布 */
+const STATUS = { PUBLISHED: 'published', DRAFT: 'draft', MIXED: 'mixed' }
+
 export const RE = reactive({
   /** 编辑器工程 */
   project: {
-    version: 1,
+    version: 2,
     name: '房间工程',
-    edits: {}, // roomKey -> { params: {}, tiles: {}, props: { add: [], remove: [] } }
+    status: STATUS.PUBLISHED,     // 旧工程加载时按 published 处理（向后兼容）
+    updatedAt: null,               // 最近编辑时间（ISO）
+    publishedAt: null,             // 最近发布时间（ISO）
+    edits: {}, // roomKey -> { params: {}, tiles: {}, props: { add: [], remove: [] }, bg: { layers: [] } }
   },
   sel: {
     regionId: '',
@@ -322,8 +332,9 @@ function readTerrainTable() {
   }
 }
 
-/** 写一条地形差分到游戏的 terrainEdits 表 */
+/** 写一条地形差分到游戏的 terrainEdits 表；草稿模式下跳过 */
 function pushTerrain(key, tile, type) {
+  if (!_runtimePushesEnabled) return
   const table = readTerrainTable()
   if (!table[key]) table[key] = {}
   table[key][tile] = type
@@ -425,8 +436,9 @@ function readBgTable() {
   }
 }
 
-/** 把某房间当前全部背景层同步到运行时表（层为空则清掉该房间条目） */
+/** 把某房间当前全部背景层同步到运行时表（层为空则清掉该房间条目）；草稿模式下跳过 */
 function pushBgTable(key) {
+  if (!_runtimePushesEnabled) return
   const e = peekEdits(key)
   const table = readBgTable()
   const layers = e?.bg?.layers || []
@@ -573,6 +585,7 @@ export function resetView() {
 
 export function saveProject() {
   try {
+    RE.project.updatedAt = new Date().toISOString()
     localStorage.setItem(KEY, JSON.stringify(RE.project))
     return true
   } catch (e) {
@@ -589,6 +602,12 @@ export function loadProject() {
     if (!data || typeof data !== 'object') return false
     RE.project.edits = data.edits || {}
     RE.project.name = data.name || '房间工程'
+    // 向后兼容：旧工程没有 status 字段，默认为 published（旧版实时生效）
+    RE.project.status = data.status || STATUS.PUBLISHED
+    RE.project.updatedAt = data.updatedAt || null
+    RE.project.publishedAt = data.publishedAt || null
+    // 草稿模式：关闭运行时推送，让现有运行时表保持"最后一次发布"状态
+    _runtimePushesEnabled = RE.project.status !== STATUS.DRAFT
     syncAllBgTables()
     return true
   } catch (e) {
@@ -599,6 +618,10 @@ export function loadProject() {
 
 export function resetProject() {
   RE.project.edits = {}
+  RE.project.status = STATUS.PUBLISHED
+  RE.project.updatedAt = null
+  RE.project.publishedAt = null
+  _runtimePushesEnabled = true
   GEN_CACHE.clear()
   BASE_CACHE.clear()
   RE.gen = null
@@ -615,6 +638,9 @@ export function exportProjectJson() {
     {
       version: RE.project.version,
       name: RE.project.name,
+      status: RE.project.status,
+      updatedAt: RE.project.updatedAt,
+      publishedAt: RE.project.publishedAt,
       exportedAt: new Date().toISOString(),
       edits: RE.project.edits,
     },
@@ -629,6 +655,11 @@ export async function importProjectJson(fileOrText) {
   const data = JSON.parse(text)
   if (!data || typeof data !== 'object') throw new Error('工程格式错误')
   RE.project.edits = data.edits || {}
+  RE.project.name = data.name || '房间工程'
+  RE.project.status = data.status || STATUS.PUBLISHED
+  RE.project.updatedAt = data.updatedAt || null
+  RE.project.publishedAt = data.publishedAt || null
+  _runtimePushesEnabled = RE.project.status !== STATUS.DRAFT
   GEN_CACHE.clear()
   BASE_CACHE.clear()
   RE.gen = null
@@ -698,6 +729,55 @@ export function clearAllEdits() {
 }
 
 // ============================================================================
+// 草稿 / 发布
+// ============================================================================
+
+/** 当前状态 computed（面板顶部徽标用） */
+export const projectStatus = computed(() => RE.project.status)
+
+/** 把当前工程版本一次性推送到游戏运行时通道（地形 / 背景层）。
+ *  推送完成后状态切 published，后续编辑实时生效。 */
+export function publish() {
+  _runtimePushesEnabled = true
+  // 1. 全量推送地形差分 + 背景层
+  const terrainTable = readTerrainTable()
+  for (const key of Object.keys(RE.project.edits)) {
+    const e = RE.project.edits[key]
+    if (!e) continue
+    // 地形差分（整房间覆盖，用 clear=true 让游戏清旧表）
+    const tiles = e.tiles || {}
+    if (Object.keys(tiles).length) terrainTable[key] = { ...tiles }
+    else delete terrainTable[key]
+    // 背景层
+    pushBgTable(key)
+    // 通知正在运行的游戏
+    notifyTerrainPatch(key, { ...tiles }, true)
+  }
+  try {
+    localStorage.setItem(TERRAIN_KEY, JSON.stringify(terrainTable))
+  } catch (e) { /* 忽略 */ }
+  // 2. 状态切换
+  RE.project.status = STATUS.PUBLISHED
+  RE.project.publishedAt = new Date().toISOString()
+  saveProject()
+  return true
+}
+
+/** 切到草稿模式：后续编辑只改工程文件，不推运行时通道。
+ *  运行时表保持「上一次发布」的版本不变。 */
+export function setDraft() {
+  RE.project.status = STATUS.DRAFT
+  _runtimePushesEnabled = false
+  saveProject()
+  return true
+}
+
+/** 是否草稿模式（store 内部推送函数和 UI 都可直接查） */
+export function isDraft() {
+  return RE.project.status === STATUS.DRAFT
+}
+
+// ============================================================================
 // 调试钩子
 // ============================================================================
 
@@ -750,6 +830,12 @@ if (typeof window !== 'undefined') {
     },
     get propCount() {
       return propCount.value
+    },
+    publish,
+    setDraft,
+    isDraft,
+    get projectStatus() {
+      return projectStatus.value
     },
   }
 }

@@ -50,6 +50,14 @@ export class RoomViewport {
     this._onUp = () => this.pointerUp()
     this._onWheel = (e) => this.wheel(e)
     this._onCtx = (e) => e.preventDefault()
+    this._onScroll = () => this.syncRect()
+
+    // 渲染节流：pointermove / wheel 一帧最多重绘一次
+    this._rafId = 0
+    // 画布屏幕矩形缓存（避免每次 pointermove 触发 getBoundingClientRect 强制重排）
+    this._rect = { left: 0, top: 0, width: 1, height: 1 }
+    // 地形离屏缓存（整间房预渲染成一张图，平移时一次 blit）
+    this._terrain = null
 
     canvas.addEventListener('pointerdown', this._onDown)
     canvas.addEventListener('pointermove', this._onMove)
@@ -57,6 +65,7 @@ export class RoomViewport {
     canvas.addEventListener('wheel', this._onWheel, { passive: false })
     canvas.addEventListener('contextmenu', this._onCtx)
     window.addEventListener('resize', this._onResize)
+    window.addEventListener('scroll', this._onScroll, true)
     this.resize()
   }
 
@@ -68,13 +77,26 @@ export class RoomViewport {
     c.removeEventListener('wheel', this._onWheel)
     c.removeEventListener('contextmenu', this._onCtx)
     window.removeEventListener('resize', this._onResize)
+    window.removeEventListener('scroll', this._onScroll, true)
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId)
+      this._rafId = 0
+    }
+    this._terrain = null
+  }
+
+  /** 刷新缓存的画布屏幕矩形 */
+  syncRect() {
+    const r = this.canvas.getBoundingClientRect()
+    this._rect = { left: r.left, top: r.top, width: r.width, height: r.height }
+    return this._rect
   }
 
   resize() {
     const c = this.canvas
-    const rect = c.getBoundingClientRect()
-    this.w = Math.max(1, Math.round(rect.width))
-    this.h = Math.max(1, Math.round(rect.height))
+    this.syncRect()
+    this.w = Math.max(1, Math.round(this._rect.width))
+    this.h = Math.max(1, Math.round(this._rect.height))
     this.dpr = Math.min(window.devicePixelRatio || 1, 2)
     c.width = Math.round(this.w * this.dpr)
     c.height = Math.round(this.h * this.dpr)
@@ -124,7 +146,7 @@ export class RoomViewport {
     } catch (err) {
       /* 指针已释放时 setPointerCapture 会抛异常，不能中断后续处理 */
     }
-    const rect = this.canvas.getBoundingClientRect()
+    const rect = this.syncRect()
     const cx = e.clientX - rect.left
     const cy = e.clientY - rect.top
     const t = this.toTile(cx, cy)
@@ -133,6 +155,8 @@ export class RoomViewport {
 
     // 中键 / Alt 拖拽 = 平移视图
     if (e.button === 1 || e.altKey) {
+      // 阻止中键自带的自动滚动 / 拖拽手势
+      e.preventDefault()
       this.drag = { mode: 'pan', sx: cx, sy: cy, panX: RE.view.panX, panY: RE.view.panY }
       return
     }
@@ -172,7 +196,7 @@ export class RoomViewport {
   }
 
   pointerMove(e) {
-    const rect = this.canvas.getBoundingClientRect()
+    const rect = this._rect
     const cx = e.clientX - rect.left
     const cy = e.clientY - rect.top
     const t = this.toTile(cx, cy)
@@ -192,7 +216,7 @@ export class RoomViewport {
         })
       }
     }
-    if (!prev || prev.x !== t.x || prev.y !== t.y || this.drag?.mode === 'bgmove') this.render()
+    if (!prev || prev.x !== t.x || prev.y !== t.y || this.drag?.mode === 'bgmove') this.requestRender()
   }
 
   pointerUp() {
@@ -202,23 +226,22 @@ export class RoomViewport {
     }
   }
 
+  /** 滚轮：默认直接缩放（无需按 Ctrl），以光标为锚点；不再用滚轮平移画布 */
   wheel(e) {
     e.preventDefault()
-    const rect = this.canvas.getBoundingClientRect()
+    // 纯横向滚动（触控板左右滑）不做任何事：既不缩放也不平移
+    if (!e.deltaY) return
+    const rect = this._rect
     const cx = e.clientX - rect.left
     const cy = e.clientY - rect.top
     const v = RE.view
-    if (e.ctrlKey || e.metaKey || e.shiftKey) {
-      const nz = Math.max(1, Math.min(24, v.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)))
-      const k = nz / v.zoom
-      v.panX = cx - (cx - v.panX) * k
-      v.panY = cy - (cy - v.panY) * k
-      v.zoom = nz
-    } else {
-      v.panX -= e.deltaX
-      v.panY -= e.deltaY
-    }
-    this.render()
+    const nz = Math.max(1, Math.min(24, v.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)))
+    if (nz === v.zoom) return
+    const k = nz / v.zoom
+    v.panX = cx - (cx - v.panX) * k
+    v.panY = cy - (cy - v.panY) * k
+    v.zoom = nz
+    this.requestRender()
   }
 
   /** 找到某格上的道具 */
@@ -296,6 +319,99 @@ export class RoomViewport {
   }
 
   // ------------------------------------------------------------ 绘制
+  /** 合并同一帧内的多次重绘请求（pointermove / wheel 高频触发时只画一次） */
+  requestRender() {
+    if (this._rafId) return
+    this._rafId = requestAnimationFrame(() => {
+      this._rafId = 0
+      this.render()
+    })
+  }
+
+  /** 地图内容哈希：地形被改动后据此失效离屏缓存 */
+  mapHash(map) {
+    const d = map.data
+    let h = 2166136261 >>> 0
+    for (let i = 0; i < d.length; i++) {
+      h = (h ^ d[i]) >>> 0
+      h = Math.imul(h, 16777619) >>> 0
+    }
+    return h
+  }
+
+  /**
+   * 地形离屏层：把整间房的地形预渲染成一张图（按颜色批量成路径一次填充），
+   * 平移 / 缩放时只需一次 drawImage，避免逐格 fillRect 造成的卡顿。
+   * 缓存分辨率上限 8px/格（再放大只是拉伸纯色块，不影响观感），防止超大画布吃内存。
+   */
+  terrainLayer(gen, z) {
+    const map = gen.map
+    const dpr = this.dpr
+    const cs = Math.max(1, Math.min(z, 8)) * dpr // 缓存里每格占多少设备像素
+    const key = `${this.mapHash(map)}|${cs}|${map.w}x${map.h}`
+    const cache = this._terrain
+    if (cache && cache.key === key) return cache
+
+    const tw = map.w
+    const th = map.h
+    const cw = Math.max(1, tw * cs)
+    const ch = Math.max(1, th * cs)
+    let canvas = cache?.canvas
+    if (!canvas || canvas.width !== cw || canvas.height !== ch) {
+      canvas = document.createElement('canvas')
+      canvas.width = cw
+      canvas.height = ch
+    }
+    const c = canvas.getContext('2d')
+    c.setTransform(1, 0, 0, 1, 0, 0)
+    c.clearRect(0, 0, cw, ch)
+
+    const data = map.data
+    const mw = map.w
+    const mh = map.h
+    const paths = new Map()
+    for (let y = 0; y < mh; y++) {
+      const row = y * mw
+      for (let x = 0; x < mw; x++) {
+        const t = data[row + x]
+        if (t === T.EMPTY) continue
+        const color = TILE_COLORS[t]
+        if (!color) continue
+        let p = paths.get(color)
+        if (!p) {
+          p = new Path2D()
+          paths.set(color, p)
+        }
+        p.rect(x * cs, y * cs, cs + 0.5, cs + 0.5)
+      }
+    }
+    for (const [color, p] of paths) {
+      c.fillStyle = color
+      c.fill(p)
+    }
+
+    // 平台高光条 / 攀爬杆
+    const thin = Math.max(1, cs * 0.16)
+    const plat = new Path2D()
+    const pole = new Path2D()
+    for (let y = 0; y < mh; y++) {
+      const row = y * mw
+      for (let x = 0; x < mw; x++) {
+        const t = data[row + x]
+        if (t === T.PLATFORM) plat.rect(x * cs, y * cs, cs + 0.5, thin)
+        else if (t === T.POLE) pole.rect(x * cs + cs * 0.42, y * cs, thin, cs + 0.5)
+      }
+    }
+    c.fillStyle = '#c0a878'
+    c.fill(plat)
+    c.fillStyle = '#d0a060'
+    c.fill(pole)
+
+    const layer = { key, canvas, cw, ch, tw, th }
+    this._terrain = layer
+    return layer
+  }
+
   render() {
     const ctx = this.ctx
     if (!ctx) return
@@ -357,24 +473,19 @@ export class RoomViewport {
       }
     }
 
-    // ---- 地形 ----
-    for (let y = y0; y <= y1; y++) {
-      for (let x = x0; x <= x1; x++) {
-        const t = map.get(x, y)
-        if (t === T.EMPTY) continue
-        const meta = TILE_COLORS[t]
-        if (!meta) continue
-        ctx.fillStyle = meta
-        ctx.fillRect(x * z + v.panX, y * z + v.panY, z + 0.5, z + 0.5)
-        if (t === T.PLATFORM) {
-          ctx.fillStyle = '#c0a878'
-          ctx.fillRect(x * z + v.panX, y * z + v.panY, z + 0.5, Math.max(1, z * 0.16))
-        } else if (t === T.POLE) {
-          ctx.fillStyle = '#d0a060'
-          ctx.fillRect(x * z + v.panX + z * 0.42, y * z + v.panY, Math.max(1, z * 0.16), z + 0.5)
-        }
-      }
-    }
+    // ---- 地形（离屏缓存，一次 blit；平移时不再逐格重绘）----
+    const terrain = this.terrainLayer(gen, z)
+    ctx.drawImage(
+      terrain.canvas,
+      0,
+      0,
+      terrain.cw,
+      terrain.ch,
+      v.panX,
+      v.panY,
+      terrain.tw * z,
+      terrain.th * z
+    )
 
     // ---- 网格 ----
     if (v.grid && z >= 3) {

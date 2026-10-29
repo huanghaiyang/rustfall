@@ -57,7 +57,7 @@ watch(bgLayers, () => vp?.render(), { deep: true })
       </button>
     </div>
     <div class="rmc-hint">
-      滚轮缩放 · Alt/中键拖拽平移 · 左键涂地形 · 右键擦除 · 背景层工具下拖拽移动图像
+      滚轮直接缩放 · 中键/Alt 拖拽平移 · 左键涂地形 · 右键擦除 · 背景层工具下拖拽移动图像
     </div>
   </div>
 </template>

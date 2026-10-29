@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue'
 import {
   SE,
   ROLE_LIST,
   MONSTER_LIST,
+  BOSS_LIST,
   SPRITE_FAMILIES,
   loadRegistry,
   filteredSprites,
@@ -17,6 +18,7 @@ import {
   currentAction,
   currentEffect,
   importSheetFile,
+  importSheetForTarget,
   addSheet,
   removeSheet,
   addSprite,
@@ -40,6 +42,16 @@ import {
   exportProjectJson,
   importProjectJson,
   downloadText,
+  targetGroups,
+  setTarget,
+  clearTarget,
+  targetDef,
+  spritesOfTarget,
+  isBossRef,
+  publish,
+  setDraft,
+  isDraft,
+  projectStatus,
 } from '../../../game/editor/sprite-store.js'
 import SpriteSheetCanvas from './SpriteSheetCanvas.vue'
 import SpriteInspector from './SpriteInspector.vue'
@@ -79,12 +91,51 @@ const spriteCount = computed(() => SE.project.sprites.length)
 const effectCount = computed(() => SE.project.effects.length)
 const sprites = computed(() => filteredSprites(kindFilter.value))
 
+// ---- 游戏实体（角色 / 怪物 / BOSS）目标选择 ----
+const entQuery = ref('')
+const entCollapsed = reactive({ role: false, monster: false, boss: false })
+const target = computed(() => SE.sel.target)
+const targetInfo = computed(() => targetDef(target.value))
+const targetSprites = computed(() => spritesOfTarget(target.value?.refId))
+
+/** 三组实体列表（带搜索过滤） */
+const entGroups = computed(() => {
+  const q = entQuery.value.trim().toLowerCase()
+  return targetGroups().map((g) => ({
+    ...g,
+    items: q
+      ? g.items.filter(
+          (it) =>
+            it.name?.toLowerCase().includes(q) || it.id.toLowerCase().includes(q)
+        )
+      : g.items,
+  }))
+})
+
+/** 选中目标：已有 sprite 则直接跳到它，否则作为「待传图目标」 */
+function pickTarget(item, group) {
+  setTarget(group.kind, item.id, group.boss)
+  const bound = spritesOfTarget(item.id)
+  if (bound.length) {
+    SE.sel.spriteId = bound[0].id
+    SE.sel.actionId = bound[0].actions[0]?.id || ''
+    SE.sel.frameId = ''
+  }
+}
+
+/** 该目标已绑定的 sprite 数 */
+function boundCount(refId) {
+  return spritesOfTarget(refId).length
+}
+
 async function onPickImage(e) {
   const f = e.target.files?.[0]
   e.target.value = ''
   if (!f) return
   try {
-    await importSheetFile(f)
+    // 已选目标 → 导入后自动为该目标建 sprite（先选后传）
+    if (SE.sel.target?.refId) await importSheetForTarget(f, SE.sel.target)
+    else await importSheetFile(f)
     saveProject()
   } catch (err) {
     console.warn('[sprite-editor] 导入失败', err)
@@ -230,10 +281,18 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="se-group">
+        <!-- 状态徽标 -->
+        <span class="se-status" :class="isDraft() ? 'draft' : 'published'">
+          <span class="se-status-dot" />
+          {{ isDraft() ? '草稿' : '已发布' }}
+        </span>
         <button class="se-btn primary" @click="imgInput?.click()">导入精灵图</button>
         <button class="se-btn" @click="projInput?.click()">导入工程</button>
         <button class="se-btn" @click="onExport">导出工程</button>
-        <button class="se-btn" @click="saveProject()">保存</button>
+        <!-- 草稿模式 → 主按钮「发布」；已发布 → 次按钮「保存草稿」 -->
+        <button v-if="isDraft()" class="se-btn primary" @click="publish()" :title="'发布精灵工程（触发 CustomEvent 通知游戏加载器）'">发布</button>
+        <button v-else class="se-btn" @click="setDraft()" :title="'切到草稿模式'">保存草稿</button>
+        <button class="se-btn" @click="saveProject()">保存工程</button>
         <button
           class="se-btn danger"
           @click="() => { if (confirm('清空当前工程？')) { resetProject(); saveProject() } }"
@@ -274,8 +333,44 @@ onBeforeUnmount(() => {
 
     <!-- 主体 -->
     <div class="se-main">
-      <!-- 左：sprite 列表 -->
+      <!-- 左：游戏实体 + sprite 列表 -->
       <aside class="se-left">
+        <!-- 游戏实体：角色 / 怪物 / BOSS（先选目标，再上传精灵图） -->
+        <section class="se-sec">
+          <header class="se-sec-h">
+            <b>游戏实体</b><em>ENTITIES</em>
+            <span class="se-grow" />
+            <span v-if="target?.refId" class="se-ent-cur" :title="target.refId">
+              {{ targetInfo?.name || target.refId }}
+              <button class="se-x" @click.stop="clearTarget()">✕</button>
+            </span>
+          </header>
+          <input v-model="entQuery" class="se-ent-filter" placeholder="搜索角色 / 怪物 / BOSS…" />
+          <div v-for="g in entGroups" :key="g.id" class="se-ent-g">
+            <header class="se-ent-h" @click="entCollapsed[g.id] = !entCollapsed[g.id]">
+              <span class="se-caret">{{ entCollapsed[g.id] ? '▸' : '▾' }}</span>
+              <b>{{ g.name }}</b><em>{{ g.items.length }}</em>
+            </header>
+            <ul v-show="!entCollapsed[g.id]" class="se-list">
+              <li
+                v-for="it in g.items"
+                :key="it.id"
+                class="se-item se-ent-item"
+                :class="{ on: target?.refId === it.id }"
+                :title="it.id"
+                @click="pickTarget(it, g)"
+              >
+                <span class="se-item-name">{{ it.name }}</span>
+                <span class="se-item-meta">{{ boundCount(it.id) ? '◆' + boundCount(it.id) : '' }}</span>
+              </li>
+              <li v-if="!g.items.length" class="se-empty">无匹配</li>
+            </ul>
+          </div>
+          <div class="se-hint">
+            先选目标 → 再「导入精灵图」，自动生成对应 sprite（带骨骼 / 碰撞模板）
+          </div>
+        </section>
+
         <section class="se-sec">
           <header class="se-sec-h">
             <b>精灵图</b><em>SHEETS</em>
@@ -341,7 +436,7 @@ onBeforeUnmount(() => {
               :class="{ on: SE.sel.spriteId === s.id }"
               @click="SE.sel.spriteId = s.id; SE.sel.actionId = s.actions[0]?.id || ''; SE.sel.frameId = ''"
             >
-              <span class="se-kind-badge" :class="s.kind">{{ s.kind === 'monster' ? '怪' : s.kind === 'role' ? 'R' : 'G' }}</span>
+              <span class="se-kind-badge" :class="isBossRef(s.refId) ? 'boss' : s.kind">{{ isBossRef(s.refId) ? 'B' : s.kind === 'monster' ? '怪' : s.kind === 'role' ? 'R' : 'G' }}</span>
               <span class="se-item-name">{{ s.name }}</span>
               <span class="se-item-meta">{{ s.w }}×{{ s.h }} · {{ s.actions.length }}动</span>
               <button class="se-x" @click.stop="removeSprite(s.id)">✕</button>
@@ -350,6 +445,9 @@ onBeforeUnmount(() => {
               未创建{{ kindFilter === 'monster' ? '怪物' : kindFilter === 'role' ? '角色' : 'sprite' }}
             </li>
           </ul>
+          <div v-if="target?.refId" class="se-hint">
+            目标「{{ targetInfo?.name || target.refId }}」已绑 {{ targetSprites.length }} 个 sprite
+          </div>
         </section>
 
         <section class="se-sec">
@@ -492,6 +590,40 @@ onBeforeUnmount(() => {
 .se-btn.danger:hover {
   border-color: var(--c-danger, #c8553f);
   color: var(--c-danger, #c8553f);
+}
+.se-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 2px;
+  font-size: 11px;
+  border: 1px solid;
+  margin-right: 4px;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.se-status.published {
+  border-color: var(--c-neon, #6ff0d0);
+  color: var(--c-neon, #6ff0d0);
+  background: rgba(111, 240, 208, 0.08);
+}
+.se-status.draft {
+  border-color: var(--c-bone-dark, #8a8272);
+  color: var(--c-bone-dark, #8a8272);
+  background: rgba(138, 130, 114, 0.08);
+}
+.se-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.se-status.published .se-status-dot {
+  background: var(--c-neon, #6ff0d0);
+  box-shadow: 0 0 4px var(--c-neon, #6ff0d0);
+}
+.se-status.draft .se-status-dot {
+  background: var(--c-bone-dark, #8a8272);
 }
 .se-tools {
   border-left: 1px solid var(--c-steel, #3a444b);
@@ -700,6 +832,76 @@ onBeforeUnmount(() => {
 .se-kind-badge.role { background: var(--c-neon, #6ff0d0); }
 .se-kind-badge.monster { background: var(--c-danger, #c8553f); color: #fff; }
 .se-kind-badge.generic { background: var(--c-steel-light, #6f828c); color: #0b0d0f; }
+.se-kind-badge.boss { background: #b46adf; color: #fff; }
+
+/* ---------------- 游戏实体列表 ---------------- */
+.se-ent-cur {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 96px;
+  padding: 0 4px;
+  font-size: 10px;
+  color: var(--c-neon-warm, #f2b34a);
+  border: 1px solid rgba(242, 179, 74, 0.4);
+  border-radius: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.se-ent-filter {
+  width: calc(100% - 16px);
+  margin: 5px 8px 4px;
+  background: #12171b;
+  border: 1px solid #262e34;
+  color: var(--c-bone, #d8cfba);
+  font-family: inherit;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 2px;
+}
+.se-ent-filter:focus {
+  outline: none;
+  border-color: var(--c-neon, #6ff0d0);
+}
+.se-ent-g {
+  border-top: 1px solid #171d21;
+}
+.se-ent-h {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: #101518;
+  cursor: pointer;
+  user-select: none;
+}
+.se-ent-h:hover {
+  background: #141a1f;
+}
+.se-ent-h b {
+  font-size: 11px;
+  color: var(--c-sand, #c9b085);
+}
+.se-ent-h em {
+  font-style: normal;
+  font-size: 9px;
+  color: var(--c-steel-light, #6f828c);
+}
+.se-caret {
+  font-size: 9px;
+  color: var(--c-steel-light, #6f828c);
+  width: 8px;
+}
+.se-ent-item {
+  padding: 2px 8px 2px 18px;
+}
+.se-hint {
+  padding: 4px 8px 6px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--c-bone-dark, #8a8272);
+}
 .se-preset-form {
   display: flex;
   align-items: center;
