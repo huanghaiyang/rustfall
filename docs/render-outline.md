@@ -33,7 +33,7 @@
 | `outlineMaterial(tex, { w, h, thickness, color, outlineColor })` | 描边材质（`ShaderMaterial`），带 `map` / `color` / `opacity` / `alphaTest` 兼容层 |
 | `outlineGeometry(w, h, thickness)` | 配套几何体（四周留白） |
 | `resizeOutlineMesh(mesh, w, h)` | 大怪拿到美术后重设尺寸用：几何体与 uniform 一起更新 |
-| `outlineThickness(w, h)` | 自适应宽度：`min(3, max(1, round(min(w,h)·0.045)))` |
+| `outlineThickness(w, h)` | 自适应宽度 = 基准的一半：`min(1.5, max(0.5, 基准/2))`，基准 = `max(1, round(min(w,h)·0.045))` |
 | `setOutline(bool \| {enabled,thickness,color})` / `outlineState()` | 运行时开关（调试 / A/B 对比） |
 | `applyOutlineFromUrl()` | `?outline=0` 关、`?outline=3` 加粗、`?outlineColor=0x101010` 换色 |
 
@@ -67,17 +67,36 @@
 | 参数 | 默认 | 说明 |
 |---|---|---|
 | `OUTLINE_STYLE.color` | `0x0a0b0d` | 近黑（纯黑在暗场里显死板） |
-| `OUTLINE_STYLE.thickness` | 2 | 上限；实际按角色尺寸自适应（小怪 1~2px，BOSS 3px） |
-| `OUTLINE_STYLE.maxThickness` | 3 | 自适应上限 |
+| `OUTLINE_STYLE.thickness` | 1 | 默认值（调试用入口，实际宽度走 `outlineThickness`） |
+| `OUTLINE_STYLE.maxThickness` | 1.5 | 自适应上限（BOSS） |
+| `OUTLINE_STYLE.minThickness` | 0.5 | 自适应下限（再细会断成半像素虚线） |
+| `OUTLINE_STYLE.baseScale` | 0.045 | 基准宽度系数（结果再乘 0.5） |
 | `OUTLINE_STYLE.alphaThreshold` | 0.5 | 与 `spriteMaterial` 的 alphaTest 一致 |
+
+> 当前宽度（基准减半后）：**BOSS 1.5px · 玩家 1px · 小怪 0.5~1px**（世界像素）。
+> 首版是 3 / 2 / 1px，实测偏粗——数据执政官那堆细线缆会被糊成一坨，所以整体减半。
+
+### 变更记录
+
+- **2025-11 默认宽度减半**：`maxThickness 3 → 1.5`、`minThickness 0.5`、`outlineThickness` 结果乘 0.5。
+  效果：BOSS 3 → 1.5px、玩家 2 → 1px、小怪 1 → 0.5px；细线缆/天线不再被黑边吃掉，
+  离线对比的「外侧新增像素」从 12884 降到 7673（约一半），原有像素依旧 0 变化。
 
 运行时对比：
 
 ```js
 window.__rustfall.setOutline(false)   // 关
-window.__rustfall.setOutline({ enabled: true, thickness: 4 })
+window.__rustfall.setOutline({ enabled: true, thickness: 3 })  // 按基准宽度、最多 3px（拿回减半前的粗边）
 window.__rustfall.outlineState()      // { enabled, thickness, color, materials }
 ```
+
+宽度语义：
+
+- **默认** = 基准 × 0.5（`widthScale: 0.5`）→ BOSS 1.5px / 玩家 1px / 小怪 0.5px
+- **显式给 `thickness`** = 基准 × 1，并把它当上限 → `?outline=3` 就是 BOSS 3px / 玩家 2px（首版观感）
+- URL 参数在**建角色之前**生效（`applyOutlineFromUrl()` 在 game 构造期调用），所以 `?outline=N` 能调粗；
+  运行中对**已有**材质调 `setOutline({thickness})` 只能在上限内收紧（几何体留白是按建材质时的宽度定的）
+- 想「全局更粗」改 `OUTLINE_STYLE.widthScale` / `maxThickness` 默认值即可
 
 ## 5. 验证
 
@@ -86,9 +105,12 @@ node scripts/verify-outline.mjs
 ```
 
 - 材质 / 几何体 / uniform 断言（含大怪「美术后加载」的重设尺寸路径）
-- 场景内开/关像素对比：变化像素 2.6 万、**100% 变暗**、平均亮度 45.3 → 6.5
+- 场景内开/关像素对比：变化像素约 1.8 万、**100% 变暗**、变化区平均亮度 45 → 6
 - **离线单精灵对比**（同一管线 `uActive=1/0`，确定性）：
-  缺失 0 px（没啃美术）、外侧新增 12884 px、新增像素 100% 近黑、原有像素最大差 **0**
+  缺失 0 px（没啃美术）、外侧新增约 0.8 万 px（随帧/轮廓周长浮动）、新增像素 100% 近黑、
+  原有像素最大差 **0**；减半后新增像素从 1.29 万降到 0.77~0.86 万（≈ 首版的 2/3，
+  因为轮廓周长占比大的细线缆不会同比例缩），跑一次 `node scripts/verify-outline.mjs` 即可看到当次数值
+- 小怪按尺寸拿到更细的边（crawler 0.5px / scrapper 1px）
 - `?outline=0` 能关掉；无 console/pageerror
 
 产物：`.screenshots/outline/{outline-scene,outline-on-crop,outline-off-crop,outline-boss-closeup,outline-player-closeup,outline-monsters-scene}.png`

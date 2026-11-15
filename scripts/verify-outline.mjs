@@ -400,6 +400,42 @@ const playerClip = {
   height: 140,
 }
 await page.screenshot({ path: path.join(OUT, 'outline-player-closeup.png'), clip: playerClip })
+// ---- 多角色场景截图（BOSS + 玩家 + 三种小怪，验收不同尺寸的描边）----
+const sceneInfo = await page.evaluate(() => {
+  const g = window.__rustfall
+  const m = g.director.largeList[0]
+  const spawned = []
+  for (const [i, id] of ['scrapper', 'crawler', 'spitter'].entries()) {
+    try {
+      const r = g.director.spawn?.(id, m.body.x + m.body.w + 40 + i * 80, 0)
+      if (r) spawned.push({ id, x: Math.round(r.body.x), outline: !!r.mat?.userData?.outline, thick: r.mat?.userData?.outlineThickness })
+    } catch (e) {
+      /* 某些房间不支持手动刷怪，忽略 */
+    }
+  }
+  return { spawned }
+})
+console.log('\n--- 多角色 ---')
+console.log(JSON.stringify(sceneInfo))
+if (sceneInfo.spawned.length) {
+  ok(sceneInfo.spawned.every((s) => s.outline), '刷出来的小怪也带描边', sceneInfo.spawned.map((s) => `${s.id}:${s.thick}px`).join(' '))
+  await wait(1600)
+  // 再冻结一次，截图才是稳定的一帧
+  await page.evaluate(() => {
+    if (!window.__frozenNow) {
+      window.__realNow = performance.now.bind(performance)
+      window.__frozenNow = window.__realNow()
+      performance.now = () => window.__frozenNow
+    }
+  })
+  await wait(400)
+  await page.screenshot({ path: path.join(OUT, 'outline-monsters-scene.png') })
+  await page.evaluate(() => {
+    if (window.__realNow) performance.now = window.__realNow
+    window.__realNow = null
+    window.__frozenNow = null
+  })
+}
 // ---- URL 参数 ----
 await page.goto(URL + (URL.includes('?') ? '&' : '?') + 'outline=0', { waitUntil: 'domcontentloaded' })
 await wait(2600)

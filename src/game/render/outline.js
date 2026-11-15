@@ -26,8 +26,14 @@ import { hardenAlpha } from './materials.js'
 export const OUTLINE_STYLE = {
   enabled: true,
   color: 0x0a0b0d, // 近黑：纯黑 0x000000 在暗场里会显死板
-  thickness: 2, // 世界像素；实际取 max(1, round(min(w,h) * 0.045)) 再夹到这个上限
-  maxThickness: 3,
+  // 描边宽度（世界像素）= 基准宽度的一半，基准 = max(1, round(min(w,h)·0.045))。
+  // 首版是 3px（BOSS）/ 2px（玩家），实际观感偏粗、细线缆容易被糊掉，故整体减半：
+  //   BOSS 1.5px · 玩家 1px · 小怪 0.5px（下限 0.5，再细就只剩半像素会断断续续）
+  thickness: 1,
+  maxThickness: 1.5,
+  minThickness: 0.5,
+  baseScale: 0.045, // 基准宽度系数（减半前）
+  widthScale: 0.5, // 默认取基准的一半；显式指定 thickness 时恢复成 1
   alphaThreshold: 0.5,
 }
 
@@ -109,10 +115,15 @@ void main() {
 /** 已建材质登记表：运行时统一切换描边 */
 const allMaterials = new Set()
 
-/** 按角色显示尺寸自适应描边粗细：小怪 1px，BOSS 封顶 3px（世界像素） */
+/**
+ * 按角色显示尺寸自适应描边粗细（世界像素），**默认减半**：
+ *   小怪（min 28~40）→ 0.5~1px，BOSS（min 136）→ 1.5px
+ * 下限 0.5：再细就是半像素线，NearestFilter 采样会断断续续（看着像脏边）。
+ */
 export function outlineThickness(w, h) {
-  const base = Math.max(1, Math.round(Math.min(w, h) * 0.045))
-  return Math.min(OUTLINE_STYLE.maxThickness, base)
+  const base = Math.max(1, Math.round(Math.min(w, h) * OUTLINE_STYLE.baseScale))
+  const scaled = base * (Number.isFinite(OUTLINE_STYLE.widthScale) ? OUTLINE_STYLE.widthScale : 0.5)
+  return Math.min(OUTLINE_STYLE.maxThickness, Math.max(OUTLINE_STYLE.minThickness, scaled))
 }
 
 /**
@@ -258,8 +269,11 @@ export function setOutline(next = {}) {
   const opt = typeof next === 'boolean' ? { enabled: next } : next || {}
   if ('enabled' in opt) OUTLINE_STYLE.enabled = !!opt.enabled
   if (Number.isFinite(opt.thickness)) {
+    // 显式给宽度 = 「按基准宽度、最多 N px」：等价于减半前的观感
+    // （?outline=3 就能拿回 3px 的 BOSS 描边；默认仍是减半的 1.5px）
     OUTLINE_STYLE.maxThickness = opt.thickness
     OUTLINE_STYLE.thickness = opt.thickness
+    OUTLINE_STYLE.widthScale = 1
   }
   if ('color' in opt) OUTLINE_STYLE.color = opt.color
   for (const m of allMaterials) {
