@@ -18,6 +18,15 @@ import {
   boneTransforms,
   orderedBones,
 } from './sprite-store.js'
+import { boneKindColor, shapeRoleColor } from './rigs.js'
+
+/** #rrggbb → rgba()，给碰撞体填充色用 */
+function hexToRgba(hex, a) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''))
+  if (!m) return 'rgba(255,86,68,' + a + ')'
+  const n = parseInt(m[1], 16)
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'
+}
 
 const C = {
   grid: 'rgba(140, 160, 170, 0.16)',
@@ -616,9 +625,10 @@ export class SpriteViewport {
     const v = SE.view
     for (const s of sp.shapes) {
       const sel = s.id === SE.sel.shapeId
+      const rc = s.role ? shapeRoleColor(s.role) : C.shape
       ctx.save()
-      ctx.strokeStyle = sel ? C.shapeSel : C.shape
-      ctx.fillStyle = 'rgba(255,86,68,0.16)'
+      ctx.strokeStyle = sel ? C.shapeSel : rc
+      ctx.fillStyle = hexToRgba(rc, sel ? 0.24 : 0.13)
       ctx.lineWidth = (sel ? 2 : 1) / v.zoom
       if (s.type === 'circle') {
         ctx.beginPath()
@@ -663,19 +673,20 @@ export class SpriteViewport {
       const tr = t.get(bone.id)
       if (!tr) continue
       const sel = bone.id === SE.sel.boneId
+      const kc = bone.kind ? boneKindColor(bone.kind) : C.bone
       const ox = sp.x + tr.x
       const oy = sp.y + tr.y
       const rad = (tr.a * Math.PI) / 180
       const tx = ox + Math.cos(rad) * bone.len
       const ty = oy + Math.sin(rad) * bone.len
-      ctx.strokeStyle = sel ? C.boneSel : C.bone
+      ctx.strokeStyle = sel ? C.boneSel : kc
       ctx.lineWidth = (sel ? 2.5 : 1.6) / v.zoom
       ctx.beginPath()
       ctx.moveTo(ox, oy)
       ctx.lineTo(tx, ty)
       ctx.stroke()
       // 端点
-      ctx.fillStyle = sel ? C.boneSel : C.bone
+      ctx.fillStyle = sel ? C.boneSel : kc
       ctx.beginPath()
       ctx.arc(ox, oy, 3.5 / v.zoom, 0, Math.PI * 2)
       ctx.fill()
@@ -683,6 +694,12 @@ export class SpriteViewport {
         ctx.beginPath()
         ctx.arc(tx, ty, 4.5 / v.zoom, 0, Math.PI * 2)
         ctx.stroke()
+      }
+      // 放大到一定程度才显示骨骼名，免得糊成一片
+      if (v.zoom >= 1.2 && bone.len > 4) {
+        ctx.fillStyle = sel ? C.boneSel : kc
+        ctx.font = `${7 / v.zoom}px monospace`
+        ctx.fillText(bone.name, tx + 3 / v.zoom, ty + 2 / v.zoom)
       }
     }
     ctx.restore()

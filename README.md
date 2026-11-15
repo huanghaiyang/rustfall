@@ -47,6 +47,8 @@ node scripts/sprite-editor-apply-walk.mjs  # 用内嵌精灵编辑器绑定到�
 node scripts/verify-boss-walk.mjs          # BOSS 测试房验证（帧数/帧率/来源）
 node scripts/verify-sprite-history.mjs     # 历史记录 + 落盘 + 恢复 + 从磁盘重建
 node scripts/verify-room-disk.mjs          # 房间编辑器工程落盘 + 从磁盘恢复
+node scripts/verify-skeleton-fit.mjs       # 骨骼/碰撞体智能识别（算法 + 确定性 + AI 降级）
+node scripts/verify-editor-rig.mjs         # 编辑器内识别全链路（坐标系往返 + 落库）
 ```
 
 编辑器（精灵 / 房间）的数据除了浏览器存储，还会**直接落盘**到

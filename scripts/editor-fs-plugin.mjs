@@ -16,6 +16,8 @@
 //   GET    /__editor/blob/:name           → 任意 JSON 快照（房间编辑器等）
 //   PUT/POST /__editor/blob/:name         → 写
 //   DELETE /__editor/blob/:name           → 删
+//   GET    /__editor/ai/status            → { available, provider, model, reason }
+//   POST   /__editor/ai/segment           → { image: dataURL } → { ok, mask, model, ms }
 //
 // 落盘位置：<root>/editor-data/
 //   sprite-editor/project.json      当前精灵工程（自包含：sheet 的 dataURL 就在里面）
@@ -23,6 +25,13 @@
 //   sprite-editor/history/index.json   历史索引（meta，不含 payload）
 //   sprite-editor/history/<id>.json    单条快照（{ meta, project } 自包含）
 //   blobs/<name>.json               通用 JSON 快照（房间编辑器工程 + 地形/背景表）
+//   ai-config.json                  { token, model, endpoint }（可选，落盘这一份就够）
+//
+// Hugging Face 分割蒙版（可选增强，给骨骼识别提供干净 alpha）：
+//   · 配置：环境变量 HF_TOKEN（或 editor-data/ai-config.json 里的 token）
+//   · 模型：HF_SEG_MODEL / ai-config.model，默认 briaai/RMBG-1.4（抠图/前景蒙版）
+//   · 没配 token 或连不上时，/status 返回 available:false + 具体原因，
+//     编辑器自动退回「纯本地几何识别」，不会报错也不会卡住。
 //
 // 几个刻意的选择：
 //   · 快照自包含（把 dataURL 一起写进去）：单个文件可拷走 / 可归档，恢复时不依赖别的文件。
@@ -33,6 +42,7 @@
 // ============================================================================
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import crypto from 'node:crypto'
 
 const API = '/__editor/sprite'
 const BLOB_API = '/__editor/blob'
@@ -301,8 +311,142 @@ export function editorFsPlugin(opts = {}) {
         sendJson(res, 405, { error: 'method not allowed' })
       }
 
+      // ---- Hugging Face 分割蒙版（可选增强）--------------------------------
+      // 目的：给「骨骼智能识别」提供一张干净的前景蒙版（画稿带背景 / 道具与身体粘连时）。
+      // 不做姿态估计 —— 那类模型（COCO 关键点）训练分布是真人照片，喂像素机甲只会得到离谱的点。
+      const AI_API = '/__editor/ai'
+      const aiCache = new Map() // key = sha1(image)，最多留 12 张
+      const DEFAULT_MODEL = 'briaai/RMBG-1.4'
+      const DEFAULT_ENDPOINT = 'https://router.huggingface.co/hf-inference/models/'
+
+      async function aiConfig() {
+        let cfg = {}
+        try {
+          cfg = await readJson(path.join(root, 'editor-data', 'ai-config.json'), {}) || {}
+        } catch (e) { /* 没有配置文件 */ }
+        const token = process.env.HF_TOKEN || cfg.token || ''
+        const model = process.env.HF_SEG_MODEL || cfg.model || DEFAULT_MODEL
+        const endpoint = process.env.HF_ENDPOINT || cfg.endpoint || DEFAULT_ENDPOINT
+        let reason = ''
+        if (!token) reason = '未配置 HF_TOKEN（环境变量或 editor-data/ai-config.json）'
+        return { token, model, endpoint, reason, available: !!token }
+      }
+
+      async function handleAi(req, res, url) {
+        if (!isLocal(req)) {
+          sendJson(res, 403, { error: 'local only' })
+          return
+        }
+        const p = url.pathname.slice(AI_API.length) || '/'
+        const method = (req.method || 'GET').toUpperCase()
+        const cfg = await aiConfig()
+
+        if (p === '/status' && method === 'GET') {
+          sendJson(res, 200, {
+            available: cfg.available,
+            provider: 'huggingface',
+            model: cfg.model,
+            endpoint: cfg.endpoint,
+            reason: cfg.reason,
+          })
+          return
+        }
+
+        if (p === '/segment' && method === 'POST') {
+          if (!cfg.available) {
+            sendJson(res, 200, { ok: false, reason: cfg.reason })
+            return
+          }
+          const text = await readBody(req, 32 * 1024 * 1024)
+          let body
+          try {
+            body = JSON.parse(text)
+          } catch (e) {
+            sendJson(res, 400, { ok: false, reason: 'body 不是合法 JSON' })
+            return
+          }
+          const dataUrl = String(body?.image || '')
+          const m = /^data:image\/([a-z0-9+]+);base64,(.+)$/i.exec(dataUrl)
+          if (!m) {
+            sendJson(res, 400, { ok: false, reason: 'image 需要 data:image/png;base64,…' })
+            return
+          }
+          const bytes = Buffer.from(m[2], 'base64')
+          const key = `${cfg.model}|${bytes.length}|${crypto.createHash('sha1').update(bytes).digest('hex')}`
+          if (aiCache.has(key)) {
+            sendJson(res, 200, { ...aiCache.get(key), cached: true })
+            return
+          }
+          const t0 = Date.now()
+          try {
+            const r = await fetch(cfg.endpoint + cfg.model, {
+              method: 'POST',
+              headers: {
+                authorization: `Bearer ${cfg.token}`,
+                'content-type': m[1] === 'png' ? 'image/png' : `image/${m[1]}`,
+                accept: 'image/png',
+                'x-wait-for-model': 'true',
+              },
+              body: bytes,
+            })
+            const ctype = r.headers.get('content-type') || ''
+            if (!r.ok) {
+              let detail = ''
+              try {
+                detail = (await r.text()).slice(0, 300)
+              } catch (e) { /* ignore */ }
+              const reason =
+                r.status === 401 || r.status === 403
+                  ? `HF token 无效或无权限（HTTP ${r.status}）`
+                  : r.status === 503
+                    ? 'HF 模型正在加载，稍后重试（HTTP 503）'
+                    : `HF 返回 HTTP ${r.status} ${detail}`
+              sendJson(res, 200, { ok: false, reason })
+              return
+            }
+            if (!ctype.includes('image')) {
+              const txt = (await r.text()).slice(0, 300)
+              sendJson(res, 200, { ok: false, reason: `HF 返回的不是图片（${ctype}）：${txt}` })
+              return
+            }
+            const buf = Buffer.from(await r.arrayBuffer())
+            const out = {
+              ok: true,
+              mask: `data:image/png;base64,${buf.toString('base64')}`,
+              model: cfg.model,
+              ms: Date.now() - t0,
+            }
+            aiCache.set(key, out)
+            while (aiCache.size > 12) aiCache.delete(aiCache.keys().next().value)
+            sendJson(res, 200, out)
+          } catch (e) {
+            sendJson(res, 200, {
+              ok: false,
+              reason: `连不上 Hugging Face（${String(e?.message || e)}）；已退回本地识别`,
+            })
+          }
+          return
+        }
+
+        sendJson(res, 404, { error: 'not found' })
+      }
+
       server.middlewares.use((req, res, next) => {
         const url = req.url || ''
+        if (url.startsWith(AI_API)) {
+          let parsed
+          try {
+            parsed = new URL(url, 'http://127.0.0.1')
+          } catch (e) {
+            return next()
+          }
+          handleAi(req, res, parsed).catch((e) => {
+            try {
+              sendJson(res, 500, { ok: false, error: String(e?.message || e) })
+            } catch (e2) { /* 响应已结束 */ }
+          })
+          return
+        }
         if (url.startsWith(BLOB_API)) {
           let parsed
           try {

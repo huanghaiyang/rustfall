@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import {
   SE,
   currentSheet,
@@ -25,7 +25,10 @@ import {
   findEntityDef,
   SPRITE_FAMILIES,
   saveProject,
+  autoFitRig,
 } from '../../../game/editor/sprite-store.js'
+import { BONE_KINDS, SHAPE_ROLES, boneKindColor, shapeRoleColor } from '../../../game/editor/rigs.js'
+import { aiStatus } from '../../../game/editor/ai-mask.js'
 
 const sheet = computed(() => currentSheet())
 const sprite = computed(() => currentSprite())
@@ -73,6 +76,38 @@ function applyBoth() {
   if (!sprite.value) return
   applyBones()
   applyShapes()
+}
+
+// ---- 智能识别（骨骼 + 碰撞体）----------------------------------------------
+const fitMode = ref('all')
+const fitting = ref(false)
+const fitResult = ref(null)
+const ai = ref({ available: false, reason: '检测中…', model: '' })
+const useAiMask = ref(false)
+
+onMounted(async () => {
+  ai.value = await aiStatus()
+})
+
+async function doAutoFit() {
+  if (!sprite.value || fitting.value) return
+  fitting.value = true
+  fitResult.value = null
+  try {
+    fitResult.value = await autoFitRig(sprite.value, {
+      mode: fitMode.value,
+      useAiMask: useAiMask.value && ai.value.available,
+    })
+  } catch (e) {
+    fitResult.value = { ok: false, reason: String(e?.message || e) }
+  } finally {
+    fitting.value = false
+  }
+}
+
+function pct(v) {
+  const n = Number(v)
+  return Number.isFinite(n) ? Math.round(n * 100) + '%' : '—'
 }
 </script>
 
@@ -178,6 +213,39 @@ function applyBoth() {
           <button class="se-btn primary se-tpl-btn" @click="applyBoth" :disabled="sprite.family === 'unknown'">全部套用</button>
         </div>
 
+        <!-- 智能识别：从当前图集的轮廓里认出关节与碰撞体 -->
+        <div class="si-sub">智能识别 · AUTO RIG</div>
+        <div class="si-fit">
+          <select v-model="fitMode" class="si-fit-mode">
+            <option value="all">整条动作（多帧取中位，最稳）</option>
+            <option value="action">当前动作</option>
+            <option value="current">当前帧</option>
+          </select>
+          <button class="se-btn primary si-fit-btn" :disabled="fitting || !sprite" @click="doAutoFit">
+            {{ fitting ? '识别中…' : '识别骨骼 + 碰撞' }}
+          </button>
+        </div>
+        <label v-if="ai.available" class="si-ai" :title="'先请求 Hugging Face 分割蒙版：' + ai.model">
+          <input type="checkbox" v-model="useAiMask" /> 先用 AI 蒙版（{{ ai.model }}）
+        </label>
+        <div v-else class="si-hint">AI 蒙版不可用：{{ ai.reason }}</div>
+        <div v-if="fitResult" class="si-fit-res" :class="{ bad: !fitResult.ok }">
+          <template v-if="fitResult.ok">
+            骨骼 {{ fitResult.bones }} · 碰撞 {{ fitResult.shapes }} ·
+            置信 {{ pct(fitResult.stats && fitResult.stats.meanConf) }} ·
+            体表覆盖 {{ pct(fitResult.stats && fitResult.stats.bodyCoverage) }}
+            <span v-if="fitResult.stats && fitResult.stats.coverageMin !== undefined">
+              （逐帧 {{ pct(fitResult.stats.coverageMin) }}~{{ pct(fitResult.stats.coverageMax) }}）
+            </span>
+          </template>
+          <template v-else>{{ fitResult.reason }}</template>
+          <div v-for="wn in (fitResult.warnings || [])" :key="wn" class="si-warn">⚠ {{ wn }}</div>
+        </div>
+        <div v-if="sprite.rig" class="si-hint">
+          上次识别：{{ sprite.rig.source }} · {{ sprite.rig.mode }} · {{ sprite.rig.frames }} 帧 ·
+          置信 {{ pct(sprite.rig.stats && sprite.rig.stats.meanConf) }}
+        </div>
+
         <div class="si-sub">骨骼 · {{ sprite.bones.length }}</div>
         <ul class="si-tree">
           <li
@@ -188,9 +256,11 @@ function applyBoth() {
             :style="{ paddingLeft: 6 + depth * 12 + 'px' }"
             @click="SE.sel.boneId = b.id; SE.sel.shapeId = ''"
           >
-            <span class="si-dot" />
+            <span class="si-dot" :style="{ background: boneKindColor(b.kind) }" :title="b.kind || '未指定种类'" />
             <span class="si-node-name">{{ b.name }}</span>
-            <span class="si-node-meta">{{ Math.round(boneXf.get(b.id)?.a ?? b.angle) }}°</span>
+            <span class="si-node-meta">
+              {{ Math.round(boneXf.get(b.id)?.a ?? b.angle) }}°<template v-if="b.conf !== undefined"> · {{ pct(b.conf) }}</template>
+            </span>
             <button class="si-x" @click.stop="removeBone(b.id)">✕</button>
           </li>
           <li v-if="!sprite.bones.length" class="si-hint">切到「骨骼」工具后在图上点击添加</li>
@@ -198,6 +268,13 @@ function applyBoth() {
 
         <div v-if="bone" class="si-box">
           <div class="si-row"><label>骨骼名</label><input v-model="bone.name" @change="commit" /></div>
+          <div class="si-row">
+            <label>种类</label>
+            <select v-model="bone.kind" @change="commit">
+              <option value="">（未指定）</option>
+              <option v-for="k in BONE_KINDS" :key="k.id" :value="k.id">{{ k.name }} · {{ k.en }}</option>
+            </select>
+          </div>
           <div class="si-grid2">
             <div class="si-row"><label>X</label><input type="number" v-model.number="bone.x" @change="commit" /></div>
             <div class="si-row"><label>Y</label><input type="number" v-model.number="bone.y" @change="commit" /></div>
@@ -222,9 +299,9 @@ function applyBoth() {
             :class="{ on: SE.sel.shapeId === s.id }"
             @click="SE.sel.shapeId = s.id; SE.sel.boneId = ''"
           >
-            <span class="si-dot red" />
+            <span class="si-dot red" :style="{ background: shapeRoleColor(s.role) }" :title="s.role || '未指定职责'" />
             <span class="si-node-name">{{ s.name }}</span>
-            <span class="si-node-meta">{{ s.type }}</span>
+            <span class="si-node-meta">{{ s.type }}<template v-if="s.role"> · {{ s.role }}</template></span>
             <button class="si-x" @click.stop="removeShape(s.id)">✕</button>
           </li>
           <li v-if="!sprite.shapes.length" class="si-hint">切到矩形 / 圆形 / 多边形工具后拖拽添加</li>
@@ -232,6 +309,13 @@ function applyBoth() {
 
         <div v-if="shape" class="si-box">
           <div class="si-row"><label>名称</label><input v-model="shape.name" @change="commit" /></div>
+          <div class="si-row">
+            <label>职责</label>
+            <select v-model="shape.role" @change="commit">
+              <option value="">（未指定）</option>
+              <option v-for="r in SHAPE_ROLES" :key="r.id" :value="r.id">{{ r.name }} · {{ r.en }}</option>
+            </select>
+          </div>
           <div class="si-grid2">
             <div class="si-row"><label>X</label><input type="number" v-model.number="shape.x" @change="commit" /></div>
             <div class="si-row"><label>Y</label><input type="number" v-model.number="shape.y" @change="commit" /></div>
@@ -497,5 +581,55 @@ function applyBoth() {
 .si-tpl-btn {
   font-size: 10px;
   padding: 3px 6px;
+}
+
+/* ---- 智能识别 ---- */
+.si-fit {
+  display: flex;
+  gap: 4px;
+  padding: 2px 8px 4px;
+  align-items: stretch;
+}
+.si-fit-mode {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: #0f1316;
+  color: var(--c-bone, #d8cfba);
+  border: 1px solid var(--c-steel, #3a444b);
+  font-family: inherit;
+  font-size: 10px;
+  padding: 2px 4px;
+}
+.si-fit-btn {
+  flex: 0 0 auto;
+  font-size: 10px;
+  padding: 3px 8px;
+}
+.si-ai {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px 4px;
+  font-size: 10px;
+  color: #9aa3ab;
+  cursor: pointer;
+}
+.si-fit-res {
+  margin: 2px 8px 6px;
+  padding: 5px 7px;
+  background: #0f1a14;
+  border: 1px solid #2f5c40;
+  font-size: 10px;
+  line-height: 1.6;
+  color: #9fd8ad;
+}
+.si-fit-res.bad {
+  background: #1c1110;
+  border-color: #6a3630;
+  color: #e0a89a;
+}
+.si-warn {
+  color: #e0c69a;
+  font-size: 10px;
 }
 </style>

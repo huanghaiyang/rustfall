@@ -23,6 +23,8 @@ import { reactive } from 'vue'
 import Content, { KIND } from '../core/registry.js'
 import { MONSTER_IDS } from '../entities/monsters/index.js'
 import { LARGE_IDS } from '../entities/monsters/large/index.js'
+import { assembleRig, assembleShapes, templateAnchors, absoluteToLocal } from './rigs.js'
+import { fitSkeleton, fitFrames, alphaFromRGBA } from './skeleton-fit.js'
 import {
   addHistory,
   listHistory,
@@ -57,6 +59,7 @@ export const BUILTIN_PRESETS = [
 
 /** 机体族系（body-plan family）——每个 family 提供一套默认骨骼层级与碰撞形状 */
 export const SPRITE_FAMILIES = [
+  { id: 'mech',   name: '机械人形(侧面)', en: 'MECH', hint: '数据执政官 / 机柜躯干 + 双足' },
   { id: 'biped',  name: '双足人形', en: 'BIPED',  hint: 'UNIT-7 / GHOST-0 / HOPPER-2 / MULE-1' },
   { id: 'wheel',  name: '轮式底盘', en: 'WHEEL',  hint: 'TESLA-9 拾荒者' },
   { id: 'track',  name: '履带/轮足', en: 'TRACK',  hint: 'AGI-X / HULK-6 / WARDEN-4' },
@@ -254,6 +257,70 @@ export function bonesForFamily(familyId) {
 
 export function shapesForFamily(familyId) {
   return FAMILY_SHAPE_TEMPLATES[familyId] || []
+}
+
+// ---- 新构型（rigs.js）：归一化 from→to，按「帧像素框」摆放 -------------------
+// 老模板写死 ±16 这种小数字，套到 272×336 的帧上全挤在左上角（看着像没生效）；
+// 新构型按帧宽高归一化，用 skeleton-fit 识别出的锚点，识别失败才退回模板兜底值。
+
+/** sprite 的「绘制框」像素尺寸：优先帧矩形，其次 sprite.w/h（逻辑命中框） */
+export function frameBoxOf(sprite) {
+  const sp = sprite || currentSprite()
+  if (!sp) return { w: 32, h: 32 }
+  const act = sp.actions?.find((a) => a.frames?.length)
+  const f = act?.frames?.[0]
+  if (f && f.w > 0 && f.h > 0) return { w: f.w, h: f.h }
+  return { w: Math.max(1, Number(sp.w) || 32), h: Math.max(1, Number(sp.h) || 32) }
+}
+
+/** 用模板锚点生成骨头（绝对坐标，parent 已转 id） */
+export function placeBonesForFamily(familyId, box) {
+  const b = box || { w: 32, h: 32 }
+  return toStoredBones(assembleRig(familyId, templateAnchors(familyId, b), b))
+}
+
+/** 用模板锚点生成碰撞体 */
+export function placeShapesForFamily(familyId, box) {
+  const b = box || { w: 32, h: 32 }
+  return toStoredShapes(assembleShapes(familyId, templateAnchors(familyId, b), b))
+}
+
+/**
+ * 名字父级 → id 父级，并补齐编辑器需要的字段。
+ * 关键：识别/模板给的都是**绝对坐标**，而编辑器 boneTransforms 要求子骨骼用
+ * 「父骨骼末端坐标系里的偏移 + 相对角度」，所以先 absoluteToLocal 再落库。
+ */
+function toStoredBones(list) {
+  const local = absoluteToLocal(list)
+  const ids = new Map()
+  for (const b of local) ids.set(b.name, uid('bn'))
+  return local.map((b) => ({
+    id: ids.get(b.name),
+    name: b.name,
+    kind: b.kind || 'root',
+    x: b.x,
+    y: b.y,
+    len: b.len,
+    angle: b.angle,
+    parent: b.parent ? ids.get(b.parent) || null : null,
+    conf: b.conf,
+  }))
+}
+
+function toStoredShapes(list) {
+  return list.map((s) => ({
+    id: uid('shp'),
+    name: s.name,
+    role: s.role || 'body',
+    type: s.type || 'rect',
+    x: s.x,
+    y: s.y,
+    w: s.w,
+    h: s.h,
+    r: s.r || 0,
+    angle: s.angle || 0,
+    points: s.points || [],
+  }))
 }
 
 // ---- 从游戏注册表拉机体/怪物参考数据 ----
@@ -642,15 +709,18 @@ function normalizeSprite(s) {
     bones: (s.bones || []).map((b) => ({
       id: b.id || uid('bn'),
       name: b.name || '骨骼',
+      kind: b.kind || '',
       x: Number(b.x) || 0,
       y: Number(b.y) || 0,
-      len: Number(b.len) || 12,
+      len: Number(b.len) || 0,
       angle: Number(b.angle) || 0,
       parent: b.parent || null,
+      conf: b.conf === undefined || b.conf === null ? undefined : Number(b.conf) || 0,
     })),
     shapes: (s.shapes || []).map((q) => ({
       id: q.id || uid('shp'),
       name: q.name || '碰撞',
+      role: q.role || '',
       type: q.type || 'rect',
       x: Number(q.x) || 0,
       y: Number(q.y) || 0,
@@ -662,6 +732,8 @@ function normalizeSprite(s) {
     })),
     grip: q2(s.grip),
     cast: q2(s.cast),
+    // 智能识别元数据（来源 / 置信度 / 覆盖率 / 警告）：只做展示与追溯，不参与运行
+    rig: s.rig && typeof s.rig === 'object' ? { ...s.rig } : null,
   }
 }
 function q2(v) {
@@ -834,8 +906,9 @@ export function addSprite(sheetId, rect, opts = {}) {
     y: rect?.y ?? 0,
     w, h,
     actions: [{ name: 'idle', fps: 8, loop: true, frames: [] }],
-    bones: opts.autoBones ? bonesForFamily(familyFinal) : [],
-    shapes: opts.autoShapes ? shapesForFamily(familyFinal) : [],
+    // autoBones/autoShapes 走「按帧框摆放」的新构型（老模板坐标写死，尺寸对不上）
+    bones: opts.autoBones ? placeBonesForFamily(familyFinal, { w, h }) : [],
+    shapes: opts.autoShapes ? placeShapesForFamily(familyFinal, { w, h }) : [],
   })
   SE.project.sprites.push(sp)
   SE.sel.spriteId = sp.id
@@ -980,58 +1053,160 @@ export function setSpriteRef(opts) {
 export function applyFamilyBones(sprite, familyId, { replace = true, scale = 1 } = {}) {
   const sp = sprite || currentSprite()
   if (!sp) return 0
-  const tpl = bonesForFamily(familyId)
-  if (!tpl || !tpl.length) return 0
-  if (replace) { sp.bones = [] }
-  // 模板里父级是字符串名，这里按模板顺序解析
-  const newIds = new Map() // 模板内名 → 新 id
-  const pending = []
-  for (const def of tpl) {
-    const id = uid('bn')
-    newIds.set(def.name, id)
-    pending.push({ def, id })
-  }
-  for (const { def, id } of pending) {
-    sp.bones.push({
-      id,
-      name: def.name,
-      x: (Number(def.x) || 0) * scale,
-      y: (Number(def.y) || 0) * scale,
-      len: (Number(def.len) || 0) * scale,
-      angle: Number(def.angle) || 0,
-      parent: def.parent ? newIds.get(def.parent) || null : null,
-    })
+  const box = frameBoxOf(sp)
+  const placed = placeBonesForFamily(familyId, { w: box.w * scale, h: box.h * scale })
+  if (!placed.length) return 0
+  if (replace) {
+    sp.bones = placed
+  } else {
+    const byName = new Map(sp.bones.map((b) => [b.name, b.id]))
+    for (const b of placed) {
+      if (b.parent && !sp.bones.some((q) => q.id === b.parent)) b.parent = byName.get(b.name) || null
+      sp.bones.push(b)
+    }
   }
   if (replace) SE.sel.boneId = sp.bones[0]?.id || ''
   sp.family = familyId
   saveProject()
-  return tpl.length
+  return placed.length
 }
 
-/** 套用某族系的碰撞模板（追加） */
+/** 套用某族系的碰撞模板（替换 / 追加） */
 export function applyFamilyShapes(sprite, familyId, { replace = true, scale = 1 } = {}) {
   const sp = sprite || currentSprite()
   if (!sp) return 0
-  const tpl = shapesForFamily(familyId)
-  if (!tpl || !tpl.length) return 0
-  if (replace) { sp.shapes = [] }
-  for (const def of tpl) {
-    const s = {
-      id: uid('shp'),
-      name: def.name,
-      type: def.type,
-      x: (Number(def.x) || 0) * scale,
-      y: (Number(def.y) || 0) * scale,
-      w: (Number(def.w) || 0) * scale,
-      h: (Number(def.h) || 0) * scale,
-      r: (Number(def.r) || 0) * scale,
-      angle: Number(def.angle) || 0,
-      points: Array.isArray(def.points) ? def.points.map((p) => ({ x: Number(p.x) * scale, y: Number(p.y) * scale })) : [],
-    }
-    sp.shapes.push(s)
-  }
+  const box = frameBoxOf(sp)
+  const placed = placeShapesForFamily(familyId, { w: box.w * scale, h: box.h * scale })
+  if (!placed.length) return 0
+  if (replace) sp.shapes = placed
+  else sp.shapes.push(...placed)
   saveProject()
-  return tpl.length
+  return placed.length
+}
+
+// ============================================================================
+// 智能识别（骨骼 + 碰撞体）
+// ============================================================================
+
+/** 把 sheet 的某个矩形区域读成紧凑 alpha（识别器只吃 alpha） */
+function readSheetAlpha(sheet, rect) {
+  return new Promise((resolve) => {
+    const img = sheetImage(sheet)
+    if (!img || !img.complete || !img.naturalWidth) {
+      // 图还在解码：等一次 onload
+      if (img && !img.complete) {
+        img.onload = () => resolve(readSheetAlpha(sheet, rect))
+        img.onerror = () => resolve(null)
+        return
+      }
+      resolve(null)
+      return
+    }
+    const w = Math.max(1, Math.round(rect.w))
+    const h = Math.max(1, Math.round(rect.h))
+    const cv = document.createElement('canvas')
+    cv.width = w
+    cv.height = h
+    const ctx = cv.getContext('2d', { willReadFrequently: true })
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(img, rect.x, rect.y, w, h, 0, 0, w, h)
+    resolve({ alpha: alphaFromRGBA(ctx.getImageData(0, 0, w, h).data, w, h), w, h })
+  })
+}
+
+/**
+ * 智能识别骨骼 + 碰撞体并写回 sprite。
+ * @param {object} sprite
+ * @param {{mode?:'all'|'action'|'current', useAiMask?:boolean, family?:string, threshold?:number}} opts
+ *        mode=all      整条动作一起拟合（关节取中位数，最稳，默认）
+ *        mode=action   只有当前动作
+ *        mode=current  只有当前帧
+ * @returns {Promise<object>} { ok, bones, shapes, stats, warnings }
+ */
+export async function autoFitRig(sprite, opts = {}) {
+  const sp = sprite || currentSprite()
+  if (!sp) return { ok: false, reason: '没有选中 sprite' }
+  const sheet = SE.project.sheets.find((s) => s.id === sp.sheetId) || SE.project.sheets[0]
+  if (!sheet) return { ok: false, reason: '这个 sprite 没有图集' }
+
+  const family = opts.family || sp.family || 'unknown'
+  const mode = opts.mode || 'all'
+  const act = mode === 'current' ? currentAction() : sp.actions.find((a) => a.frames?.length)
+  const box = frameBoxOf(sp)
+
+  // 选帧：current 只取当前帧；action 取该动作全部；all 取所有动作
+  let frames = []
+  if (mode === 'current') {
+    const f = currentFrame() || act?.frames?.[0]
+    if (f) frames.push(f)
+  } else if (mode === 'action') {
+    frames = (act?.frames || []).slice()
+  } else {
+    const seen = new Set()
+    for (const a of sp.actions || []) {
+      for (const f of a.frames || []) {
+        const key = `${f.x},${f.y},${f.w},${f.h}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        frames.push(f)
+      }
+    }
+  }
+  if (!frames.length) return { ok: false, reason: '这个 sprite 还没有切帧' }
+
+  const loaded = []
+  for (const f of frames) {
+    const px = await readSheetAlpha(sheet, f)
+    if (px) loaded.push({ f, ...px })
+  }
+  if (!loaded.length) return { ok: false, reason: '帧图像读取失败（图集还没解码完？）' }
+
+  // AI 蒙版（Hugging Face，可选）：拿不到就用图集自带的 alpha
+  let ai = null
+  if (opts.useAiMask) {
+    try {
+      const { aiSegment } = await import('./ai-mask.js')
+      ai = await aiSegment({ sheet, rect: loaded[0].f })
+    } catch (e) {
+      ai = { ok: false, reason: String(e?.message || e) }
+    }
+  }
+  if (ai?.ok && ai.alpha && ai.w === loaded[0].w && ai.h === loaded[0].h) {
+    loaded[0] = { ...loaded[0], alpha: ai.alpha }
+  }
+
+  const fit =
+    mode === 'current' && loaded.length === 1
+      ? fitSkeleton({ alpha: loaded[0].alpha, w: loaded[0].w, h: loaded[0].h, family, threshold: opts.threshold })
+      : fitFrames(
+          loaded.map((q) => ({ alpha: q.alpha, w: q.w, h: q.h })),
+          { family, threshold: opts.threshold },
+        )
+  if (!fit.ok) return { ...fit, reason: fit.reason || '识别失败' }
+
+  sp.bones = toStoredBones(fit.bones)
+  sp.shapes = toStoredShapes(fit.shapes)
+  sp.family = family
+  sp.rig = {
+    fittedAt: new Date().toISOString(),
+    source: ai?.ok ? 'ai+local' : 'local',
+    mode,
+    family,
+    frames: fit.frames || 1,
+    stats: fit.stats || null,
+    warnings: fit.warnings || [],
+  }
+  SE.sel.boneId = sp.bones[0]?.id || ''
+  SE.sel.shapeId = ''
+  saveProject()
+  return {
+    ok: true,
+    bones: sp.bones.length,
+    shapes: sp.shapes.length,
+    stats: fit.stats,
+    warnings: fit.warnings || [],
+    frameBox: box,
+  }
 }
 
 /** 按 kind 过滤 sprite 列表；传 null = 全部 */
@@ -1507,6 +1682,11 @@ if (typeof window !== 'undefined') {
     applyFamilyShapes,
     bonesForFamily,
     shapesForFamily,
+    // 骨骼 / 碰撞体：按帧框摆放 + 智能识别
+    frameBoxOf,
+    placeBonesForFamily,
+    placeShapesForFamily,
+    autoFitRig,
     guessFamilyFromRef,
     targetGroups,
     setTarget,

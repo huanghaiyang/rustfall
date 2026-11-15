@@ -223,6 +223,129 @@ DELETE /__editor/sprite/history       → 清空
    否则最后 0.6s 的编辑会丢。
 4. 写盘用「先写 `.tmp` 再 `rename`」，断电不会留下半截 JSON；`index.json` 的读-改-写也串行。
 
+### 1.8 骨骼 / 碰撞体 与「智能识别」
+
+**源码**
+
+| 文件 | 职责 |
+|---|---|
+| `src/game/editor/rigs.js` | 族系构型表（骨头 / 碰撞体 / 颜色 / 层级）、`assembleRig`、`absoluteToLocal` |
+| `src/game/editor/skeleton-fit.js` | 从 alpha 轮廓识别锚点与骨骼（纯函数，可离线单测） |
+| `src/game/editor/ai-mask.js` | 可选：Hugging Face 分割蒙版客户端 |
+| `SpriteInspector.vue` | 「智能识别 · AUTO RIG」区块、骨骼/碰撞体列表与编辑器 |
+| `sprite-viewport.js` | 骨骼按 `kind` 配色、碰撞按 `role` 配色、放大后标骨骼名 |
+
+#### 坐标系（最容易错的一处）
+
+- 骨骼 / 碰撞都活在 **帧像素坐标**：原点 = 当前帧左上角，`x` 右、`y` 下。
+  不是 `sprite.w/h` —— 那是逻辑命中框（数据执政官 136×168，帧是 272×336）。
+- 落库时骨骼必须是 **层级相对**：`boneTransforms()` 里子骨骼的 `x/y` 是
+  「父骨骼末端坐标系里的偏移」、角度相对父级累加。识别器产出的是**绝对坐标**，
+  所以 `toStoredBones()` 会先过一遍 `absoluteToLocal()`。
+  > 不做这一步，层级会一层层叠加偏移，骨骼整片飞出去。
+  > 反过来，编辑老工程里那些「写死绝对坐标」的模板骨骼本身就是错的 —— 新模板已按帧框归一化。
+
+#### 构型（`rigs.js`）
+
+每个骨头声明 `{ name, kind, parent, from, to, fb }`：`from/to` 是锚点槽名（识别结果），
+`fb` 是归一化兜底值（识别不到时用模板位置）。碰撞体同构：`{ name, role, from, to, fb }`。
+
+| family | 骨头 | 说明 |
+|---|---|---|
+| `mech` / `biped` / `boss` / `arm` | 21 | 机械人形：root→pelvis→spine→chest→head→crown、双肩+上臂/前臂/手、双髋+大腿/小腿/足、prop |
+| `quad` | 8 | 脊柱横放 + 四条腿 + 尾 |
+| `flyer` | 6 | 机身 + 双翼 + 尾 |
+| `swarm` | 6 | 核心 + 四条触须 |
+| `plant` | 5 | 根 + 茎 + 头 + 卷须 |
+| `minion` / `light` / `wheel` / `track` | 5 | 极简 |
+
+骨骼 `kind`（19 种）与碰撞体 `role`（9 种）见 `BONE_KINDS` / `SHAPE_ROLES`，
+种类决定配色与未来接引擎 IK / 断肢 / 爆头倍率的语义。
+
+#### 识别算法（`skeleton-fit.js`，确定性、离线、无模型依赖）
+
+```
+alpha ──► 掩码 / 包围盒
+      ──► 倒角距离变换（厚度场）
+      ──► 躯干块：厚度 ≥0.5×max 的核心定位置 → 放宽到 0.18×max 取真实外框
+      ──► 髋线 = 躯干底（夹在 42%~82% 帧高）
+      ──► 腿：先在「贴地 13% 带」找脚簇（掐掉弱边）→ 各自向上取腿的列窗
+              只能找到一只脚 → 退回「髋线以下列聚类」；再不行 → 中线对半拆
+      ──► 手臂：躯干中下段、躯干外侧、厚度 ≥6%×max 的突起 → 肩/肘/手/指尖
+      ──► 头：只在「躯干正上方那一列带」里找（否则两侧线缆/光环会撑大头部框）
+      ──► 道具：两腿外侧、宽高都 ≥12% 帧尺寸的独立块（严格验收，宁可不出假框）
+      ──► assembleRig/Shapes（缺锚点的零件不生成，而不是拿兜底值硬凑）
+      ──► 置信度 = 骨骼支撑度(采样点落在掩码内的比例)×0.7 + 长度合理性×0.3
+            覆盖率 = 掩码像素被碰撞体覆盖的比例（另算「排除总命中框」的体表覆盖率）
+```
+
+多帧联合拟合 `fitFrames()`：每条动作的每一帧各识别一次，**关节取中位数**当静息骨架
+（走路循环这种「躯干不动、四肢晃」的动作最稳），零件类骨骼要求「半数以上帧都认出来」，
+否则宁可不生成。数据执政官 10 帧实测：`20 骨 / 7 碰撞体 / 置信 0.80 / 体表覆盖 76~94%`。
+
+#### UI 用法
+
+精灵编辑器 → 右栏「智能识别 · AUTO RIG」：
+
+- 模式：`整条动作（多帧取中位，最稳）` / `当前动作` / `当前帧`
+- 「识别骨骼 + 碰撞」→ 直接覆盖该 sprite 的 bones / shapes，并把元数据写进 `sprite.rig`
+  （来源 / 模式 / 帧数 / 置信度 / 覆盖率 / 警告），面板上显示「上次识别：local · all · 10 帧 · 置信 80%」
+- 骨骼列表显示 `种类色点 + 角度 + 单骨置信度`；点开可改 `种类`；碰撞体列表显示 `type · role`
+- 参数手调（X/Y/长度/角度/父级）照旧，识别只是把初值填对，不是锁定
+
+#### API
+
+| API | 作用 |
+|---|---|
+| `autoFitRig(sprite, {mode:'all'\|'action'\|'current', useAiMask, family})` | 识别并覆盖 bones/shapes，返回 `{ok, bones, shapes, stats, warnings}` |
+| `placeBonesForFamily(family, {w,h})` / `placeShapesForFamily(...)` | 用模板锚点摆一套（不依赖图集内容） |
+| `frameBoxOf(sprite)` | 取「绘制框」：优先帧矩形，其次 `sprite.w/h` |
+| `absoluteToLocal(list)` | 绝对坐标 → 层级相对（落库前必过） |
+| `fitSkeleton({alpha,w,h,family})` / `fitFrames(frames, opts)` | 纯识别器（Node 里也能跑，只吃 alpha 数组） |
+| `findAnchors(alpha,w,h)` | 只要锚点（调试 / 画叠加图用） |
+
+#### Hugging Face 分割蒙版（可选增强）
+
+**为什么不是姿态估计模型**：COCO 关键点那类模型训练分布是真人照片，
+喂「侧面像素机甲」只会得到离谱的关键点。真正有用的只是**干净的前景蒙版**，
+骨架交给几何识别。所以接的是抠图/分割模型（默认 `briaai/RMBG-1.4`）。
+
+配置（二选一）：
+
+```bash
+# 环境变量
+set HF_TOKEN=hf_xxx
+# 或者落一份配置文件（会被 dev server 读，token 不进前端）
+editor-data/ai-config.json → { "token": "hf_xxx", "model": "briaai/RMBG-1.4" }
+```
+
+接口：`GET /__editor/ai/status`、`POST /__editor/ai/segment`（经 dev server 代理，
+token 不出服务端、同图结果按 sha1 缓存 12 条、`x-wait-for-model: true`）。
+没配 token / 离线 / 模型报错时，`/status` 返回 `available:false` + 具体原因，
+面板显示「AI 蒙版不可用：…」，识别自动走纯本地路径，**不会报错也不会卡住**。
+
+#### 验证
+
+```bash
+node scripts/verify-skeleton-fit.mjs   # 识别算法：10 帧样本 + 确定性 + 鲁棒性 + AI 降级 + 叠加图
+node scripts/verify-editor-rig.mjs     # 编辑器全链路：坐标系往返 ≤2px + 落库字段 + 磁盘工程
+```
+
+两个脚本都会输出「骨骼 / 碰撞体 / 置信度 / 覆盖率」明细并落一张可视化叠加图。
+
+#### 坑
+
+1. **层级相对 vs 绝对**：见上文坐标系。往返校验是 `maxErr ≤2px`（实测 0.01px）。
+2. **帧框 ≠ sprite.w/h**：模板/识别一律用 `frameBoxOf()`，否则 272×336 的帧上骨头会挤在左上角。
+3. **躯干阈值**：只用 `0.5×maxDist` 会只框住机柜最厚的一条带（实测 63px 宽），
+   必须「核心定位置、放宽阈值定尺寸」。
+4. **髋线**：按「宽度突然变窄」找髋线，在提着箱子/叉腿时会一路漂到 271（真值 205），
+   所以直接用躯干底 + 夹取。
+5. **脚簇弱边**：手提箱在地面带会压出 1~2px 浅痕，脚簇的列范围要掐掉弱边（≥50% 峰值），
+   否则整条箱子会并进后腿。
+6. **道具宁缺毋滥**：与身体相连的挂件严格来说需要实例分割，几何上只认「两腿外侧、够大够方」的块。
+
+
 ---
 
 ## 2. 房间编辑器（Room Editor）
