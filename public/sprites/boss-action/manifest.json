@@ -1,41 +1,73 @@
 {
   "tb_data_archon": {
-    "file": "sprites/boss-action/tb_data_archon.png",
-    "w": 3264,
-    "h": 336,
+    "kinds": {
+      "base": {
+        "file": "sprites/boss-action/tb_data_archon.png",
+        "frames": 12
+      },
+      "walk": {
+        "file": "sprites/boss-action/tb_data_archon_walk.png",
+        "frames": 10
+      }
+    },
     "frameW": 272,
     "frameH": 336,
     "logicalW": 136,
     "logicalH": 168,
+    "fps": {
+      "idle": 6,
+      "walk": 11,
+      "run": 11,
+      "move": 11,
+      "attack": 12,
+      "cast": 10,
+      "hurt": 8,
+      "dead": 5
+    },
     "frames": {
       "idle": [
-        0,
-        1
+        "base:0",
+        "base:1"
+      ],
+      "walk": [
+        "walk:0",
+        "walk:1",
+        "walk:2",
+        "walk:3",
+        "walk:4",
+        "walk:5",
+        "walk:6",
+        "walk:7",
+        "walk:8",
+        "walk:9"
       ],
       "run": [
-        2,
-        3,
-        4,
-        5
+        "walk:0",
+        "walk:1",
+        "walk:2",
+        "walk:3",
+        "walk:4",
+        "walk:5",
+        "walk:6",
+        "walk:7",
+        "walk:8",
+        "walk:9"
       ],
       "attack": [
-        6,
-        7
+        "base:6",
+        "base:7"
       ],
       "cast": [
-        8,
-        9
+        "base:8",
+        "base:9"
       ],
       "hurt": [
-        10
+        "base:10"
       ],
       "dead": [
-        11
+        "base:11"
       ]
     },
-    "grid": [
-      "2x3",
-      "3x2"
-    ]
+    "file": "sprites/boss-action/tb_data_archon.png"
   }
 }

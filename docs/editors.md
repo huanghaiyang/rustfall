@@ -348,7 +348,7 @@ Content.stats()                      // → { monster: N, chassis: N, item: N, .
 
 | 值 | 含义 | 房间编辑器运行时推送 | 精灵编辑器运行时推送 |
 |---|---|---|---|
-| `published` | 已发布（默认，向后兼容） | **实时**：每次编辑都写 `rustfall.terrain.v1` / `rustfall.bgedits.v1` + 发 `rustfall:terrain-patch` CustomEvent | 标记 published + 发 `rustfall:sprite-editor-published` CustomEvent（游戏尚未接入） |
+| `published` | 已发布（默认，向后兼容） | **实时**：每次编辑都写 `rustfall.terrain.v1` / `rustfall.bgedits.v1` + 发 `rustfall:terrain-patch` CustomEvent | 标记 published + 发 `rustfall:sprite-editor-published` CustomEvent；**BOSS 动作已接入**（见 5.5） |
 | `draft` | 草稿 | **不推**：所有编辑只改工程 localStorage（`rustfall.roomeditor.v1`），运行时表保持「上一次发布」版本 | 仅标记 draft（无运行时通路） |
 
 ### 工程状态字段（两个编辑器的 project 对象）
@@ -421,16 +421,80 @@ window.__spriteEditor.setDraft()
 window.__spriteEditor.projectStatus
 ```
 
-### 精灵编辑器的运行时通路（未来）
+### 精灵编辑器的运行时通路（已接入：BOSS 动作覆盖）
 
-目前游戏运行时**不**从精灵编辑器工程加载 sprite——精灵还在纯 `public/sprites/*` 的 asset 通道里。发布时的 `CustomEvent('rustfall:sprite-editor-published', { sheets, sprites })` 是给未来接入用的。当游戏侧实现 sprite 加载时：
+精灵编辑器发布的 sprite 现在会**真的落到游戏里的角色身上**，通路在
+`src/game/render/art/sprite-editor-bridge.js`，消费方是 `render/art/boss-action.js`：
 
-```js
-window.addEventListener('rustfall:sprite-editor-published', ({ detail }) => {
-  // 按 detail.sheets / detail.sprites 重新构建游戏运行时 sprite 表
-  // 读同一个 localStorage['rustfall.spriteeditor.v1'] 拿 dataURL
-})
 ```
+精灵编辑器 publish()
+  → localStorage['rustfall.spriteeditor.v1']（含 sheet 的 dataURL）
+  → CustomEvent('rustfall:sprite-editor-published')
+  → boss-action.js: invalidateEditorSprites() + clearBossActionCache() + _version++
+  → 下一次 loadBossAction(id)：磁盘图集 frames 打底，编辑器同名动作整组覆盖
+  → 场上 BOSS 的 updateBehavior 发现 bossActionVersion() 变了 → _loadActionFrames() 就地换帧
+```
+
+优先级与语义：
+
+| 项 | 规则 |
+|---|---|
+| 谁生效 | 编辑器 `sprite.refId` 命中 + 该动作有帧 → 覆盖；否则继续用磁盘图集 |
+| 覆盖粒度 | **按动作名整组替换**（`idle / walk / run / attack / cast / hurt / dead / move`），不做逐帧混拼 |
+| 帧率 | 编辑器 action 的 `fps` 压过磁盘 `manifest.fps` |
+| 尺寸 | 编辑器 sprite 的 `w/h`（= 命中框）作为无图集时的逻辑尺寸兜底 |
+| 热更新 | 发布即生效，不用重进房间、不用重新 build |
+
+桥接实现里三个必须知道的点：
+
+1. **帧矩形是逻辑坐标**：`offset/repeat` 一律除以 `sheet.width/height`（逻辑尺寸），
+   别用 `naturalW` —— `sheet.scale ≠ 1` 时会对不上。
+2. **THREE 纹理 `flipY = true`**（`v=0` 在图片底部），所以帧的 `y` 要翻过来：
+   `offset.y = 1 - (frame.y + frame.h) / sheetH`。
+3. **一张 sheet 只上传一次 GPU**：同一 sheet 的所有帧都是同一张纹理的 `clone()`，
+   只差 `offset/repeat`；不 clone 会让 N 个动作抢同一个 offset。
+
+> 为什么是「覆盖」而不是「编辑器工程替代 public/sprites」：磁盘图集是**可发布、可入库**的
+> 成品（新机器 / 无 localStorage 也能跑），编辑器工程是**随时可调**的覆盖层。
+> 两条路读同一份数据形状，所以调满意了再用 `scripts/boss-walk-post.mjs` 烘回磁盘。
+
+#### 5.5 实操：把一条序列帧绑到角色（数据执政官走路为例）
+
+```bash
+# 1) N 张单帧 PNG → 一张横向图集 + manifest 帧组
+node scripts/boss-walk-post.mjs            # 默认 数据执政官 原地走路 001~010
+
+# 2) 用内嵌编辑器绑定到目标并发布（真点 UI：主菜单 → 精灵编辑器 → 选目标 → 导入精灵图）
+node scripts/sprite-editor-apply-walk.mjs  # --boss / --strip / --cols / --cellw / --cellh / --fps
+
+# 3) 进 BOSS 测试房验：帧数 / 帧率 / 「纹理图源是 dataURL」= 确实走了编辑器
+node scripts/verify-boss-walk.mjs          # --no-editor 只验磁盘图集那条路
+```
+
+图集规范（`public/sprites/boss-action/manifest.json`）：
+
+```jsonc
+{
+  "tb_data_archon": {
+    "kinds": {                       // 一只 BOSS 可以有任意多张图集
+      "base": { "file": "sprites/boss-action/tb_data_archon.png",      "frames": 12 },
+      "walk": { "file": "sprites/boss-action/tb_data_archon_walk.png", "frames": 10 }
+    },
+    "frameW": 272, "frameH": 336,    // 每格像素（= logicalW/H × 2）
+    "logicalW": 136, "logicalH": 168,
+    "fps": { "idle": 6, "walk": 11, "run": 11, "attack": 12, "cast": 10, "hurt": 8, "dead": 5 },
+    "frames": {
+      "idle":   ["base:0", "base:1"],
+      "walk":   ["walk:0", "…", "walk:9"],
+      "run":    ["walk:0", "…", "walk:9"],   // 引擎里「移动」读的是 run
+      "attack": ["base:6", "base:7"]
+    }
+  }
+}
+```
+
+帧引用两种写法：`"<kind>:<index>"`（多图集必须用这个）或纯数字 `<index>`（旧格式，按动作名猜图集）。
+`walk / run / move` 三个名字都归一化到移动循环；`hurt / dead` 旧格式映射到 `react` 图集。
 
 ---
 

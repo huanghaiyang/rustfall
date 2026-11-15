@@ -1,22 +1,49 @@
 // ============================================================================
 // 锈雨 · RUSTFALL —— AI BOSS 动作序列帧加载层
 // ----------------------------------------------------------------------------
-// public/sprites/boss-action/manifest.json 由 scripts/boss-action-post.mjs 生成：
-//   { "<bossId>": { file, w, h, frameW, frameH, logicalW, logicalH,
-//                   frames: { idle:[0,1], run:[2,3,4,5], attack:[6,7],
-//                             cast:[8,9], hurt:[10], dead:[11] } } }
+// public/sprites/boss-action/manifest.json 由 scripts/boss-action-post.mjs /
+// scripts/boss-walk-post.mjs 生成。每个 BOSS 可以有多张图集（kinds），帧引用写法：
 //
-// 每只 BOSS 的 12 帧打包成一张横向图集；这里按 UV 偏移克隆出 12 个纹理，
-// 共享同一张 GPU 图，只有 offset/repeat 不同。按需加载（BOSS 进场时才请求），
-// 避免 51 张图集常驻显存。
+//   { "<bossId>": {
+//       kinds: { base: { file, frames: 12 }, walk: { file, frames: 10 } },
+//       frameW, frameH, logicalW, logicalH,
+//       fps:    { idle: 6, walk: 11, run: 11, attack: 12, cast: 10, hurt: 8, dead: 5 },
+//       frames: { idle: ["base:0","base:1"],
+//                 walk: ["walk:0", … , "walk:9"],
+//                 run:  ["walk:0", … ] } } }
+//
+// 帧引用两种写法：
+//   · `"<kind>:<index>"` —— 显式指定图集（多图集时用这个，最不容易猜错）
+//   · `<index>`（数字）  —— 按动作名猜图集（旧格式，向后兼容）
+//
+// 每张图集只上传一次 GPU：按 UV 偏移 clone 出 N 个纹理，共享同一张图。
+// 按需加载（BOSS 进场时才请求），避免 51 张图集常驻显存。
+//
+// 覆盖层：精灵编辑器发布的 sprite（localStorage）优先级高于磁盘图集 ——
+// 见 sprite-editor-bridge.js。发布事件会清空缓存并 bump 版本号，
+// 场上的 BOSS 靠 bossActionVersion() 变化就地换帧，不用重进房间。
 // ============================================================================
 
 import * as THREE from 'three'
+import { editorFramesFor, editorFpsFor, editorSpriteSize, invalidateEditorSprites } from './sprite-editor-bridge.js'
 
 const META = new Map()
 const READY = new Map()
 const PENDING = new Map()
 let manifestPromise = null
+let _version = 0
+
+/** 动作名 → 图集名候选链（先精确，再兜底）。 */
+const NAME_KIND = {
+  idle: ['idle', 'all'],
+  walk: ['walk', 'move', 'all'],
+  move: ['walk', 'move', 'all'],
+  run: ['walk', 'move', 'all'],
+  attack: ['attack', 'all'],
+  cast: ['cast', 'attack', 'all'],
+  hurt: ['react', 'hurt', 'all'],
+  dead: ['react', 'dead', 'all'],
+}
 
 function assetUrl(rel) {
   const base = (import.meta.env && import.meta.env.BASE_URL) || '/'
@@ -30,7 +57,7 @@ function loadManifest() {
     .then((json) => {
       if (json && typeof json === 'object') {
         for (const [id, info] of Object.entries(json)) {
-          if (info && info.file) META.set(id, info)
+          if (info && (info.file || info.kinds)) META.set(id, info)
         }
       }
       return META
@@ -68,6 +95,25 @@ export function bossActionState(id) {
   return 'idle'
 }
 
+/** 覆盖层版本号：精灵编辑器每发布一次 +1。场上 BOSS 靠它发现要换帧。 */
+export function bossActionVersion() {
+  return _version
+}
+
+/** 清空缓存（发布 / 热重载）。 */
+export function clearBossActionCache() {
+  READY.clear()
+  PENDING.clear()
+  _version++
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('rustfall:sprite-editor-published', () => {
+    invalidateEditorSprites()
+    clearBossActionCache()
+  })
+}
+
 /**
  * 按需加载某只 BOSS 的动作图集；重复调用复用同一个 Promise。
  * 返回 null 表示这张 BOSS 没有动作表（或加载失败），调用方继续用单帧立绘。
@@ -76,13 +122,37 @@ export function loadBossAction(id) {
   const key = String(id || '')
   if (READY.has(key)) return Promise.resolve(READY.get(key))
   if (PENDING.has(key)) return PENDING.get(key)
-  const job = loadManifest()
-    .then((meta) => {
+
+  const job = Promise.all([loadManifest(), editorFramesFor(key).catch(() => null)])
+    .then(([meta, editorFrames]) => {
       const info = meta.get(key)
-      if (!info) return null
+
+      // ---- 只有编辑器数据、没有磁盘图集：也能出动作（尺寸取编辑器里的 sprite） ----
+      if (!info) {
+        if (!editorFrames) return null
+        const size = editorSpriteSize(key)
+        const firstFrames = Object.values(editorFrames)[0] || []
+        const art = {
+          w: size?.w || 136,
+          h: size?.h || 168,
+          logicalW: size?.w || 136,
+          logicalH: size?.h || 168,
+          frameW: 0,
+          frameH: 0,
+          fps: editorFpsFor(key),
+          frames: { ...editorFrames },
+          fromEditor: true,
+        }
+        if (!art.frames.idle && firstFrames.length) art.frames.idle = firstFrames
+        READY.set(key, art)
+        return art
+      }
+
       // 兼容旧格式（单图集 info.file）与新格式（多图集 info.kinds）
       const kinds = info.kinds
-        ? Object.entries(info.kinds).map(([kind, k]) => ({ kind, file: k.file }))
+        ? Object.entries(info.kinds)
+            .filter(([, k]) => k && k.file)
+            .map(([kind, k]) => ({ kind, file: k.file }))
         : [{ kind: 'all', file: info.file }]
 
       const loads = kinds.map(
@@ -112,27 +182,44 @@ export function loadBossAction(id) {
       return Promise.all(loads).then((loaded) => {
         const byKind = new Map()
         for (const k of loaded) if (k) byKind.set(k.kind, k.frames)
-        if (!byKind.size) return null
+        if (!byKind.size && !editorFrames) return null
 
-        const frames = {}
-        const NAME_KIND = {
-          idle: 'idle',
-          walk: 'move',
-          run: 'move',
-          move: 'move',
-          attack: 'attack',
-          cast: 'cast',
-          hurt: 'react',
-          dead: 'react',
+        // 数字引用 → 按动作名猜图集；"kind:index" → 显式图集
+        const pickKind = (name) => {
+          for (const k of NAME_KIND[name] || []) if (byKind.has(k)) return byKind.get(k)
+          if (byKind.has('all')) return byKind.get('all')
+          return [...byKind.values()][0] || []
         }
+        const frames = {}
         for (const [name, list] of Object.entries(info.frames || {})) {
           if (!Array.isArray(list) || !list.length) continue
-          const kind = NAME_KIND[name] || 'all'
-          const src = byKind.get(kind) || byKind.get('all') || [...byKind.values()][0]
-          if (!src) continue
-          frames[name] = list.map((i) => src[Math.min(src.length - 1, i)]).filter(Boolean)
+          const out = []
+          for (const ref of list) {
+            let src = null
+            let idx = NaN
+            if (typeof ref === 'number') {
+              idx = ref
+              src = pickKind(name)
+            } else if (typeof ref === 'string' && ref.includes(':')) {
+              const [kindName, n] = ref.split(':')
+              idx = Number(n)
+              src = byKind.get(kindName) || null
+            }
+            if (!src || !src.length || !Number.isFinite(idx)) continue
+            const t = src[Math.max(0, Math.min(src.length - 1, idx))]
+            if (t) out.push(t)
+          }
+          if (out.length) frames[name] = out
         }
         if (frames.run && !frames.move) frames.move = frames.run
+
+        // ---- 精灵编辑器覆盖：同名动作整组替换（编辑器里编排的就是最终顺序） ----
+        if (editorFrames) {
+          for (const [name, list] of Object.entries(editorFrames)) {
+            if (list && list.length) frames[name] = list
+          }
+          if (!frames.move && frames.run) frames.move = frames.run
+        }
         if (!frames.idle) return null
 
         const art = {
@@ -142,8 +229,9 @@ export function loadBossAction(id) {
           logicalH: info.logicalH,
           frameW: info.frameW,
           frameH: info.frameH,
-          fps: info.fps || null,
+          fps: Object.assign({}, info.fps || {}, editorFpsFor(key) || {}),
           frames,
+          fromEditor: !!editorFrames,
         }
         READY.set(key, art)
         return art

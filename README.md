@@ -39,6 +39,16 @@ node scripts/test-v5.mjs         # 手柄 / 动画 / 拾取
 node scripts/test-v6.mjs         # 武器 / 大型敌人
 ```
 
+### 序列帧美术管线（BOSS 动作 / 走路）
+
+```bash
+node scripts/boss-walk-post.mjs            # N 张单帧 PNG → 横向图集 + manifest 帧组
+node scripts/sprite-editor-apply-walk.mjs  # 用内嵌精灵编辑器绑定到角色并发布
+node scripts/verify-boss-walk.mjs          # BOSS 测试房验证（帧数/帧率/来源）
+```
+
+详见 [`docs/editors.md`](docs/editors.md) 第 5 节。
+
 ---
 
 ## 操作

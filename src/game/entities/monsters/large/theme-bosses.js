@@ -28,7 +28,7 @@ import {
 import { BOSS_KIT_FACTORIES } from './theme-boss-kits.js'
 import { BOSS_SIGNATURES } from './boss-signatures.js'
 import { updateFx, clearFx } from './theme-boss-fx.js'
-import { loadBossAction } from '../../../render/art/boss-action.js'
+import { loadBossAction, bossActionVersion } from '../../../render/art/boss-action.js'
 import { playBossVfx, preloadBossVfx, vfxForMove, vfxNamesForBoss } from '../../../render/art/boss-vfx.js'
 
 /** 各站点 BOSS 的配置表。moves 即该 BOSS 独占的四招，按出招优先级排列。 */
@@ -882,14 +882,26 @@ class ThemeBoss extends BaseMonster {
     this._buildAura()
   }
 
-  /** 按需加载 12 帧动作图集；到货后直接替换当前动作帧，无需重建 mesh。 */
+  /** 按需加载动作图集（磁盘 manifest + 精灵编辑器覆盖）；到货后直接替换当前动作帧。 */
   _loadActionFrames() {
     const id = String(this.def?.artId || this.def?.id || '')
-    if (!id.startsWith('tb_')) return
+    // 不限定 tb_*：精灵编辑器里绑了任何 BOSS 都能覆盖；没有图集时 loadBossAction 返回 null，什么也不做
+    if (!id) return
+    const ver = bossActionVersion()
+    this._artVer = ver
     loadBossAction(id).then((art) => {
       if (!art || !art.frames || this.dead || !this.mesh) return
+      // 版本已经变过（加载途中又发布了一次）：这次结果作废，等下一帧重新取
+      if (this._artVer !== bossActionVersion()) return
       this.frames = art.frames
-      this.art = Object.assign({}, this.art, { frames: art.frames, w: art.w, h: art.h })
+      // 动作表自带 fps 表（idle 6 / walk·run 11 / attack 12 …），不接的话全按 9fps 播
+      if (art.fps) this.animFps = art.fps
+      this.art = Object.assign({}, this.art, {
+        frames: art.frames,
+        w: art.w,
+        h: art.h,
+        fromEditor: !!art.fromEditor,
+      })
       this.playAnim(this.animName)
       this.applyFrame()
     })
@@ -1041,6 +1053,8 @@ class ThemeBoss extends BaseMonster {
   }
 
   updateBehavior(dt) {
+    // 精灵编辑器发布过 → 就地换帧（不用重进房间；每帧一次数值比较，代价可忽略）
+    if (this._artVer !== bossActionVersion()) this._loadActionFrames()
     this.moveCd = Math.max(0, this.moveCd - dt)
     for (const k in this.moveReady) {
       if (this.moveReady[k] > 0) this.moveReady[k] = Math.max(0, this.moveReady[k] - dt)
