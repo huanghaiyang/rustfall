@@ -1,0 +1,94 @@
+[
+  {
+    "id": "h_mwhk8nm0_adxt0c",
+    "at": "2026-11-15T08:16:06.024Z",
+    "reason": "发布",
+    "label": "",
+    "hash": "7a49fb46",
+    "bytes": 475446,
+    "projectName": "未命名工程",
+    "status": "published",
+    "counts": {
+      "sheets": 1,
+      "sprites": 1,
+      "effects": 0,
+      "presets": 8,
+      "actions": 2,
+      "frames": 20,
+      "bones": 9,
+      "shapes": 5
+    },
+    "sheets": [
+      {
+        "id": "sh_mwhk8nam13ki5",
+        "name": "数据执政官·走路 10 帧",
+        "w": 2720,
+        "h": 336,
+        "naturalW": 2720,
+        "naturalH": 336
+      }
+    ],
+    "targets": [
+      {
+        "refId": "tb_data_archon",
+        "name": "数据执政官 ARCHON-9",
+        "kind": "monster",
+        "actions": "walk(10) run(10)"
+      }
+    ],
+    "spriteNames": [
+      {
+        "id": "sp_mwhk8narfzm3k",
+        "name": "数据执政官 ARCHON-9",
+        "refId": "tb_data_archon",
+        "kind": "monster"
+      }
+    ]
+  },
+  {
+    "id": "h_mwhk838x_dbvfw3",
+    "at": "2026-11-15T08:15:39.633Z",
+    "reason": "发布",
+    "label": "",
+    "hash": "5ed7154f",
+    "bytes": 474561,
+    "projectName": "未命名工程",
+    "status": "published",
+    "counts": {
+      "sheets": 1,
+      "sprites": 1,
+      "effects": 0,
+      "presets": 8,
+      "actions": 1,
+      "frames": 10,
+      "bones": 9,
+      "shapes": 5
+    },
+    "sheets": [
+      {
+        "id": "sh_mwhk82x35uxzf",
+        "name": "数据执政官·走路 10 帧（walk only）",
+        "w": 2720,
+        "h": 336,
+        "naturalW": 2720,
+        "naturalH": 336
+      }
+    ],
+    "targets": [
+      {
+        "refId": "tb_data_archon",
+        "name": "数据执政官 ARCHON-9",
+        "kind": "monster",
+        "actions": "walk(10)"
+      }
+    ],
+    "spriteNames": [
+      {
+        "id": "sp_mwhk82xagjneq",
+        "name": "数据执政官 ARCHON-9",
+        "refId": "tb_data_archon",
+        "kind": "monster"
+      }
+    ]
+  }
+]
