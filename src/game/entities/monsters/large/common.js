@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import * as monsterArt from '../../../render/art/monsters.js'
 import { attachNameplate } from '../../../render/art/nameplate.js'
+import { resizeOutlineMesh } from '../../../render/outline.js'
 
 /**
  * 大型敌人公共工具（junk_golem / sky_warden / mimic_beast / swarm_core 共用）。
@@ -83,15 +84,14 @@ export function applyLargeArt(m) {
   m.spriteH = dh
 
   const geo = m.mesh.geometry
-  const gw = geo?.parameters?.width
-  const gh = geo?.parameters?.height
-  if (Math.abs((gw || 0) - dw) > 0.5 || Math.abs((gh || 0) - dh) > 0.5) {
-    m.mesh.geometry = new THREE.PlaneGeometry(dw, dh)
-    try {
-      geo?.dispose?.()
-    } catch (e) {
-      /* ignore */
-    }
+  // 描边版几何体是「精灵尺寸 + 四周留白」，比较时要把它还原成精灵尺寸再比
+  const padX = m.mat?.uniforms?.uPad?.value?.x || 0
+  const padY = m.mat?.uniforms?.uPad?.value?.y || 0
+  const gw = (geo?.parameters?.width || 0) - 2 * padX
+  const gh = (geo?.parameters?.height || 0) - 2 * padY
+  if (Math.abs(gw - dw) > 0.5 || Math.abs(gh - dh) > 0.5) {
+    // resizeOutlineMesh 会按新尺寸重算留白并同步材质 uniform（描边宽度自适应）
+    resizeOutlineMesh(m.mesh, dw, dh)
   }
   const tex = frames?.idle?.[0] || null
   if (m.mat && tex) {

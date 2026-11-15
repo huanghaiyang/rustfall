@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { spriteMaterial } from '../../render/materials.js'
+import { outlineMaterial, outlineGeometry } from '../../render/outline.js'
 import { TS, PLAYER } from '../../config.js'
 import { makeBody, moveBody } from '../../world/tilemap.js'
 import { Events, EV } from '../../core/events.js'
@@ -78,9 +79,14 @@ export class BaseMonster {
     this.spriteW = w
     this.spriteH = h
     const tex = this.frames?.idle?.[0] || null
-    const mat = spriteMaterial(tex, { color: tex ? 0xffffff : this.def.color || 0x8a4b26 })
+    // 角色黑描边（卡通风格）：描边画在 quad 的留白里，精灵本身尺寸不变
+    const mat = outlineMaterial(tex, {
+      w,
+      h,
+      color: tex ? 0xffffff : this.def.color || 0x8a4b26,
+    })
     this.mat = mat
-    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat)
+    this.mesh = new THREE.Mesh(outlineGeometry(w, h, mat.userData.outlineThickness), mat)
     this.mesh.renderOrder = 4
     this.group.add(this.mesh)
 

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { spriteMaterial } from '../render/materials.js'
+import { outlineMaterial, outlineGeometry } from '../render/outline.js'
 import { getGlowTexture } from '../render/textures.js'
 import { getWeaponArt, getWeaponHoldArt } from '../render/art/weapons.js'
 import { getToolArt } from '../render/art/tools.js'
@@ -112,9 +113,10 @@ export class Robot {
     this.spriteW = w
     this.spriteH = h
     const tex = this.art?.frames?.idle?.[0] || null
-    const mat = spriteMaterial(tex, { color: 0xffffff })
+    // 角色黑描边（卡通风格）：玩家与所有怪物统一走 outline.js
+    const mat = outlineMaterial(tex, { w, h, color: 0xffffff })
     this.mat = mat
-    this.artMesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat)
+    this.artMesh = new THREE.Mesh(outlineGeometry(w, h, mat.userData.outlineThickness), mat)
     this.artMesh.renderOrder = 5
     this.artMesh.position.z = 2
     if (this.group) {
@@ -491,10 +493,11 @@ export class Robot {
       }
     }
     if (!tex) return
-    const mat = spriteMaterial(tex)
     const w = tex.image?.width || 32
     const h = tex.image?.height || 24
-    this.weaponMesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat)
+    // 手持物也描边：不然武器/工具像浮在身上（卡通风格里挂件要跟着描）
+    const mat = outlineMaterial(tex, { w, h })
+    this.weaponMesh = new THREE.Mesh(outlineGeometry(w, h, mat.userData.outlineThickness), mat)
     this.weaponMesh.position.z = 3
     this.weaponMesh.renderOrder = 6
     this.group.add(this.weaponMesh)
@@ -517,9 +520,9 @@ export class Robot {
       tex = null
     }
     if (!tex) return
-    const mat = spriteMaterial(tex)
     const size = 20
-    this.toolMesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat)
+    const mat = outlineMaterial(tex, { w: size, h: size })
+    this.toolMesh = new THREE.Mesh(outlineGeometry(size, size, mat.userData.outlineThickness), mat)
     this.toolMesh.position.z = 3.2
     this.toolMesh.renderOrder = 6
     this.group.add(this.toolMesh)

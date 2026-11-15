@@ -50,6 +50,7 @@ import { createChaosAI } from './systems/chaos-ai.js'
 import { createLighting } from './systems/lighting.js'
 import { clamp, damp } from './utils.js'
 import { ensureHotkeys, setHotkey as applyHotkey, resetHotkeys as resetHotkeyDefaults } from './hotkeys.js'
+import { setOutline, outlineState, applyOutlineFromUrl } from './render/outline.js'
 
 // 任务物品保底：collect 目标适合出现在哪些 biome（房间生成时保证至少能捡到）
 const QUEST_ITEM_BIOMES = {
@@ -169,6 +170,10 @@ export class Game {
     bindGame(this)
     window.__rustfall = this
     window.__G = G
+    // 角色黑描边：URL 参数（?outline=0 / ?outline=3 / ?outlineColor=0x101010）优先
+    applyOutlineFromUrl()
+    this.setOutline = setOutline
+    this.outlineState = outlineState
 
     this.bootPromise = this.boot()
   }
