@@ -146,6 +146,10 @@ const out = await page.evaluate(
 
     E.saveProject()
     E.publish()
+    // publish() 内部的 recordHistory 是 fire-and-forget；同内容再存一次会被去重成 null，
+    // 但这一次 await 能保证上面那次 IDB 写已经排队完成，脚本读历史才是准的。
+    await E.recordHistory('发布')
+    const hist = await E.historyEntries()
 
     const raw = localStorage.getItem('rustfall.spriteeditor.v1') || ''
     return {
@@ -183,6 +187,12 @@ const out = await page.evaluate(
       publishedAt: S.project.publishedAt,
       storageKB: Math.round(raw.length / 1024),
       spritesBound: S.project.sprites.filter((s) => s.refId === BOSS).length,
+      history: hist.slice(0, 6).map((m) => ({
+        at: m.at,
+        reason: m.reason,
+        counts: m.counts,
+        targets: (m.targets || []).map((t) => t.refId),
+      })),
     }
   },
   { BOSS, STRIP, COLS, CELL_W, CELL_H, FPS, ACTIONS, SHEET_NAME },
@@ -219,6 +229,7 @@ console.log(
       publishedAt: out.publishedAt,
       storageKB: out.storageKB,
       spritesBound: out.spritesBound,
+      history: out.history,
     },
     null,
     1,

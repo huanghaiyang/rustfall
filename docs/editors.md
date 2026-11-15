@@ -35,7 +35,9 @@ window.__roomEditor    // 房间编辑器 hook
 ### 1.1 持久化
 
 - 工程文件整体存 `localStorage['rustfall.spriteeditor.v1']`（JSON）
+- **同时落盘**到 `<workspace>/editor-data/sprite-editor/project.json`（防浏览器数据被清；见 1.7）
 - 可导出 / 导入 `.json` 工程（菜单 → 导出工程 / 导入工程）
+- 历史版本快照见 **1.7 历史编辑记录**
 
 ### 1.2 实体注册表（左栏「游戏实体」区块）
 
@@ -143,6 +145,83 @@ SE.sel = {
   target,   // { kind, refId, boss }  —— 先选目标再导入精灵图
 }
 ```
+
+### 1.7 历史编辑记录 + 落盘（防丢失）
+
+**为什么**：`localStorage` 会被「清除站点数据」清掉、换浏览器/隐身模式直接没有、配额还只有 ~5MB
+（一份工程带 dataURL 约 0.4~1MB）。所以编辑数据现在**双写**：浏览器存一份（快），磁盘存一份（稳）。
+
+**落盘位置**（dev server 提供文件接口，见下）：
+
+```
+editor-data/sprite-editor/
+├─ project.json            当前工程（自包含，连 sheet 的 dataURL 一起）
+├─ project.prev.json       上一版（每次覆盖前的自动备份）
+└─ history/
+   ├─ index.json           历史索引（只剩 meta：时间/原因/计数/绑定目标）
+   └─ <id>.json            单条快照 { meta, project }（自包含，可单文件拷走）
+```
+
+**什么时候记一条历史**：
+
+| 触发 | reason |
+|---|---|
+| 顶栏「发布」 | `发布` |
+| 顶栏「清空」 | `清空前`（先存再清） |
+| 「导入工程」 | `导入前` |
+| 历史面板「恢复此版本」 | `恢复前`（内容与最新一条相同则去重，不产生垃圾条目） |
+| 历史面板「存当前快照」 | `手动快照`（force，不去重） |
+
+**存储优先级**（自动降级）：磁盘 → IndexedDB → localStorage（最后兜底只留 3 条）。
+上限 **24 条 / 60MB**，超了从最旧的开始丢。
+
+**面板**（顶栏「历史 N」）：左列表 / 右详情。
+- 左：目标下拉（默认跟当前选中的游戏实体走，可直接看「数据执政官上一次的编辑」）+ 搜索 + 时间倒序
+- 右：那一刻的绑定目标、结构摘要（图集/角色/动作/帧/骨骼/碰撞）、**与当前版本的结构差异**、
+  动作帧预览（图集缩略 + 帧矩形编号，可切动作）
+- 底：「恢复此版本」/「删除这条」
+
+**恢复语义**：先把当前工程存成「恢复前」→ 装入历史版本 → 若该版本是已发布状态，
+直接 `publish()`（走 5.5 的运行时覆盖通道，场上 BOSS 立刻换帧，不再重复记快照）。
+
+**API**（`sprite-store.js` / `sprite-history.js` 导出，`window.__spriteEditor` 也挂了）
+
+| API | 作用 |
+|---|---|
+| `recordHistory(reason, {force})` | 把当前工程存成一条历史（内容相同 → null） |
+| `historyEntries()` | 历史 meta 列表（时间倒序，不读 payload） |
+| `historyProject(id)` | 某条快照的整份工程 |
+| `restoreHistory(id)` | 恢复（含「恢复前」留档 + 自动发布） |
+| `deleteHistory(id)` / `wipeHistory()` | 删一条 / 清空 |
+| `flushDiskProject(force)` | 立刻把当前工程写盘（不等 600ms 防抖） |
+| `restoreProjectFromDiskIfEmpty()` | localStorage 空 → 从磁盘捞回工程（清过浏览器数据的场景） |
+| `migrateHistoryToDisk()` | 把浏览器里已有的历史补写进磁盘 |
+| `diffProjects(prev, cur)` / `summarizeProject(p)` | 纯函数，结构差异 / 摘要（面板和自检共用） |
+
+**dev server 文件接口**（`scripts/editor-fs-plugin.mjs`，只允许 localhost）：
+
+```
+GET    /__editor/sprite/ping          → { ok, dir, fileApi:'disk' }
+GET    /__editor/sprite/project       → 工程 JSON（没有则 204）
+POST   /__editor/sprite/project       → 覆盖写（自动备份 project.prev.json）
+GET    /__editor/sprite/history       → meta 列表
+POST   /__editor/sprite/history       → { meta, project } 写一条
+GET    /__editor/sprite/history/:id   → { meta, project }
+DELETE /__editor/sprite/history/:id   → 删一条
+DELETE /__editor/sprite/history       → 清空
+```
+
+> 生产构建没有这个中间件 → 探测 404 → 自动退回 IndexedDB，编辑器和游戏都不会报错。
+> 历史面板顶部会显示当前到底是「已落盘 · <绝对路径>」还是「IndexedDB（无落盘接口）」。
+
+**坑**：
+
+1. `SE.project` 是 Vue reactive proxy，**不能直接塞进 IndexedDB / `JSON.stringify`** → 一律先 `plainProject()` 拍平。
+2. 「发布」里的 `recordHistory` 是 fire-and-forget，外部再 `await` 一次会**并发**读同一个「最新一条」→ 写出重复快照。
+   `addHistory` 内部用一条 promise 链串行化，去重才可靠。
+3. `saveProject()` 默认防抖 600ms 落盘；**发布 / 关面板 / 关页面**必须显式 `flushDiskProject()`，
+   否则最后 0.6s 的编辑会丢。
+4. 写盘用「先写 `.tmp` 再 `rename`」，断电不会留下半截 JSON；`index.json` 的读-改-写也串行。
 
 ---
 
@@ -337,6 +416,24 @@ Content.stats()                      // → { monster: N, chassis: N, item: N, .
 | `rustfall.roomeditor.v1` | 房间编辑器工程文件 | 房间编辑器 |
 | `rustfall.spriteeditor.v1` | 精灵编辑器工程文件 | 精灵编辑器 |
 | `rustfall.settings.v1` | 设置（画面 / 音频 / 手柄） | 游戏 |
+| IndexedDB `rustfall-sprite-editor` | 精灵编辑器历史（无落盘接口时的缓存） | 精灵编辑器 |
+| `rustfall.se.history.meta.v1` / `.body.v1.*` | 历史（localStorage 兜底，最多 3 条） | 精灵编辑器 |
+
+**磁盘上的编辑数据**（`editor-data/`，已 gitignore —— 属于本机工作数据，不入库）：
+
+| 路径 | 用途 |
+|---|---|
+| `editor-data/sprite-editor/project.json` | 精灵编辑器当前工程（自动落盘，清浏览器数据后可恢复） |
+| `editor-data/sprite-editor/project.prev.json` | 上一版工程（覆盖前备份） |
+| `editor-data/sprite-editor/history/index.json` | 历史索引（meta） |
+| `editor-data/sprite-editor/history/<id>.json` | 单条历史快照（自包含） |
+| `editor-data/blobs/room-editor.json` | 房间编辑器：工程 + 地形表 + 背景表（一份 JSON） |
+
+房间编辑器同样在 `saveProject()` / 地形与背景表写入时镜像到
+`editor-data/blobs/room-editor.json`（防抖 800ms），面板打开时如果 localStorage 是空的，
+会先尝试从磁盘恢复。API：`flushDiskBackup()` / `restoreProjectFromDiskIfEmpty()` /
+`diskBackupState()`（`window.__roomEditor` 上也挂了）。通用文件接口
+`GET|PUT|DELETE /__editor/blob/:name`，写入 `editor-data/blobs/<name>.json`。
 
 ---
 

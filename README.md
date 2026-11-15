@@ -45,9 +45,13 @@ node scripts/test-v6.mjs         # 武器 / 大型敌人
 node scripts/boss-walk-post.mjs            # N 张单帧 PNG → 横向图集 + manifest 帧组
 node scripts/sprite-editor-apply-walk.mjs  # 用内嵌精灵编辑器绑定到角色并发布
 node scripts/verify-boss-walk.mjs          # BOSS 测试房验证（帧数/帧率/来源）
+node scripts/verify-sprite-history.mjs     # 历史记录 + 落盘 + 恢复 + 从磁盘重建
+node scripts/verify-room-disk.mjs          # 房间编辑器工程落盘 + 从磁盘恢复
 ```
 
-详见 [`docs/editors.md`](docs/editors.md) 第 5 节。
+编辑器（精灵 / 房间）的数据除了浏览器存储，还会**直接落盘**到
+`editor-data/`（`project.json` + `history/<id>.json`，dev server 提供 `/__editor/sprite/*`
+文件接口），清浏览器数据 / 换浏览器都不会丢。详见 [`docs/editors.md`](docs/editors.md) 第 5 节。
 
 ---
 

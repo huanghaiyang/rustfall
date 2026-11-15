@@ -2,11 +2,13 @@
 // 该步骤在某些受限环境下会因 exec('net use') 被沙箱拒绝而失败）
 import { createServer } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { editorFsPlugin } from './editor-fs-plugin.mjs'
 
 const server = await createServer({
   root: process.cwd(),
   configFile: false,
-  plugins: [vue()],
+  // editor-fs-plugin：编辑器把工程/历史直接写到 <root>/editor-data/sprite-editor/
+  plugins: [vue(), editorFsPlugin({ root: process.cwd() })],
   server: { host: '127.0.0.1', port: 5180, strictPort: true },
   build: { target: 'es2020' },
   logLevel: 'info',

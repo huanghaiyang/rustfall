@@ -21,6 +21,8 @@ import {
   publish,
   setDraft,
   isDraft,
+  flushDiskBackup,
+  restoreProjectFromDiskIfEmpty,
 } from '../../../game/editor/room-store.js'
 import RoomCanvas from './RoomCanvas.vue'
 import RoomInspector from './RoomInspector.vue'
@@ -137,14 +139,21 @@ function onKey(e) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadProject()
+  // 清过浏览器数据 → 从磁盘 blobs/room-editor.json 把工程 + 地形/背景表捞回来
+  try {
+    const r = await restoreProjectFromDiskIfEmpty()
+    if (r.ok) console.info('[room-editor] 已从磁盘恢复工程', r)
+  } catch (e) { /* 没有落盘接口时忽略 */ }
   const first = ALL_ROOMS[0]
   if (first) selectRoom(first.regionId, first.roomId)
   window.addEventListener('keydown', onKey, true)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey, true)
+  // 关面板时把还没落盘的那一版推上去
+  flushDiskBackup().catch(() => {})
 })
 </script>
 

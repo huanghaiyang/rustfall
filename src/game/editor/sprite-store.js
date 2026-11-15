@@ -23,6 +23,17 @@ import { reactive } from 'vue'
 import Content, { KIND } from '../core/registry.js'
 import { MONSTER_IDS } from '../entities/monsters/index.js'
 import { LARGE_IDS } from '../entities/monsters/large/index.js'
+import {
+  addHistory,
+  listHistory,
+  getHistory,
+  removeHistory,
+  clearHistory,
+  plainProject,
+  hashText,
+  syncHistoryToDisk,
+} from './sprite-history.js'
+import { diskGetProject, diskPutProject } from './disk-store.js'
 
 const KEY = 'rustfall.spriteeditor.v1'
 
@@ -471,13 +482,86 @@ export function boneTransforms(sprite, pose) {
 // 持久化
 // ============================================================================
 
+// ---- 落盘（防丢失）：浏览器存储 + 磁盘文件双写 -----------------------------
+// localStorage 说清就清、换浏览器就没、隐私模式还会直接抛异常。
+// 所以每次保存都顺手把工程写到 <root>/editor-data/sprite-editor/project.json
+// （经 dev server 的 /__editor/sprite/* 接口）。防抖 600ms，内容没变不写。
+const DISK_DEBOUNCE_MS = 600
+let _diskTimer = null
+let _diskLastHash = ''
+let _diskWriting = null
+
+function scheduleDiskSave() {
+  if (_diskTimer) clearTimeout(_diskTimer)
+  _diskTimer = setTimeout(() => {
+    _diskTimer = null
+    void flushDiskProject()
+  }, DISK_DEBOUNCE_MS)
+}
+
+/**
+ * 立刻把当前工程写到磁盘。
+ * @param {boolean} force 内容没变也写（脚本 / 关面板时用）
+ * @returns {Promise<{ok:boolean, skipped?:boolean, bytes?:number, error?:string}>}
+ */
+export async function flushDiskProject(force = false) {
+  if (_diskTimer) {
+    clearTimeout(_diskTimer)
+    _diskTimer = null
+  }
+  const plain = plainProject(SE.project)
+  if (!plain) return { ok: false, error: 'empty-project' }
+  // 去重只看内容：updatedAt 每次保存都会变，把它排除掉，否则永远判定「变了」
+  const hashSrc = plainProject(plain)
+  if (hashSrc) delete hashSrc.updatedAt
+  const hash = hashText(JSON.stringify(hashSrc || plain))
+  if (!force && hash === _diskLastHash) return { ok: true, skipped: true }
+  _diskWriting = diskPutProject(plain).then((r) => {
+    if (r.ok) _diskLastHash = hash
+    return r
+  })
+  return _diskWriting
+}
+
+/** 上次落盘结果 / 状态（UI 徽标用）。 */
+export function diskSaveState() {
+  return { lastHash: _diskLastHash, pending: !!_diskTimer, writing: !!_diskWriting }
+}
+
+/** localStorage 里没有工程时，从磁盘恢复（清过浏览器数据的场景）。 */
+export async function restoreProjectFromDiskIfEmpty() {
+  let hasLocal = false
+  try {
+    hasLocal = !!localStorage.getItem(KEY)
+  } catch (e) {
+    hasLocal = false
+  }
+  if (hasLocal) return { ok: false, reason: 'local-exists' }
+  const proj = await diskGetProject()
+  if (!proj) return { ok: false, reason: 'no-disk-project' }
+  applyProjectData(proj, { save: true })
+  return { ok: true, sheets: (proj.sheets || []).length, sprites: (proj.sprites || []).length }
+}
+
+/** 把浏览器里已有的历史补写到磁盘（迁移 / 首次落盘）。 */
+export async function migrateHistoryToDisk() {
+  try {
+    return await syncHistoryToDisk()
+  } catch (e) {
+    return { ok: false, migrated: 0, reason: String(e?.message || e) }
+  }
+}
+
 export function saveProject() {
   try {
     SE.project.updatedAt = new Date().toISOString()
     localStorage.setItem(KEY, JSON.stringify(SE.project))
+    scheduleDiskSave()
     return true
   } catch (e) {
     console.warn('[sprite-editor] 保存失败', e)
+    // localStorage 写不进去（配额 / 隐私模式）至少还有磁盘
+    scheduleDiskSave()
     return false
   }
 }
@@ -524,6 +608,7 @@ export function loadProject() {
 }
 
 export function resetProject() {
+  recordHistory('清空前')
   SE.project = emptyProject()
   clearSelection()
 }
@@ -1212,9 +1297,8 @@ export function exportProjectJson() {
   }, null, 2)
 }
 
-export async function importProjectJson(file) {
-  const text = await file.text()
-  const data = JSON.parse(text)
+/** 工程 JSON → 规范化的工程对象（导入工程 / 恢复历史共用）。 */
+function projectFromData(data) {
   const tmp = emptyProject()
   tmp.name = data.name || '导入工程'
   tmp.status = data.status || STATUS.PUBLISHED
@@ -1241,11 +1325,78 @@ export async function importProjectJson(file) {
     h: Number(q.h) || 32,
     builtin: !!q.builtin,
   }))
+  return tmp
+}
+
+/**
+ * 把一份工程装进编辑器（导入工程 / 恢复历史版本共用）。
+ * @param {object} data    工程 JSON
+ * @param {{save?:boolean, publish?:boolean}} opts
+ */
+export function applyProjectData(data, opts = {}) {
+  if (!data || typeof data !== 'object') return null
+  const tmp = projectFromData(data)
   SE.project = tmp
   clearSelection()
   SE.sel.sheetId = tmp.sheets[0]?.id || ''
-  saveProject()
+  if (opts.publish) publish({ record: false })
+  else if (opts.save !== false) saveProject()
   return tmp
+}
+
+export async function importProjectJson(file) {
+  const text = await file.text()
+  const data = JSON.parse(text)
+  await recordHistory('导入前')
+  return applyProjectData(data, { save: true })
+}
+
+// ============================================================================
+// 历史编辑记录（查看 / 恢复）
+// ============================================================================
+
+/** 把当前工程存进历史。同一内容不会重复存（除非 force）。 */
+export async function recordHistory(reason = '手动快照', opts = {}) {
+  try {
+    return await addHistory(SE.project, { reason, ...opts })
+  } catch (e) {
+    console.warn('[sprite-editor] 历史快照失败', e)
+    return null
+  }
+}
+
+/** 历史列表（meta，时间倒序）。 */
+export function historyEntries() {
+  return listHistory()
+}
+
+/** 取某条历史里的整份工程。 */
+export function historyProject(id) {
+  return getHistory(id)
+}
+
+/**
+ * 恢复到某个历史版本。
+ *   1. 先把「当前」存一份（原因「恢复前」），所以恢复本身也能反悔
+ *   2. 装入历史版本
+ *   3. 如果它原来是已发布状态 → 直接发布（走运行时覆盖通道，不再重复记快照）
+ */
+export async function restoreHistory(id) {
+  const data = await getHistory(id)
+  if (!data) return null
+  await recordHistory('恢复前')
+  const tmp = applyProjectData(data, { save: true, publish: false })
+  if ((tmp?.status || STATUS.PUBLISHED) === STATUS.PUBLISHED) publish({ record: false })
+  else saveProject()
+  return tmp
+}
+
+export async function deleteHistory(id) {
+  return removeHistory(id)
+}
+
+export async function wipeHistory() {
+  return clearHistory()
 }
 
 // ============================================================================
@@ -1257,10 +1408,9 @@ import { computed } from 'vue'
 /** 当前状态 computed（面板顶部徽标用） */
 export const projectStatus = computed(() => SE.project.status)
 
-/** 发布精灵工程：标记 published 并通知未来的游戏加载器。
- *  目前游戏尚未从精灵编辑器工程直接加载，发布 = 打标签 + 发 CustomEvent。
- *  后续游戏侧实现 sprite 加载时，只需监听 rustfall:sprite-editor-published 即可。 */
-export function publish() {
+/** 发布精灵工程：标记 published + 通知游戏运行时（BOSS 动作覆盖层）。
+ *  @param {{record?:boolean}} opts record=false 时不额外记历史（恢复历史后重发用） */
+export function publish(opts = {}) {
   SE.project.status = STATUS.PUBLISHED
   SE.project.publishedAt = new Date().toISOString()
   try {
@@ -1275,6 +1425,9 @@ export function publish() {
     )
   } catch (e) { /* 非浏览器环境忽略 */ }
   saveProject()
+  // 发布是「重要断点」，不等防抖：立刻落盘 + 记历史
+  void flushDiskProject()
+  if (opts.record !== false) void recordHistory('发布')
   return true
 }
 
@@ -1338,6 +1491,10 @@ if (typeof window !== 'undefined') {
     currentAction,
     currentFrame,
     saveProject,
+    flushDiskProject,
+    diskSaveState,
+    restoreProjectFromDiskIfEmpty,
+    migrateHistoryToDisk,
     loadProject,
     resetProject,
     exportProjectJson,
@@ -1363,6 +1520,14 @@ if (typeof window !== 'undefined') {
     publish,
     setDraft,
     isDraft,
+    // 历史编辑记录
+    recordHistory,
+    historyEntries,
+    historyProject,
+    restoreHistory,
+    deleteHistory,
+    wipeHistory,
+    applyProjectData,
     get projectStatus() { return projectStatus.value },
   }
 }

@@ -26,10 +26,13 @@ import { generateBiomeRoom } from '../world/biomes/index.js'
 import { T, Tilemap } from '../world/tilemap.js'
 import { TS } from '../config.js'
 import { PROP_ART_KINDS } from '../render/art/props.js'
+import { diskBlobGet, diskBlobPut } from './disk-store.js'
 
 const KEY = 'rustfall.roomeditor.v1'
 const TERRAIN_KEY = 'rustfall.terrain.v1'
 const BG_KEY = 'rustfall.bgedits.v1'
+/** 落盘快照名（<root>/editor-data/blobs/room-editor.json） */
+const DISK_BLOB = 'room-editor'
 
 /** 房间唯一键：与 game.js 的 terrainEdits 键格式保持一致 */
 export const roomKey = (regionId, roomId) => `${regionId}:${roomId}`
@@ -334,6 +337,8 @@ function readTerrainTable() {
 
 /** 写一条地形差分到游戏的 terrainEdits 表；草稿模式下跳过 */
 function pushTerrain(key, tile, type) {
+  // 草稿模式也要落盘（工程里那份 edits 才是唯一记录），所以调度放在早退之前
+  scheduleDiskBackup()
   if (!_runtimePushesEnabled) return
   const table = readTerrainTable()
   if (!table[key]) table[key] = {}
@@ -343,6 +348,7 @@ function pushTerrain(key, tile, type) {
   } catch (e) {
     /* 存储满 / 隐私模式，忽略 */
   }
+  scheduleDiskBackup()
   // 通知正在运行的游戏：立刻把这一格改掉（否则存档时会被游戏内存里的旧表覆盖）
   notifyTerrainPatch(key, { [tile]: type })
 }
@@ -449,6 +455,7 @@ function pushBgTable(key) {
   } catch (err) {
     /* 图太大写不进 localStorage 时忽略，工程 JSON 里仍有 */
   }
+  scheduleDiskBackup()
 }
 
 /** 新增一层（默认叠在 biome 背景之上：视差取 0.6、全不透明） */
@@ -587,11 +594,78 @@ export function saveProject() {
   try {
     RE.project.updatedAt = new Date().toISOString()
     localStorage.setItem(KEY, JSON.stringify(RE.project))
+    scheduleDiskBackup()
     return true
   } catch (e) {
     console.warn('[room-editor] 保存失败', e)
+    // 配额 / 隐私模式写不进 localStorage 时，至少把磁盘那份推上去
+    scheduleDiskBackup()
     return false
   }
+}
+
+// ---- 落盘（防丢失）：工程 + 地形表 + 背景表一起写成一份 JSON -----------------
+// localStorage 会被清、换浏览器就没，所以 dev server 在时全部镜像到
+// <root>/editor-data/blobs/room-editor.json。
+const DISK_DEBOUNCE_MS = 800
+let _diskTimer = null
+let _diskWriting = null
+
+function scheduleDiskBackup() {
+  if (_diskTimer) clearTimeout(_diskTimer)
+  _diskTimer = setTimeout(() => {
+    _diskTimer = null
+    void flushDiskBackup()
+  }, DISK_DEBOUNCE_MS)
+}
+
+/** 立刻把「工程 + 地形表 + 背景表」写到磁盘。 */
+export async function flushDiskBackup() {
+  if (_diskTimer) {
+    clearTimeout(_diskTimer)
+    _diskTimer = null
+  }
+  const payload = {
+    kind: 'room-editor',
+    version: 1,
+    at: new Date().toISOString(),
+    project: JSON.parse(JSON.stringify(RE.project)),
+    terrain: readTerrainTable(),
+    bg: readBgTable(),
+  }
+  _diskWriting = diskBlobPut(DISK_BLOB, payload)
+  const r = await _diskWriting
+  _diskWriting = null
+  return r
+}
+
+/** localStorage 里没有工程时，从磁盘恢复（清过浏览器数据也能救回来）。 */
+export async function restoreProjectFromDiskIfEmpty() {
+  let hasLocal = false
+  try {
+    hasLocal = !!localStorage.getItem(KEY)
+  } catch (e) {
+    hasLocal = false
+  }
+  if (hasLocal) return { ok: false, reason: 'local-exists' }
+  const snap = await diskBlobGet(DISK_BLOB)
+  if (!snap?.project) return { ok: false, reason: 'no-disk-snapshot' }
+  try {
+    localStorage.setItem(KEY, JSON.stringify(snap.project))
+    if (snap.terrain) localStorage.setItem(TERRAIN_KEY, JSON.stringify(snap.terrain))
+    if (snap.bg) localStorage.setItem(BG_KEY, JSON.stringify(snap.bg))
+  } catch (e) { /* 存不下也继续，至少内存里有 */ }
+  loadProject()
+  return {
+    ok: true,
+    rooms: Object.keys(snap.project.edits || {}).length,
+    at: snap.at || '',
+  }
+}
+
+/** 上次落盘结果（UI / 自检用）。 */
+export function diskBackupState() {
+  return { pending: !!_diskTimer, writing: !!_diskWriting }
 }
 
 export function loadProject() {
@@ -705,6 +779,7 @@ export function clearRoomEdits(regionId, roomId) {
   if (RE.sel.bgLayerId) RE.sel.bgLayerId = ''
   notifyTerrainPatch(key, {}, true)
   RE.gen = generateRoom(regionId, roomId, { force: true })
+  scheduleDiskBackup()
 }
 
 /** 全工程清空（含游戏的 terrainEdits / bgedits） */
@@ -726,6 +801,7 @@ export function clearAllEdits() {
   RE.sel.bgLayerId = ''
   for (const k of Object.keys(table)) notifyTerrainPatch(k, {}, true)
   if (RE.sel.roomId) RE.gen = generateRoom(RE.sel.regionId, RE.sel.roomId, { force: true })
+  scheduleDiskBackup()
 }
 
 // ============================================================================
@@ -834,6 +910,10 @@ if (typeof window !== 'undefined') {
     publish,
     setDraft,
     isDraft,
+    // 落盘（防丢失）
+    flushDiskBackup,
+    restoreProjectFromDiskIfEmpty,
+    diskBackupState,
     get projectStatus() {
       return projectStatus.value
     },

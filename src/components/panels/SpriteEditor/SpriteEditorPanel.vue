@@ -52,10 +52,15 @@ import {
   setDraft,
   isDraft,
   projectStatus,
+  historyEntries,
+  flushDiskProject,
+  restoreProjectFromDiskIfEmpty,
+  migrateHistoryToDisk,
 } from '../../../game/editor/sprite-store.js'
 import SpriteSheetCanvas from './SpriteSheetCanvas.vue'
 import SpriteInspector from './SpriteInspector.vue'
 import SpriteTimeline from './SpriteTimeline.vue'
+import SpriteHistoryPanel from './SpriteHistoryPanel.vue'
 
 const emit = defineEmits(['close'])
 
@@ -69,6 +74,28 @@ const preH = ref(32)
 
 // 分类筛选：null=全部 | 'role' | 'monster' | 'generic'
 const kindFilter = ref('all')
+
+// 历史编辑记录
+const historyOpen = ref(false)
+const historyCount = ref(0)
+async function refreshHistoryCount() {
+  try {
+    historyCount.value = (await historyEntries()).length
+  } catch (e) {
+    historyCount.value = 0
+  }
+}
+function openHistory() {
+  historyOpen.value = true
+  refreshHistoryCount()
+}
+
+/** 关面板 / 关页面时把还没落盘的那一版推上去 */
+function flushOnLeave() {
+  try {
+    flushDiskProject()
+  } catch (e) { /* ignore */ }
+}
 
 const TOOLS = [
   { id: 'select', label: '选择', en: 'SELECT', key: '1' },
@@ -240,6 +267,15 @@ function onViewportChange(ev) {
 function onKey(e) {
   const tag = e.target?.tagName
   if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
+  // 历史面板打开时只响应 ESC（避免 1~8 把工具切走）
+  if (historyOpen.value) {
+    if (e.key === 'Escape') {
+      historyOpen.value = false
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    return
+  }
   if (e.key === 'Escape' && SE.sel.tool === 'poly') {
     SE.sel.tool = 'select'
     e.stopPropagation()
@@ -261,13 +297,26 @@ function onKey(e) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadProject()
   loadRegistry()  // 后台拉 chassis / monster 注册表
+  // 清过浏览器数据 → 从磁盘把工程捞回来；再把浏览器里的旧历史补写盘
+  try {
+    const r = await restoreProjectFromDiskIfEmpty()
+    if (r.ok) console.info('[sprite-editor] 已从磁盘恢复工程', r)
+  } catch (e) { /* 没有落盘接口时忽略 */ }
+  try {
+    const m = await migrateHistoryToDisk()
+    if (m?.migrated) console.info('[sprite-editor] 历史已补写磁盘', m)
+  } catch (e) { /* ignore */ }
+  refreshHistoryCount()
   window.addEventListener('keydown', onKey, true)
+  window.addEventListener('beforeunload', flushOnLeave)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey, true)
+  window.removeEventListener('beforeunload', flushOnLeave)
+  flushOnLeave()
 })
 </script>
 
@@ -293,6 +342,13 @@ onBeforeUnmount(() => {
         <button v-if="isDraft()" class="se-btn primary" @click="publish()" :title="'发布精灵工程（触发 CustomEvent 通知游戏加载器）'">发布</button>
         <button v-else class="se-btn" @click="setDraft()" :title="'切到草稿模式'">保存草稿</button>
         <button class="se-btn" @click="saveProject()">保存工程</button>
+        <button
+          class="se-btn"
+          :title="'查看历史编辑记录（发布/清空/导入会自动记一条）'"
+          @click="openHistory"
+        >
+          历史<span v-if="historyCount" class="se-hist-n">{{ historyCount }}</span>
+        </button>
         <button
           class="se-btn danger"
           @click="() => { if (confirm('清空当前工程？')) { resetProject(); saveProject() } }"
@@ -514,6 +570,9 @@ onBeforeUnmount(() => {
     <footer class="se-bottom">
       <SpriteTimeline />
     </footer>
+
+    <!-- 历史编辑记录（浮层） -->
+    <SpriteHistoryPanel v-if="historyOpen" @close="historyOpen = false; refreshHistoryCount()" />
   </div>
 </template>
 
@@ -567,6 +626,17 @@ onBeforeUnmount(() => {
 .se-stat {
   color: var(--c-bone-dark, #8a8272);
   margin-right: 6px;
+}
+.se-hist-n {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  background: #2b3a2f;
+  border: 1px solid #3f7a52;
+  border-radius: 2px;
+  font-size: 9px;
+  color: #9fd8ad;
+  vertical-align: middle;
 }
 
 .se-btn {
