@@ -49,11 +49,15 @@ node scripts/verify-sprite-history.mjs     # 历史记录 + 落盘 + 恢复 + �
 node scripts/verify-room-disk.mjs          # 房间编辑器工程落盘 + 从磁盘恢复
 node scripts/verify-skeleton-fit.mjs       # 骨骼/碰撞体智能识别（算法 + 确定性 + AI 降级）
 node scripts/verify-editor-rig.mjs         # 编辑器内识别全链路（坐标系往返 + 落库）
+node scripts/verify-boss-move.mjs          # 大怪/BOSS 行走位移（追击/巡逻/不转圈/探测语义）
 ```
 
 编辑器（精灵 / 房间）的数据除了浏览器存储，还会**直接落盘**到
 `editor-data/`（`project.json` + `history/<id>.json`，dev server 提供 `/__editor/sprite/*`
 文件接口），清浏览器数据 / 换浏览器都不会丢。详见 [`docs/editors.md`](docs/editors.md) 第 5 节。
+
+敌人 AI 的移动链路与地面 / 墙体探测语义（含「原地打转、走不动」的成因与取舍）见
+[`docs/monster-ai.md`](docs/monster-ai.md)。
 
 ---
 

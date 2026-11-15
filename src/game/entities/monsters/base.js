@@ -155,20 +155,40 @@ export class BaseMonster {
     this.facing = this.player.centerX >= this.px ? 1 : -1
   }
 
-  /** 前方是否有地面（防止走下悬崖），dir=1/-1 */
-  groundAhead(dir = this.facing) {
+  /**
+   * 前方是否有地面（防止走下悬崖），dir=1/-1。
+   *
+   * 注意大块头：巨型机甲身高 168px，脚下 6~25px 的浅层探测只要碰上
+   * 一个高 32px 的台阶边沿就会判「没有地面」→ 每帧 vxTarget=0 且翻面，
+   * 表现就是「原地打转、走不动」（数据执政官就是这么卡住的）。
+   * 所以身高超过 1.5 格的目标，把容许落差放宽到身高 30%（封顶 2 格），
+   * 小怪探测范围完全不变。
+   */
+  groundAhead(dir = this.facing, maxDrop = 0) {
     const map = this.map
     if (!map) return true
     const x = this.body.x + (dir > 0 ? this.body.w + 8 : -8)
-    const y = this.body.y + this.body.h + 6
-    return map.solidAt(x, y) || map.solidAt(x, y + TS * 0.6)
+    const feet = this.body.y + this.body.h
+    // 浅层：小怪只认这几像素（保持原有手感和防掉坑逻辑）
+    if (map.solidAt(x, feet + 6)) return true
+    if (map.solidAt(x, feet + 6 + TS * 0.6)) return true
+    // 深层：只有大块头才往后探，走下小台阶算正常走路
+    const tall = this.body.h > TS * 1.5
+    const drop = maxDrop > 0 ? maxDrop : tall ? Math.min(TS * 2, this.body.h * 0.3) : 0
+    for (let d = 12; d <= drop; d += 6) {
+      if (map.solidAt(x, feet + d)) return true
+    }
+    return false
   }
 
   wallAhead(dir = this.facing) {
     const map = this.map
     if (!map) return false
     const x = this.body.x + (dir > 0 ? this.body.w + 4 : -4)
-    return map.solidAt(x, this.body.y + this.body.h * 0.5)
+    if (map.solidAt(x, this.body.y + this.body.h * 0.5)) return true
+    // 大块头：半身高处看不出台阶，脚踝高度也要探一下，否则会一直顶着台阶磨
+    if (this.body.h > TS * 2) return map.solidAt(x, this.body.y + this.body.h * 0.85)
+    return false
   }
 
   /** 玩家是否在攻击范围内且大致同高 */

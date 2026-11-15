@@ -373,10 +373,24 @@ export function roamStep(m, dt, opts = {}) {
   m.vxTarget = dir * m.speed * mul
   m.playAnim('run')
   if (m.wallAhead(dir) || !m.groundAhead(dir)) {
+    // 被挡住时**不要每帧翻面**（那会变成原地抽搐/打转）：
+    // 只停住，隔 0.6s 才换下一个巡逻点。groundAhead 现在对高个子放宽了落差，
+    // 只有真正的墙和深坑才会走到这里。
     m.vxTarget = 0
-    m.patrolIdx = (m.patrolIdx + 1) % patrol.length
-    m.patrolWait = 0.8
-    m.facing = -dir
+    // 目标方向走不通（巡逻点在台阶上方/坑对面）→ 反过来走，别杵在原地装死
+    if (!m.wallAhead(-dir) && m.groundAhead(-dir)) {
+      m.vxTarget = -dir * m.speed * mul
+      m.facing = -dir
+      m.playAnim('run')
+    }
+    m._roamBlockCd = (m._roamBlockCd || 0) - dt
+    if (m._roamBlockCd <= 0) {
+      m.patrolIdx = (m.patrolIdx + 1) % patrol.length
+      m.patrolWait = 0.8
+      m._roamBlockCd = 0.6
+    }
+  } else {
+    m._roamBlockCd = 0
   }
 }
 

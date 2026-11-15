@@ -2,8 +2,8 @@
   "version": 2,
   "name": "未命名工程",
   "status": "published",
-  "updatedAt": "2026-11-15T09:04:21.912Z",
-  "publishedAt": "2026-11-15T09:04:21.912Z",
+  "updatedAt": "2026-11-15T09:01:18.492Z",
+  "publishedAt": "2026-11-15T08:32:14.347Z",
   "sheets": [
     {
       "id": "sh_mwhk8nam13ki5",
@@ -230,7 +230,7 @@
       ],
       "bones": [
         {
-          "id": "bn_mwhlyorfkoxeh",
+          "id": "bn_mwhluskbpzywb",
           "name": "root",
           "kind": "root",
           "x": 130.33,
@@ -241,218 +241,229 @@
           "conf": 0.7
         },
         {
-          "id": "bn_mwhlyorfd9sqx",
+          "id": "bn_mwhluskbtd744",
           "name": "pelvis",
           "kind": "pelvis",
           "x": 0,
           "y": 0,
           "len": 10.76,
           "angle": -90,
-          "parent": "bn_mwhlyorfkoxeh",
+          "parent": "bn_mwhluskbpzywb",
           "conf": 1
         },
         {
-          "id": "bn_mwhlyorf1aj5t",
+          "id": "bn_mwhluskbgjhov",
           "name": "spine",
           "kind": "spine",
           "x": 0,
           "y": 0,
           "len": 34.6,
           "angle": 11.53,
-          "parent": "bn_mwhlyorfd9sqx",
+          "parent": "bn_mwhluskbtd744",
           "conf": 1
         },
         {
-          "id": "bn_mwhlyorf0v13a",
+          "id": "bn_mwhluskbszxwq",
           "name": "chest",
           "kind": "chest",
           "x": 0.17,
           "y": -0.87,
           "len": 45.75,
           "angle": -11.53,
-          "parent": "bn_mwhlyorf1aj5t",
+          "parent": "bn_mwhluskbgjhov",
           "conf": 1
         },
         {
-          "id": "bn_mwhlyorfyonm6",
+          "id": "bn_mwhluskbhuex1",
           "name": "head",
           "kind": "head",
           "x": -0.25,
           "y": 0,
           "len": 25.91,
           "angle": -6.69,
-          "parent": "bn_mwhlyorf0v13a",
+          "parent": "bn_mwhluskbszxwq",
           "conf": 0.86
         },
         {
-          "id": "bn_mwhlyorfd0flb",
+          "id": "bn_mwhluskbr11j9",
           "name": "crown",
           "kind": "crown",
           "x": 0,
           "y": 0.16,
           "len": 20.25,
           "angle": 6.69,
-          "parent": "bn_mwhlyorfyonm6",
+          "parent": "bn_mwhluskbhuex1",
           "conf": 0.83
         },
         {
-          "id": "bn_mwhlyorfcu58s",
+          "id": "bn_mwhluskb7n5tm",
           "name": "shoulderF",
           "kind": "shoulder",
           "x": -45.75,
           "y": -0.24,
           "len": 59.66,
           "angle": 124.38,
-          "parent": "bn_mwhlyorf0v13a",
+          "parent": "bn_mwhluskbszxwq",
           "conf": 0.97
         },
         {
-          "id": "bn_mwhlyorfz4fsh",
+          "id": "bn_mwhluskb3w6la",
           "name": "armF",
           "kind": "arm",
           "x": -0.41,
           "y": 0.15,
           "len": 12.28,
           "angle": -11.59,
-          "parent": "bn_mwhlyorfcu58s",
+          "parent": "bn_mwhluskb7n5tm",
           "conf": 0.44
         },
         {
-          "id": "bn_mwhlyorfd6d9d",
+          "id": "bn_mwhluskb4pj8p",
           "name": "forearmF",
           "kind": "forearm",
           "x": -2.75,
           "y": 0.73,
           "len": 6.14,
           "angle": 0,
-          "parent": "bn_mwhlyorfz4fsh",
+          "parent": "bn_mwhluskb3w6la",
           "conf": 0.21
         },
         {
-          "id": "bn_mwhlyorfiwzaa",
+          "id": "bn_mwhluskbw77vy",
           "name": "handF",
           "kind": "hand",
           "x": -2.47,
           "y": 1.65,
           "len": 6.14,
           "angle": 0,
-          "parent": "bn_mwhlyorfd6d9d",
+          "parent": "bn_mwhluskb4pj8p",
           "conf": 0.21
         },
         {
-          "id": "bn_mwhlyorf4vnl6",
+          "id": "bn_mwhluskb17weu",
           "name": "shoulderB",
           "kind": "shoulder",
           "x": -45.75,
           "y": 0,
           "len": 61.26,
           "angle": -123.19,
-          "parent": "bn_mwhlyorf0v13a",
+          "parent": "bn_mwhluskbszxwq",
           "conf": 1
         },
         {
-          "id": "bn_mwhlyorf33s2z",
+          "id": "bn_mwhluskbnguky",
           "name": "armB",
           "kind": "arm",
           "x": -0.05,
           "y": -0.54,
           "len": 13.85,
           "angle": -11.05,
-          "parent": "bn_mwhlyorf4vnl6",
+          "parent": "bn_mwhluskb17weu",
           "conf": 1
         },
         {
-          "id": "bn_mwhlyorf3bhs9",
+          "id": "bn_mwhluskb137ny",
           "name": "forearmB",
           "kind": "forearm",
           "x": 1.25,
           "y": 2.05,
           "len": 6.93,
           "angle": 0,
-          "parent": "bn_mwhlyorf33s2z",
+          "parent": "bn_mwhluskbnguky",
           "conf": 0.76
         },
         {
-          "id": "bn_mwhlyorfy9k79",
+          "id": "bn_mwhluskbyjah6",
           "name": "handB",
           "kind": "hand",
           "x": -0.45,
           "y": -0.04,
           "len": 6.93,
           "angle": 0,
-          "parent": "bn_mwhlyorf3bhs9",
+          "parent": "bn_mwhluskb137ny",
           "conf": 0.61
         },
         {
-          "id": "bn_mwhlyorfs4yqu",
+          "id": "bn_mwhluskbt78zi",
           "name": "thighF",
           "kind": "thigh",
           "x": 36.4,
           "y": 0,
           "len": 65.79,
           "angle": 94.35,
-          "parent": "bn_mwhlyorfkoxeh",
+          "parent": "bn_mwhluskbpzywb",
           "conf": 0.94
         },
         {
-          "id": "bn_mwhlyorfhiwrn",
+          "id": "bn_mwhluskb6l8ci",
           "name": "shinF",
           "kind": "shin",
           "x": -0.02,
           "y": 4.39,
           "len": 50.28,
           "angle": -5.81,
-          "parent": "bn_mwhlyorfs4yqu",
+          "parent": "bn_mwhluskbt78zi",
           "conf": 1
         },
         {
-          "id": "bn_mwhlyorftjeb0",
+          "id": "bn_mwhluskbqw4ci",
           "name": "footF",
           "kind": "foot",
           "x": -0.21,
           "y": 6.8,
           "len": 20.31,
           "angle": -37.02,
-          "parent": "bn_mwhlyorfhiwrn",
+          "parent": "bn_mwhluskb6l8ci",
           "conf": 0.96
         },
         {
-          "id": "bn_mwhlyorfhy6ty",
+          "id": "bn_mwhluskbc3s85",
           "name": "thighB",
           "kind": "thigh",
           "x": -35.51,
           "y": 0,
           "len": 65.84,
           "angle": 87.85,
-          "parent": "bn_mwhlyorfkoxeh",
+          "parent": "bn_mwhluskbpzywb",
           "conf": 0.84
         },
         {
-          "id": "bn_mwhlyorfnhzs9",
+          "id": "bn_mwhluskb023ak",
           "name": "shinB",
           "kind": "shin",
           "x": -0.03,
           "y": -0.28,
           "len": 51.02,
           "angle": -3.73,
-          "parent": "bn_mwhlyorfhy6ty",
+          "parent": "bn_mwhluskbc3s85",
           "conf": 0.87
         },
         {
-          "id": "bn_mwhlyorfcpk41",
+          "id": "bn_mwhluskbvx4mb",
           "name": "footB",
           "kind": "foot",
           "x": -0.37,
           "y": -5.21,
           "len": 18.65,
           "angle": 38.06,
-          "parent": "bn_mwhlyorfnhzs9",
+          "parent": "bn_mwhluskb023ak",
           "conf": 0.87
+        },
+        {
+          "id": "bn_mwhluskbbmxxw",
+          "name": "prop",
+          "kind": "prop",
+          "x": -15.48,
+          "y": -6.82,
+          "len": 120,
+          "angle": -45.76,
+          "parent": "bn_mwhluskbyjah6",
+          "conf": 0.69
         }
       ],
       "shapes": [
         {
-          "id": "shp_mwhlyorfxvu2j",
+          "id": "shp_mwhluskcgnpma",
           "name": "hitbox",
           "role": "hitbox",
           "type": "rect",
@@ -465,7 +476,7 @@
           "points": []
         },
         {
-          "id": "shp_mwhlyorfk58nb",
+          "id": "shp_mwhluskcink8e",
           "name": "torso",
           "role": "hurtbox",
           "type": "rect",
@@ -478,7 +489,7 @@
           "points": []
         },
         {
-          "id": "shp_mwhlyorfb97se",
+          "id": "shp_mwhluskcmkohq",
           "name": "head",
           "role": "head",
           "type": "rect",
@@ -491,7 +502,7 @@
           "points": []
         },
         {
-          "id": "shp_mwhlyorftfgfl",
+          "id": "shp_mwhluskczftj4",
           "name": "legF",
           "role": "leg",
           "type": "rect",
@@ -504,7 +515,7 @@
           "points": []
         },
         {
-          "id": "shp_mwhlyorfpgk9x",
+          "id": "shp_mwhluskcceiiu",
           "name": "legB",
           "role": "leg",
           "type": "rect",
@@ -517,7 +528,7 @@
           "points": []
         },
         {
-          "id": "shp_mwhlyorfmhyb9",
+          "id": "shp_mwhluskcc30zn",
           "name": "armF",
           "role": "arm",
           "type": "rect",
@@ -530,7 +541,7 @@
           "points": []
         },
         {
-          "id": "shp_mwhlyorfva1mf",
+          "id": "shp_mwhluskct7usk",
           "name": "armB",
           "role": "arm",
           "type": "rect",
@@ -546,13 +557,13 @@
       "grip": null,
       "cast": null,
       "rig": {
-        "fittedAt": "2026-11-15T09:04:20.187Z",
+        "fittedAt": "2026-11-15T09:01:18.492Z",
         "source": "local",
         "mode": "all",
         "family": "mech",
         "frames": 10,
         "stats": {
-          "bones": 20,
+          "bones": 21,
           "shapes": 7,
           "meanConf": 0.8,
           "coverage": 1,
@@ -586,7 +597,9 @@
         "warnings": [
           "这些骨骼没找到对应部位（未生成）：prop",
           "这些碰撞体没找到对应部位（未生成）：prop",
-          "只识别到一条腿（另一条被挡住/并腿），前后腿按中线拆"
+          "缺少锚点 propTop/propBottom，骨骼 prop 未生成",
+          "只识别到一只着地脚，腿按髋线以下列聚类估计",
+          "只能识别到一根腿部聚类，前后腿按中线对半拆"
         ]
       }
     }
