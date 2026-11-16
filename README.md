@@ -42,9 +42,11 @@ node scripts/test-v6.mjs         # 武器 / 大型敌人
 ### 序列帧美术管线（BOSS 动作 / 走路）
 
 ```bash
-node scripts/boss-walk-post.mjs            # N 张单帧 PNG → 横向图集 + manifest 帧组
+node scripts/boss-walk-post.mjs            # N 张单帧 PNG → 横向图集 + manifest 帧组（走路）
+node scripts/boss-dash-post.mjs            # 12 张冲刺 PNG → 512×336 宽格图集 + manifest（冲刺）
 node scripts/sprite-editor-apply-walk.mjs  # 用内嵌精灵编辑器绑定到角色并发布
 node scripts/verify-boss-walk.mjs          # BOSS 测试房验证（帧数/帧率/来源）
+node scripts/verify-boss-dash.mjs          # 冲刺验证（12 帧动画 + 真实位移 + 撞墙 + 命中）
 node scripts/verify-sprite-history.mjs     # 历史记录 + 落盘 + 恢复 + 从磁盘重建
 node scripts/verify-room-disk.mjs          # 房间编辑器工程落盘 + 从磁盘恢复
 node scripts/verify-skeleton-fit.mjs       # 骨骼/碰撞体智能识别（算法 + 确定性 + AI 降级）

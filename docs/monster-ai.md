@@ -73,7 +73,66 @@ node scripts/verify-boss-move.mjs
 同一张测试房地图上横扫 ±600px：旧逻辑判「有地」34%，新逻辑 87%——
 这就是这个 bug 的影响面（三分之二的位置它都以为前面没路）。
 
-## 5. 已知取舍
+## 5. 冲刺（TUNNEL DASH）：动画 + 真正的位移
+
+数据执政官的突进招式。两件事分开做：**美术管线**出新图集，**行为层**给真实位移。
+
+### 5.1 美术管线
+
+```bash
+node scripts/boss-dash-post.mjs --preview   # 12 张 PNG → tb_data_archon_dash.png + manifest
+```
+
+- 输入顺序就是播放顺序（默认 `033,022,023,…,032`，可用 `--frames` 改）。
+- **dash 用 512×336 的格子**（走路是 272×336）：冲刺姿势大幅前倾 + 提箱拖在身后，
+  源图并集 1022×637；按走路的内容高度（269px）对齐需要 ~0.43 缩放 → 内容 415×269，
+  272 宽的格子装不下，硬塞只能缩到 0.39，角色会明显变小。
+- manifest 里 `kinds.dash` 自带 `frameW/frameH`，loader 把每种图集的格尺寸记进 `art.actionCell`；
+  `BaseMonster._syncFrameScale()` 在切换动作时按格的宽高比把 quad 拉宽/还原（走 136×168，冲刺 256×168），
+  所以**像素比例与走路完全一致**，不会「冲刺瞬间变小」。
+- 编辑器覆盖层只替换它自己有的动作（walk/run），不会动 dash。
+
+### 5.2 行为层（真的有位移）
+
+```js
+startDash({ dur, speedMul, damage })   // 招式 exec 里调
+_updateDash(dt)                        // state === 'dash' 时每帧跑
+```
+
+- 只设 `vxTarget = facing * speed * speedMul`，位移由 `base.update` 的
+  `body.vx → moveBody()` 完成 → **撞墙会被拦住、下台阶会自然掉下去**，不是改坐标。
+- 起手额外给 `body.vx` 一记冲量（速度的一半）：`vx` 的平滑加速有 ~0.15s 迟滞，
+  不给冲量的话前 100ms 几乎不动，手感会「黏」。
+- 冲刺期间**不 facePlayer()**：冲刺是承诺动作，每帧转向会变成追着玩家拐弯
+  （撞墙测试里直接冲反了）。
+- 结束条件：时间到 / `body.wallDir !== 0`（撞墙）/ `!groundAhead(facing)`（前面是坑）。
+  撞墙会给尘爆 + 震屏。
+- 接触伤害：每段冲刺最多命中一次，用 `game.damageArea()` 打玩家，不新增伤害通道。
+
+招式参数（`theme-boss-kits.js`）：一阶段 `dur 0.5 / speedMul 6.2`，二阶段 `0.58 / 7.0`，
+实战位移 ~140~160px（走路 58px/s × 0.5s ≈ 29px，所以是实打实的突进）。
+
+### 5.3 验证
+
+```bash
+node scripts/verify-boss-dash.mjs
+```
+
+| 项 | 判据 | 实测 |
+|---|---|---|
+| 资源 | 12 帧 / fps 16 / dash 格 512×336 | 全部命中 |
+| 状态机 | wind → dash → recover | ✓ |
+| 动画 | 冲刺期间 `animName === 'dash'` | ✓ |
+| **位移** | 沿朝向 ≥120px | **142~158px** |
+| 速度 | 峰值 >150px/s | **280px/s**（走路 58） |
+| 尺寸 | 冲刺时 quad 256×168，收招回 136×168 | ✓ |
+| 命中 | 玩家在路径上掉血 | 100 → 78 |
+| 撞墙 | 不穿墙、提前收招 | 只推进 5px 就收招 |
+
+截图：`.screenshots/dash/ingame-dash-1..6.png`（推进 95ms → 冻结时钟 → 截图，
+因为一张 1400×860 截图要 200ms+，靠 `wait` 抓不准冲刺中的帧）。
+
+## 6. 已知取舍
 
 - 大怪可以走下 1~2 格台阶，但**没有上台阶能力**（`moveBody` 无 step-up）。
   掉进不可攀爬的坑里会留在原地——这是既有设计，不在本次修复范围内。

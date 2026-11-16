@@ -45,7 +45,7 @@ export const THEME_BOSS_DEFS = [
     size: [136, 168],
     artId: 'cyberpsycho_boss',
     accent: 0x8fc4ff,
-    moves: ['da_delete_beam', 'da_packet_fan', 'da_node_sentry', 'da_buffer_overflow'],
+    moves: ['da_delete_beam', 'da_packet_fan', 'da_tunnel_dash', 'da_node_sentry', 'da_buffer_overflow'],
     summonIds: ['server_wraith', 'sentry'],
     desc: '失落数据中心的最后一道权限。它把入侵者当成待清理的脏数据，先标记，再删除。',
   },
@@ -900,6 +900,9 @@ class ThemeBoss extends BaseMonster {
         frames: art.frames,
         w: art.w,
         h: art.h,
+        // dash 之类更宽的格子要带过来，applyFrame 才会把 quad 临时拉宽
+        baseCell: art.baseCell,
+        actionCell: art.actionCell,
         fromEditor: !!art.fromEditor,
       })
       this.playAnim(this.animName)
@@ -1031,6 +1034,87 @@ class ThemeBoss extends BaseMonster {
     this.lastMove = move
   }
 
+  // ------------------------------------------------------------------ 冲刺
+  /**
+   * 真正的冲刺位移：给一个短时间的速度倍率，靠物理（moveBody）推进，
+   * 所以撞墙会自然停下、下台阶会自然掉下去，不是「改坐标」那种假位移。
+   * 招式 exec 里调 `b.startDash({ dur, speedMul, damage })`。
+   */
+  startDash(opts = {}) {
+    const d = {
+      t: 0,
+      dur: Math.max(0.12, opts.dur ?? 0.5),
+      speedMul: Math.max(1.2, opts.speedMul ?? 4.4),
+      damage: opts.damage ?? this.damage * 0.85,
+      hit: false,
+      trailT: 0,
+    }
+    this._dash = d
+    this.state = 'dash'
+    this.stateT = 0
+    this.vxTarget = this.facing * this.speed * d.speedMul
+    // 起手给一记冲量：vx 的平滑加速有 ~0.15s 迟滞，直接给一半速度才「冲」得出去。
+    // 仍然是速度不是坐标，撞墙照样被 moveBody 拦住。
+    this.body.vx = this.facing * this.speed * d.speedMul * 0.55
+    this.playAnim('dash')
+    puff(this, 12, 0x93a8b2, 1.2)
+    shake(this, 0.16)
+    sfx(this, 'mechStep', 0.55, 0.75)
+    return d
+  }
+
+  _updateDash(dt) {
+    const d = this._dash
+    if (!d) {
+      this.state = 'chase'
+      return
+    }
+    d.t += dt
+    // 持续给出速度（base.update 会把它平滑成 body.vx → moveBody 真正位移）
+    // 注意：冲刺期间**不追玩家朝向** —— 冲刺是「认准一个方向冲出去」的承诺动作，
+    // 每帧 facePlayer() 会变成追着玩家拐弯，撞墙测试里直接就冲反了。
+    this.vxTarget = this.facing * this.speed * d.speedMul
+    this.playAnim('dash')
+
+    // 拖尾扬尘
+    d.trailT -= dt
+    if (d.trailT <= 0) {
+      d.trailT = 0.05
+      puff(this, 2, this.accent || 0x6ff0d0, 0.85)
+    }
+
+    // 接触伤害（一次冲刺最多一次）
+    const p = this.player
+    if (p && !p.dead && !d.hit) {
+      const dx = Math.abs(p.body.x + p.body.w / 2 - this.px)
+      const dy = Math.abs(p.body.y + p.body.h / 2 - (this.body.y + this.body.h * 0.55))
+      if (dx < this.body.w * 0.5 + p.body.w * 0.75 && dy < this.body.h * 0.62) {
+        d.hit = true
+        this.game?.damageArea?.(p.body.x + p.body.w / 2, p.body.y + p.body.h / 2, 46, d.damage)
+        spark(this, p.centerX, p.centerY, this.accent || 0x6ff0d0, 14, 260)
+        shake(this, 0.32)
+        sfx(this, 'hit', 0.5, 1.05)
+      }
+    }
+
+    // 撞墙 / 前方没地 / 时间到 → 收招
+    const wallHit = this.body.wallDir !== 0
+    const noGround = !this.groundAhead(this.facing)
+    if (wallHit || noGround || d.t >= d.dur) {
+      if (wallHit) {
+        puff(this, 14, 0x6b5f55, 1.4)
+        shake(this, 0.4)
+        sfx(this, 'explosion', 0.45, 1.1)
+      }
+      this._dash = null
+      this.vxTarget = 0
+      this.playAnim('idle')
+      this.state = 'recover'
+      this.stateT = 0
+      this.moveCd = (this.phase > 1 ? 1.0 : 1.6) * (0.8 + Math.random() * 0.5)
+    }
+  }
+
   /** 招式特效序列帧：地面类落在玩家脚下，其余落在 BOSS 胸口/落点。 */
   _playMoveVfx(move, spec) {
     const name = vfxForMove(move, spec?.name || '', this.cfg?.id || '')
@@ -1084,6 +1168,12 @@ class ThemeBoss extends BaseMonster {
       return
     }
 
+    // 冲刺进行中（真的有位移）
+    if (this.state === 'dash') {
+      this._updateDash(dt)
+      return
+    }
+
     // 冲锋进行中
     if (this.state === 'charge') {
       this.chargeT -= dt
@@ -1113,7 +1203,7 @@ class ThemeBoss extends BaseMonster {
       if (this.stateT >= wind) {
         if (this.tell) showTell(this.tell, 0)
         this._exec(move)
-        if (this.state === 'charge') return
+        if (this.state === 'charge' || this.state === 'dash') return
         this.state = 'recover'
         this.stateT = 0
       }

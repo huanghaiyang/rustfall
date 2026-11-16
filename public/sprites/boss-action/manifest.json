@@ -8,6 +8,12 @@
       "walk": {
         "file": "sprites/boss-action/tb_data_archon_walk.png",
         "frames": 10
+      },
+      "dash": {
+        "file": "sprites/boss-action/tb_data_archon_dash.png",
+        "frames": 12,
+        "frameW": 512,
+        "frameH": 336
       }
     },
     "frameW": 272,
@@ -22,7 +28,8 @@
       "attack": 12,
       "cast": 10,
       "hurt": 8,
-      "dead": 5
+      "dead": 5,
+      "dash": 16
     },
     "frames": {
       "idle": [
@@ -52,6 +59,20 @@
         "walk:7",
         "walk:8",
         "walk:9"
+      ],
+      "dash": [
+        "dash:0",
+        "dash:1",
+        "dash:2",
+        "dash:3",
+        "dash:4",
+        "dash:5",
+        "dash:6",
+        "dash:7",
+        "dash:8",
+        "dash:9",
+        "dash:10",
+        "dash:11"
       ],
       "attack": [
         "base:6",

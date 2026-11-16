@@ -92,6 +92,24 @@ function bossKit_dataArchon(b) {
         })
       },
     },
+    // 冲刺：真有位移的突进（12 帧冲刺序列帧 + 接触伤害 + 撞墙收招）
+    da_tunnel_dash: {
+      name: '穿隧冲刺',
+      en: 'TUNNEL DASH',
+      wind: 0.42,
+      cool: 4.6,
+      range: [150, 900],
+      exec() {
+        // 起手：先亮一下突进方向，再真冲出去（位移由 startDash 的速度倍率经物理推进）
+        mark(b, b.px + b.facing * 150, feetY(b), 52, 0x9fe0ff, 0.3)
+        spark(b, b.px + b.facing * 30, b.py - b.h * 0.12, 0x9fe0ff, 10, 220)
+        b.startDash({
+          dur: b.phase > 1 ? 0.58 : 0.5,
+          speedMul: b.phase > 1 ? 7.0 : 6.2,
+          damage: b.damage * (b.phase > 1 ? 1.05 : 0.9),
+        })
+      },
+    },
     da_buffer_overflow: {
       name: '缓存溢出',
       en: 'BUFFER OVERFLOW',

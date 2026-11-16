@@ -39,6 +39,7 @@ const NAME_KIND = {
   walk: ['walk', 'move', 'all'],
   move: ['walk', 'move', 'all'],
   run: ['walk', 'move', 'all'],
+  dash: ['dash', 'walk', 'all'],
   attack: ['attack', 'all'],
   cast: ['cast', 'attack', 'all'],
   hurt: ['react', 'hurt', 'all'],
@@ -149,12 +150,16 @@ export function loadBossAction(id) {
       }
 
       // 兼容旧格式（单图集 info.file）与新格式（多图集 info.kinds）
+      // 每种图集可以有自己的格宽高（例如 dash 格 512×336，走路格 272×336）：
+      // 冲刺姿势前倾 + 拖箱，按走路的格子放会小一圈，所以单独给更宽的格子，
+      // 由 cellFor 让 BOSS 的 quad 在该动作下临时拉宽，像素比例保持不变。
       const kinds = info.kinds
         ? Object.entries(info.kinds)
             .filter(([, k]) => k && k.file)
-            .map(([kind, k]) => ({ kind, file: k.file }))
+            .map(([kind, k]) => ({ kind, file: k.file, frameW: k.frameW, frameH: k.frameH }))
         : [{ kind: 'all', file: info.file }]
 
+      const cellFor = {}
       const loads = kinds.map(
         (k) =>
           new Promise((resolve) => {
@@ -168,7 +173,10 @@ export function loadBossAction(id) {
                 tex.wrapS = THREE.ClampToEdgeWrapping
                 tex.wrapT = THREE.ClampToEdgeWrapping
                 tex.needsUpdate = true
-                const count = Math.max(1, Math.round(tex.image.width / (info.frameW || tex.image.width)))
+                const cw = k.frameW || info.frameW || tex.image.width
+                const ch = k.frameH || info.frameH || tex.image.height
+                cellFor[k.kind] = { w: cw, h: ch }
+                const count = Math.max(1, Math.round(tex.image.width / cw))
                 const list = []
                 for (let i = 0; i < count; i++) list.push(cloneFrame(tex, i, count))
                 resolve({ kind: k.kind, frames: list })
@@ -222,6 +230,21 @@ export function loadBossAction(id) {
         }
         if (!frames.idle) return null
 
+        // 每个动作对应的格尺寸 / quad 尺寸：默认 = base 格，dash 之类更宽的格会覆盖
+        const baseCell = { w: info.frameW || 272, h: info.frameH || 336 }
+        const actionCell = {}
+        for (const [name, list] of Object.entries(frames)) {
+          // 从 frames 的引用里推出该动作用的是哪个 kind
+          const refs = (info.frames && info.frames[name]) || []
+          let kindName = null
+          if (refs.length && typeof refs[0] === 'string' && refs[0].includes(':')) kindName = refs[0].split(':')[0]
+          const cell = (kindName && cellFor[kindName]) || baseCell
+          if (cell.w !== baseCell.w || cell.h !== baseCell.h) actionCell[name] = cell
+        }
+        if (editorFrames) {
+          // 编辑器覆盖的动作按 base 格走（编辑器里只有一张图集）
+          for (const name of Object.keys(editorFrames)) delete actionCell[name]
+        }
         const art = {
           w: info.logicalW || info.frameW / 2,
           h: info.logicalH || info.frameH / 2,
@@ -229,6 +252,8 @@ export function loadBossAction(id) {
           logicalH: info.logicalH,
           frameW: info.frameW,
           frameH: info.frameH,
+          baseCell,
+          actionCell,
           fps: Object.assign({}, info.fps || {}, editorFpsFor(key) || {}),
           frames,
           fromEditor: !!editorFrames,

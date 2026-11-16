@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { spriteMaterial } from '../../render/materials.js'
-import { outlineMaterial, outlineGeometry } from '../../render/outline.js'
+import { outlineMaterial, outlineGeometry, resizeOutlineMesh } from '../../render/outline.js'
 import { TS, PLAYER } from '../../config.js'
 import { makeBody, moveBody } from '../../world/tilemap.js'
 import { Events, EV } from '../../core/events.js'
@@ -132,6 +132,39 @@ export class BaseMonster {
       this.mat.map = tex
       this.mat.needsUpdate = true
       this.mat.color.setHex(0xffffff)
+    }
+    this._syncFrameScale()
+  }
+
+  /**
+   * 动作换了「格子尺寸」时把 quad 跟着改宽（例如 dash 用 512×336 的格子，走路是 272×336）。
+   * 格子更宽而 quad 不变的话，冲刺帧会被横向压扁；这里按格的宽高比换算 quad 尺寸，
+   * 保证像素比例与走路完全一致（描边留白也跟着重算）。
+   */
+  _syncFrameScale() {
+    const art = this.art
+    const actionCell = art?.actionCell
+    if (!actionCell || !this.mesh) return
+    const base = art.baseCell
+    if (!base?.w || !base?.h) return
+    const cell = actionCell[this.animName]
+    const bw = Number(art.w) || this.spriteW
+    const bh = Number(art.h) || this.spriteH
+    const tw = cell ? bw * (cell.w / base.w) : bw
+    const th = cell ? bh * (cell.h / base.h) : bh
+    if (Math.abs(tw - this.spriteW) < 0.5 && Math.abs(th - this.spriteH) < 0.5) return
+    this.spriteW = tw
+    this.spriteH = th
+    if (this.mat?.userData?.outline) {
+      resizeOutlineMesh(this.mesh, tw, th)
+    } else {
+      const old = this.mesh.geometry
+      this.mesh.geometry = new THREE.PlaneGeometry(tw, th)
+      try {
+        old?.dispose?.()
+      } catch (e) {
+        /* ignore */
+      }
     }
   }
 
