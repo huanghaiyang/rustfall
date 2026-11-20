@@ -23,10 +23,10 @@ import {
   showTell,
   disposeTell,
   largeDeathFx,
-  roomBounds,
 } from './common.js'
 import { BOSS_KIT_FACTORIES } from './theme-boss-kits.js'
 import { BOSS_SIGNATURES } from './boss-signatures.js'
+import { BossBrain } from './boss-ai.js'
 import { updateFx, clearFx } from './theme-boss-fx.js'
 import { loadBossAction, bossActionVersion } from '../../../render/art/boss-action.js'
 import { playBossVfx, preloadBossVfx, vfxForMove, vfxNamesForBoss } from '../../../render/art/boss-vfx.js'
@@ -872,6 +872,12 @@ class ThemeBoss extends BaseMonster {
     this.lastMove = null
     this.comboCount = 0
     this._fx = []
+    // 地形感知追击大脑：距离带 / 跨沟 / 攀台阶 / 绕路 / 失联搜索 / 脱困
+    this.ai = new BossBrain(this, { maxStepTiles: 2, jumpVy: -620 })
+    this.ai.setBandFromKit(this.kit)
+    this._hopCd = 0
+    this._hopping = false
+    this._hopKind = null
     initLarge(this, { intro: 1.25, activateRange: 780 })
     applyLargeArt(this)
     this._loadActionFrames()
@@ -1115,6 +1121,40 @@ class ThemeBoss extends BaseMonster {
     }
   }
 
+  // ------------------------------------------------------------------ 攀跳
+  /**
+   * 追击大脑要求起跳时调用。仍然是「给速度」而不是改坐标：
+   * 垂直给负 vy、水平给一记冲量，位移由 base.update 的 moveBody 完成，
+   * 所以撞天花板会被拦、踩空会掉、落到台阶上才算真上去。
+   */
+  _startHop(kind = 'step') {
+    if (!this.body.onGround || this._hopCd > 0) return false
+    const leap = kind === 'leap'
+    this.body.vy = this.ai.jumpVy * (leap ? 1.05 : 1)
+    this.body.vx = this.facing * this.speed * (leap ? 2.8 : 1.2)
+    this._hopCd = leap ? 1.0 : 0.62
+    this._hopping = true
+    this._hopKind = kind
+    this.playAnim('run')
+    puff(this, leap ? 16 : 7, this.accent || 0x93a8b2, leap ? 1.25 : 0.9)
+    sfx(this, 'mechStep', leap ? 0.6 : 0.4, leap ? 0.7 : 0.95)
+    if (leap) shake(this, 0.2)
+    return true
+  }
+
+  /** 落地：尘爆 + 一点震屏，让「攀上去 / 跨过去」有反馈 */
+  _updateHopLanding() {
+    if (!this._hopping || !this.body.onGround) return
+    this._hopping = false
+    puff(this, 8, 0x93a8b2, 1.0)
+    shake(this, 0.16)
+    sfx(this, 'mechStep', 0.35, 1.15)
+    if (this.ai) {
+      this.ai.sampleX = this.px
+      this.ai.stuckLevel = 0
+    }
+  }
+
   /** 招式特效序列帧：地面类落在玩家脚下，其余落在 BOSS 胸口/落点。 */
   _playMoveVfx(move, spec) {
     const name = vfxForMove(move, spec?.name || '', this.cfg?.id || '')
@@ -1140,6 +1180,8 @@ class ThemeBoss extends BaseMonster {
     // 精灵编辑器发布过 → 就地换帧（不用重进房间；每帧一次数值比较，代价可忽略）
     if (this._artVer !== bossActionVersion()) this._loadActionFrames()
     this.moveCd = Math.max(0, this.moveCd - dt)
+    this._hopCd = Math.max(0, this._hopCd - dt)
+    this._updateHopLanding()
     for (const k in this.moveReady) {
       if (this.moveReady[k] > 0) this.moveReady[k] = Math.max(0, this.moveReady[k] - dt)
     }
@@ -1229,21 +1271,14 @@ class ThemeBoss extends BaseMonster {
       return
     }
 
-    // 追击 + 选招
-    const hd = this._hd()
-    this.facePlayer()
-    if (hd > 110) {
-      this.state = 'chase'
-      this.vxTarget = this.facing * this.speed
-      this.playAnim('run')
-    } else {
-      this.vxTarget = 0
-      this.playAnim('idle')
-    }
-    if (this.wallAhead() || !this.groundAhead()) this.vxTarget = 0
-    const { w } = roomBounds(this)
-    if (this.body.x < 30) this.body.x = 30
-    else if (this.body.x > w - this.body.w - 30) this.body.x = w - this.body.w - 30
+    // 追击 + 选招：交给地形感知大脑（距离带 / 跨沟 / 攀台阶 / 绕路 / 失联搜索）
+    // 大脑只给意图，位移仍由 base.update 的 moveBody 完成，撞墙/掉落都是真物理。
+    const intent = this.ai.think(dt)
+    this.facing = intent.facing ?? this.facing
+    this.state = 'chase'
+    this.vxTarget = intent.dir * this.speed * intent.speedMul
+    this.playAnim(intent.anim || (Math.abs(this.vxTarget) > 4 ? 'run' : 'idle'))
+    if (intent.jump) this._startHop(intent.jump)
 
     if (this.moveCd <= 0) {
       const move = this._pickMove()
@@ -1264,6 +1299,7 @@ class ThemeBoss extends BaseMonster {
       this.speed = this.baseSpeed * 1.16
       this.damage = this.baseDamage * 1.18
       this.moveCd = 0.5
+      this.ai?.setPhase?.(2)
       puff(this, 26, this.accent, 1.7)
       shake(this, 0.55)
       sfx(this, 'growl', 0.7, 0.6)

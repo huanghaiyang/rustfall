@@ -153,6 +153,14 @@ const setup = await page.evaluate(() => {
   b.state = 'roam'
   b.stateT = 0
   b.moveCd = 6 // 先别放招，专心走路
+  // 这只 BOSS 是「中远程型」，默认距离带会停在 350px 左右。
+  // 这里测的是「行走位移」，把距离带压成近战型，让它必须一直走到玩家身边。
+  if (b.ai) {
+    b.ai.band = [72, 150]
+    b.ai.stuckLevel = 0
+    b.ai.forceDirT = 0
+    b.ai.sampleX = b.body.x
+  }
   return { bossX: Math.round(b.body.x), playerX: Math.round(g.player.body.x), hp: g.player.hp }
 })
 

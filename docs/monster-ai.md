@@ -132,9 +132,94 @@ node scripts/verify-boss-dash.mjs
 截图：`.screenshots/dash/ingame-dash-1..6.png`（推进 95ms → 冻结时钟 → 截图，
 因为一张 1400×860 截图要 200ms+，靠 `wait` 抓不准冲刺中的帧）。
 
-## 6. 已知取舍
+## 6. BOSS 追击大脑（boss-ai.js）
 
-- 大怪可以走下 1~2 格台阶，但**没有上台阶能力**（`moveBody` 无 step-up）。
-  掉进不可攀爬的坑里会留在原地——这是既有设计，不在本次修复范围内。
-  如果以后要改，建议在 `updateBehavior` 里给大怪加「起跳/攀爬」或让关卡生成器避免刷在坑里。
+主题站点 BOSS（51 只）的追击不走 `BaseMonster` 的默认逻辑，而是交给
+`src/game/entities/monsters/large/boss-ai.js` 里的 `BossBrain`：
+
+```
+ThemeBoss.updateBehavior
+  └─ BossBrain.think(dt) → { dir, speedMul, mode, facing, jump }
+       ├─ ThemeBoss 写 vxTarget / facing / 动画
+       ├─ jump → this._startHop(kind) 只给 body.vy + body.vx 冲量
+       └─ 其余照旧：base.update → moveBody（真物理）
+```
+
+**大脑只出意图，不碰坐标。** 所以跨沟会真的掉下去、攀台阶会真的被天花板挡、
+撞墙会被 `moveBody` 拦——不会出现「穿墙追击 / 瞬移贴脸」。
+
+| 行为 | 触发条件 | 做法 |
+|---|---|---|
+| `press` | 距离 > 距离带上限 | 全速朝玩家走 |
+| `hold` | 在距离带内 | 停下；远程型贴太近会后退拉距 |
+| `leap` | 前方沟宽 ≤ `speed×1.7`（80~150px）、深 ≥1 格 | 起跳 + 2.8× 水平速度 |
+| `climb` / `step` | 前方 1~2 格台阶且顶面够宽、上方有空间 | 负 vy 攀跳 + 1.2× 水平冲量 |
+| `edge` | 前方是无底深渊，或 >2 格爬不上的高墙 | 停在崖边/墙下，改用远程招 |
+| `search` | 视线（`hasLineOfSight`）丢失 >0.7s | 去最后已知位置；到了左右扫视 |
+| `reposition` | 推着走 0.5s 位移 <8px | 反向 0.7s + 起跳脱困 |
+
+距离带由招式表推出来（`setBandFromKit`），不是写死：
+
+| 近战招占比 | band（px） | 观感 |
+|---|---|---|
+| ≥50% | 72 ~ 150 | 贴脸型：走到脸上砸 |
+| 25%~50% | 130 ~ 240 | 中距型：打一套就挪 |
+| <25% | 220 ~ 380 | 远程型：保持射程，被贴就后撤 |
+
+二阶段（`takeDamage` 掉到半血）会把 band 收窄到 0.82/0.86，压迫感更强。
+
+几何探测（都是纯函数，可单测）：
+
+- `probeStep(m, dir, maxTiles)` —— 前缘 2~26px 逐点找「挡脚」的实心格，
+  往上找到顶面，判断高度、顶面宽度（≥ 0.55×身宽）、头顶空间。
+- `probeGap(m, dir, maxScan)` —— 逐列量「脚下多深才有地」，返回沟宽与最浅落底深度。
+- `findApproach(m, dir, maxScan)` —— 玩家在高台上、正面爬不上去时，沿墙 ±340px
+  找抬升 ≤2.6 格、落面够宽、上方有空间的落脚点，绕过去。
+
+### 6.1 验证
+
+```bash
+node scripts/verify-boss-ai.mjs     # 决策层（假地图，秒级）
+node scripts/verify-boss-chase.mjs  # 集成层（真引擎 / 真地形 / 真物理）
+```
+
+决策层断言：距离带（近战/远程）、1 格与 2 格台阶攀跳、5 格墙不硬攀、
+窄沟 leap、深渊 edge、失联 search（且只计一次）、钉住 0.5s 判卡住并脱困、
+`findApproach` 能找到斜坡并往那个方向走。
+
+集成层在「数据执政官」测试房里把玩家放到坑对面 / 高一格的台面上，
+断言 BOSS 真的下坑再爬出来、真的抬脚上台、失联后真的移动。
+
+实测（2026-11-20，数据执政官，测试房里现挖 3 格深 V 形坑 / 现垫 1 格台面）：
+
+| 场景 | 判据 | 实测 |
+|---|---|---|
+| 平地追击 | 位移 >100px、距离缩短 >60px、翻面 ≤2 | 位移 **222px**，508 → 286px，翻面 0 |
+| 过坑（坑宽 8 列 / 深 3 格） | 下坑、回到坑沿高度、距离缩短 | 脚底 1568 → 1614（下坑）→ 1468（出坑），距离 472 → 142px，1 次 leap |
+| 上 1 格台阶 | 脚底抬到台面 | 1568 → 1510（继续爬到 1536 台面），距离 282 → 144px |
+| 失联搜索 | mode=search 且真的移动 | 1.7s 内移动 89px |
+| 控制台 | 无 error | 0 |
+
+调试时可以直接在控制台看 `__rustfall.director.largeList[0].ai.debug`：
+`{ mode, dir, speedMul, gap, gapDepth, step, band, stuck }`。
+
+调参入口（`new BossBrain(host, opts)`）：
+
+```js
+maxStepTiles   2       // 能攀几格台阶
+jumpVy        -620    // 攀跳初速（h≈96px）
+leapSpeedMul  2.8      // 跨沟时的水平速度倍率
+```
+
+## 7. 已知取舍
+
+- **大怪（junk_golem 等 4 种）仍走旧的 `roamStep` / 各写各的 chase**：本次只把
+  51 只主题 BOSS 接进 `BossBrain`，避免一次性改动 6 份行为代码。
+  它们可以走下 1~2 格台阶，但还不能上台阶；掉进只有 1 格斜坡的坑仍然爬不出来。
+  要接的话在它们的 `chase` 分支里换成 `new BossBrain(this)` 即可（接口一致）。
+- BOSS 的「攀跳」是 **真物理**（负 vy + 水平冲量），不是补间动画，所以：
+  顶到天花板会被拦、踩到单向平台不会穿过去、跳跃高度受 gravity 影响。
+  跳跃期间没有专门的 jump 动作帧，沿用 `run`——美术管线只有 `idle/run/attack/cast/dash/hurt`。
+- 距离带只用招式表的静态范围，不看玩家是否在弹道死角；斜上方/正上方的死角判断
+  仍由各招式自己的 `range` 与命中判定负责。
 - 反向行走只是兜底，不改变「巡逻点由 director 生成」的架构（`makePatrol`：以刷新点为中心 ±220px）。
