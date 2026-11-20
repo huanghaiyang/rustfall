@@ -2,7 +2,7 @@
 // 锈雨 · RUSTFALL —— AI BOSS 动作序列帧加载层
 // ----------------------------------------------------------------------------
 // public/sprites/boss-action/manifest.json 由 scripts/boss-action-post.mjs /
-// scripts/boss-walk-post.mjs 生成。每个 BOSS 可以有多张图集（kinds），帧引用写法：
+// scripts/boss-walk-post.mjs / scripts/boss-jump-post.mjs 生成。每个 BOSS 可以有多张图集（kinds），帧引用写法：
 //
 //   { "<bossId>": {
 //       kinds: { base: { file, frames: 12 }, walk: { file, frames: 10 } },
@@ -40,6 +40,8 @@ const NAME_KIND = {
   move: ['walk', 'move', 'all'],
   run: ['walk', 'move', 'all'],
   dash: ['dash', 'walk', 'all'],
+  jump: ['jump', 'all'],
+  land: ['land', 'jump', 'all'],
   attack: ['attack', 'all'],
   cast: ['cast', 'attack', 'all'],
   hurt: ['react', 'hurt', 'all'],

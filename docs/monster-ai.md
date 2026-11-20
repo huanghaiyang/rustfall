@@ -211,6 +211,76 @@ jumpVy        -620    // 攀跳初速（h≈96px）
 leapSpeedMul  2.8      // 跨沟时的水平速度倍率
 ```
 
+### 6.2 攀跳动作：jump / land 两组帧
+
+「原地起跳」源素材共 41 帧（461×672，已去背景），美术管线：
+
+```bash
+node scripts/boss-jump-post.mjs --preview \
+  --jump-from 14 --jump-to 28 --jump-fps 24 \
+  --land-from 29 --land-to 41 --land-fps 30
+```
+
+产出 `tb_data_archon_jump.png`（41 格 272×336，1.4MB）+ manifest 的 `kinds.jump`、
+`frames.jump`（15 帧）与 `frames.land`（13 帧）。
+
+**和走路管线的关键差别：跳跃不能用「并集包围盒」。** 走路 10 帧的脚底位置基本一致，
+并集对齐能消抖；跳跃是一整段「蹲 → 蹬 → 腾空 → 落地 → 起身」，身体在画布里上下大幅移动，
+若整体并集缩放，起跳高度会被烘进图里，再叠加引擎的 `body.y` 就会「跳两次」。所以改为：
+
+- 逐帧取自己的 bbox，**统一缩放**（用站立帧 001~004 / 037~041 的中位身高定标，
+  内容高 269px，与 idle/walk 一致，切动作不变大变小）；
+- **统一贴底**：每帧 bbox 底边压到格子底部，图里只留姿势，腾空位移交给物理。
+
+帧组切分（0 基）：
+
+| 组 | 帧 | fps | 时长 | 用途 |
+|---|---|---|---|---|
+| `jump` | 013..027（源 014~028） | 24 | 0.625s | 蹬地伸展 + 腾空收腿，正好等于滞空时间 |
+| `land` | 028..040（源 029~041） | 30 | 0.433s | 落地压缩 + 起身 |
+
+行为层（`theme-bosses.js`）：
+
+- `_startHop` 播 `jump`（没有 jump 帧组的 BOSS 仍回退 `run`）。
+- **滞空期间锁帧**：chase 分支每帧都会 `playAnim(intent.anim)`，不锁的话起跳那一帧就被
+  `run` 抢回去（实测第一次接入时 jump 只闪了 1 帧）。
+- **必须先离地再判落地**：起跳瞬间 `vy` 刚给上、身体还在地上，`onGround` 仍是 true，
+  `_updateHopLanding` 会立刻判「落地」并切 land。现在用 `_hopAir` + `_hopT`（≥0.3s 兜底）。
+- 落地后 `_landT = land帧数/fps`，这段时间 chase 让位给 `land`，播完自动交还；
+  `animT` 夹在最后一帧（`applyFrame` 是取模循环，不夹会跳回第 1 帧）。
+- jump/land 都是 base 格（272×336），`actionCell` 不新增条目，quad 保持 136×168。
+
+验证：
+
+```bash
+node scripts/verify-boss-jump.mjs
+```
+
+| 项 | 判据 | 实测 |
+|---|---|---|
+| 资源 | jump 15 帧 / land 13 帧 / 24·30fps / 图集 41 格 | 全部命中 |
+| 位置 | jump 用 base 格，quad 不变 | 272×336，136×168 |
+| 起跳 | `animName === 'jump'`，帧号 0→14 推进 | 0,3,6,8,9,10,12,13 |
+| 物理 | 脚底抬升 >60px | 91px |
+| 落地 | 先播 land，帧号 0..12，`_landT` 计时 | 2,3,6,9,11 |
+| 收尾 | land 播完回到 run / idle，`_landT` 归零 | ✓ |
+| 控制台 | 无 error | 0 |
+
+截图：`.screenshots/boss-jump/jump-air.png`（0.26s 最高点）、`jump-land.png`（0.68s 落地）。
+
+### 6.3 顺带修掉的两个抖动源
+
+接入跳跃动作后，两个原本被「没有 jump 帧」掩盖的 AI 问题变得很明显，一并修了：
+
+- **原地连跳**：卡死判据是「0.5s 位移 <8px」，但它用的是上一帧的 `wasPushing`
+  （阈值 0.15×speed）。带内 ±55px 的回正速度只有 0.28，0.5s 走不到 8px → 每 0.5s
+  误判一次卡住 → 起跳脱困 → 每次落地都比之前更贴近玩家，最后一只远程 BOSS 一路跳到
+  21px 贴脸。现在只在 `speedMul ≥ 0.9`（全速推进）时才武装卡死检测。
+- **带边 1px 抖动**：`adx < band[0]` 后退与「偏离带心 >55px 回正」在边界上每帧互相打架。
+  现在只在「进入追击」一侧加 12px 回差（`adx > band[1]+12`），后退阈值必须用准 `band[0]`；
+  另外 `speedMul ≤ 0.4` 的微调不再播 `run`（地形挡住时就是原地踏步）。
+
+
 ## 7. 已知取舍
 
 - **大怪（junk_golem 等 4 种）仍走旧的 `roamStep` / 各写各的 chase**：本次只把
@@ -219,7 +289,8 @@ leapSpeedMul  2.8      // 跨沟时的水平速度倍率
   要接的话在它们的 `chase` 分支里换成 `new BossBrain(this)` 即可（接口一致）。
 - BOSS 的「攀跳」是 **真物理**（负 vy + 水平冲量），不是补间动画，所以：
   顶到天花板会被拦、踩到单向平台不会穿过去、跳跃高度受 gravity 影响。
-  跳跃期间没有专门的 jump 动作帧，沿用 `run`——美术管线只有 `idle/run/attack/cast/dash/hurt`。
+  数据执政官已接上 jump/land 帧组；其余 50 只没有跳跃素材的 BOSS 仍沿用 `run`，
+  落地也不会播 land（`_updateHopLanding` 找不到 `frames.land` 就跳过）。
 - 距离带只用招式表的静态范围，不看玩家是否在弹道死角；斜上方/正上方的死角判断
   仍由各招式自己的 `range` 与命中判定负责。
 - 反向行走只是兜底，不改变「巡逻点由 director 生成」的架构（`makePatrol`：以刷新点为中心 ±220px）。

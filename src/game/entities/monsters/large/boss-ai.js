@@ -228,7 +228,7 @@ export class BossBrain {
       mode: this.mode,
       facing: this.facing,
       jump: null,
-      anim: Math.abs(this.dir) > 0 && this.speedMul > 0.05 ? 'run' : 'idle',
+      anim: Math.abs(this.dir) > 0 && this.speedMul > 0.4 ? 'run' : 'idle',
       reason: this.reason,
     }
   }
@@ -247,7 +247,8 @@ export class BossBrain {
       mode,
       facing: this.facing,
       jump,
-      anim: Math.abs(dir) > 0 && mul > 0.05 ? 'run' : 'idle',
+      // 带内 0.28 的微调速度不值得播跑步（地形挡住时就是原地踏步）
+      anim: Math.abs(dir) > 0 && mul > 0.4 ? 'run' : 'idle',
       reason: mode,
     }
   }
@@ -308,11 +309,14 @@ export class BossBrain {
     // ---- 朝向滞回：近处不翻面 ----
     if (Math.abs(adx) > 30 || !body.onGround) this.facing = dx >= 0 ? 1 : -1
 
-    // ---- 卡死检测：推着走却 0.5s 没位移 ----
+    // ---- 卡死检测：全速推进却 0.5s 没位移 ----
+    // 只看「上一帧是不是全力推进」：带内回正(0.28)/后退拉距(0.55)/绕路(0.85) 本来就慢，
+    // 0.5s 走不到 8px 很正常，算作推墙会每 0.5s 误判一次卡住 → 原地连跳、越跳越贴脸。
     this.sampleT += dt
     if (this.sampleT >= 0.5) {
       const moved = Math.abs(m.px - this.sampleX)
-      if (this.wasPushing && moved < 8 && body.onGround) {
+      const pushing = Math.abs(this.dir) > 0 && this.speedMul >= 0.9 && body.onGround
+      if (pushing && moved < 8) {
         this.stuckLevel++
         this.stats.stuck++
         if (this.stuckLevel >= 2 && this.forceDirT <= 0) {
@@ -367,12 +371,17 @@ export class BossBrain {
     }
 
     // ---- 距离带 ----
+    // 进/出带各留 12px 回差：正好卡在 band 边界上时，「贴太近要后退」和
+    // 「偏离带心要回正」两条会每帧互相打架，BOSS 会在原地 1px 来回抖。
+    // 回差只加在「进入追击」一侧（adx > band[1]+12），后退一侧必须用准 band[0]：
+    // 后退阈值一旦也往外推，边界上就会变成 1px 抖动的死循环。
     const band = this.band
     const center = (band[0] + band[1]) / 2
+    const HYST = 12
     let dir = 0
     let mul = 0
     let mode = 'hold'
-    if (adx > band[1]) {
+    if (adx > band[1] + HYST) {
       dir = sign(dx)
       mul = 1.0
       mode = 'press'
@@ -469,7 +478,7 @@ export class BossBrain {
       dir = -1
     }
 
-    this.wasPushing = dir !== 0 && mul > 0.15
+    this.wasPushing = dir !== 0 && mul >= 0.9
     return this._emit(dir, mul, mode)
   }
 

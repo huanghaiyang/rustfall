@@ -878,6 +878,11 @@ class ThemeBoss extends BaseMonster {
     this._hopCd = 0
     this._hopping = false
     this._hopKind = null
+    /** 本次起跳是否真的离过地 / 起跳后经过的时间（判落地用） */
+    this._hopAir = false
+    this._hopT = 0
+    /** 落地起身动画剩余时间：land 帧组播完前不让 chase 的跑步动作抢帧 */
+    this._landT = 0
     initLarge(this, { intro: 1.25, activateRange: 780 })
     applyLargeArt(this)
     this._loadActionFrames()
@@ -1134,8 +1139,11 @@ class ThemeBoss extends BaseMonster {
     this.body.vx = this.facing * this.speed * (leap ? 2.8 : 1.2)
     this._hopCd = leap ? 1.0 : 0.62
     this._hopping = true
+    this._hopAir = false
+    this._hopT = 0
     this._hopKind = kind
-    this.playAnim('run')
+    // 起跳/腾空用 jump 帧组（014~028，24fps ≈ 0.62s，正好对上滞空时间）
+    this.playAnim(this.frames?.jump?.length ? 'jump' : 'run')
     puff(this, leap ? 16 : 7, this.accent || 0x93a8b2, leap ? 1.25 : 0.9)
     sfx(this, 'mechStep', leap ? 0.6 : 0.4, leap ? 0.7 : 0.95)
     if (leap) shake(this, 0.2)
@@ -1143,9 +1151,24 @@ class ThemeBoss extends BaseMonster {
   }
 
   /** 落地：尘爆 + 一点震屏，让「攀上去 / 跨过去」有反馈 */
-  _updateHopLanding() {
-    if (!this._hopping || !this.body.onGround) return
+  _updateHopLanding(dt = 0) {
+    if (!this._hopping) return
+    // 起跳那一帧 vy 刚给上、身体还没离地，onGround 仍是 true ——
+    // 必须先真的离过地再判落地，否则会「一起跳就判落地」，动画立刻切 land。
+    if (!this.body.onGround) {
+      this._hopAir = true
+      this._hopT += dt
+      return
+    }
+    this._hopT += dt
+    if (!this._hopAir && this._hopT < 0.3) return
     this._hopping = false
+    // 落地压缩 + 起身：land 帧组（029~041，30fps ≈ 0.43s），播完再交还给 chase
+    const landFrames = this.frames?.land?.length || 0
+    if (landFrames) {
+      this._landT = landFrames / this.animFpsFor('land')
+      this.playAnim('land')
+    }
     puff(this, 8, 0x93a8b2, 1.0)
     shake(this, 0.16)
     sfx(this, 'mechStep', 0.35, 1.15)
@@ -1181,7 +1204,13 @@ class ThemeBoss extends BaseMonster {
     if (this._artVer !== bossActionVersion()) this._loadActionFrames()
     this.moveCd = Math.max(0, this.moveCd - dt)
     this._hopCd = Math.max(0, this._hopCd - dt)
-    this._updateHopLanding()
+    this._updateHopLanding(dt)
+    this._landT = Math.max(0, this._landT - dt)
+    // 起身动作播到最后一帧就停住（applyFrame 是取模循环，不夹住会跳回第 1 帧）
+    if (this._landT > 0) {
+      const n = this.frames?.land?.length || 0
+      if (n && this.animName === 'land' && this.animT >= n - 0.02) this.animT = n - 0.02
+    }
     for (const k in this.moveReady) {
       if (this.moveReady[k] > 0) this.moveReady[k] = Math.max(0, this.moveReady[k] - dt)
     }
@@ -1277,7 +1306,13 @@ class ThemeBoss extends BaseMonster {
     this.facing = intent.facing ?? this.facing
     this.state = 'chase'
     this.vxTarget = intent.dir * this.speed * intent.speedMul
-    this.playAnim(intent.anim || (Math.abs(this.vxTarget) > 4 ? 'run' : 'idle'))
+    // 起跳/腾空：整个滞空期锁在 jump 帧组（chase 每帧都会 playAnim，不锁会被 run 抢回去）
+    const hopping = this._hopping && this.body.onGround === false
+    // 刚落地时先播完起身（land），别立刻切回跑步
+    const playing = this._landT > 0 && this.frames?.land?.length
+    this.playAnim(
+      hopping ? 'jump' : playing ? 'land' : intent.anim || (Math.abs(this.vxTarget) > 4 ? 'run' : 'idle'),
+    )
     if (intent.jump) this._startHop(intent.jump)
 
     if (this.moveCd <= 0) {

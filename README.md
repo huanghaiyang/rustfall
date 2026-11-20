@@ -44,6 +44,7 @@ node scripts/test-v6.mjs         # 武器 / 大型敌人
 ```bash
 node scripts/boss-walk-post.mjs            # N 张单帧 PNG → 横向图集 + manifest 帧组（走路）
 node scripts/boss-dash-post.mjs            # 12 张冲刺 PNG → 512×336 宽格图集 + manifest（冲刺）
+node scripts/boss-jump-post.mjs            # 41 张起跳 PNG → 272×336 图集 + jump/land 帧组（跳跃）
 node scripts/sprite-editor-apply-walk.mjs  # 用内嵌精灵编辑器绑定到角色并发布
 node scripts/verify-boss-walk.mjs          # BOSS 测试房验证（帧数/帧率/来源）
 node scripts/verify-boss-dash.mjs          # 冲刺验证（12 帧动画 + 真实位移 + 撞墙 + 命中）
@@ -54,6 +55,7 @@ node scripts/verify-editor-rig.mjs         # 编辑器内识别全链路（坐�
 node scripts/verify-boss-move.mjs          # 大怪/BOSS 行走位移（追击/巡逻/不转圈/探测语义）
 node scripts/verify-boss-ai.mjs            # BOSS 追击大脑：距离带/跨沟/攀台阶/绕路/失联/脱困（纯逻辑）
 node scripts/verify-boss-chase.mjs         # BOSS 追击集成：真引擎里下坑、爬坑、上台阶、失联搜索
+node scripts/verify-boss-jump.mjs          # 攀跳动作：jump/land 帧组加载、帧号推进、落地起身
 node scripts/verify-outline.mjs            # 角色黑描边（材质/像素对比/开关）
 ```
 

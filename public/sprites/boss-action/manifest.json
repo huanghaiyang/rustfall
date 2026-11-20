@@ -14,6 +14,10 @@
         "frames": 12,
         "frameW": 512,
         "frameH": 336
+      },
+      "jump": {
+        "file": "sprites/boss-action/tb_data_archon_jump.png",
+        "frames": 41
       }
     },
     "frameW": 272,
@@ -29,7 +33,9 @@
       "cast": 10,
       "hurt": 8,
       "dead": 5,
-      "dash": 16
+      "dash": 16,
+      "jump": 24,
+      "land": 30
     },
     "frames": {
       "idle": [
@@ -73,6 +79,38 @@
         "dash:9",
         "dash:10",
         "dash:11"
+      ],
+      "jump": [
+        "jump:13",
+        "jump:14",
+        "jump:15",
+        "jump:16",
+        "jump:17",
+        "jump:18",
+        "jump:19",
+        "jump:20",
+        "jump:21",
+        "jump:22",
+        "jump:23",
+        "jump:24",
+        "jump:25",
+        "jump:26",
+        "jump:27"
+      ],
+      "land": [
+        "jump:28",
+        "jump:29",
+        "jump:30",
+        "jump:31",
+        "jump:32",
+        "jump:33",
+        "jump:34",
+        "jump:35",
+        "jump:36",
+        "jump:37",
+        "jump:38",
+        "jump:39",
+        "jump:40"
       ],
       "attack": [
         "base:6",
