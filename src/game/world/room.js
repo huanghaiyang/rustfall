@@ -5,6 +5,7 @@ import { T } from './tilemap.js'
 import { hash2 } from '../render/rng.js'
 import { getBiomeArt, getSkyArt, getStarField, getSunArt, getMoonArt } from '../render/art/world.js'
 import { getThemeBackdrop, getSceneBackdrop } from '../render/art/backdrops.js'
+import { getBackdropImage, getSceneBackdropImage, getRoomBackdropImage, getRoomLayerImage, getPropImage } from '../render/art/sprite-images.js'
 import { getRoomScene } from './scene-data.js'
 import { Surf, mix } from '../render/art/core.js'
 import { PAL } from '../render/palette.js'
@@ -39,6 +40,17 @@ const Z = {
 }
 
 const PANEL_CACHE = new Map()
+
+/**
+ * AI 分层条带背景配置：far 天空远山 / mid 楼群轮廓行 / near 底部近景剪影。
+ * p 视差系数、z 深度、texH 素材像素高、strip 顶部裁除比例（去掉上半天空，只留底部有效条）、
+ * drift 自动横向漂移（纹理宽/秒）、bob 竖直浮动振幅、flicker 明灭振幅。
+ */
+const AI_LAYER_CFG = {
+  far: { p: 0.88, z: Z.far,  texH: 928, strip: 0,    tint: 0xd9c9a8, opacity: 0.95, yOff: 0, drift: 0.004, bob: 0, bobFreq: 0.3, flicker: 0,    flickFreq: 0 },
+  mid: { p: 0.7,  z: Z.mid,  texH: 560, strip: 0.55, tint: 0xfff0d8, opacity: 0.98, yOff: 0, drift: 0.002, bob: 2, bobFreq: 0.5, flicker: 0,    flickFreq: 0 },
+  near: { p: 0.48, z: Z.near, texH: 380, strip: 0.55, tint: 0x6a5c4a, opacity: 0.98, yOff: 0, drift: 0,     bob: 3, bobFreq: 0.7, flicker: 0.06, flickFreq: 1.3 },
+}
 
 /** 避难所面板底纹：铆钉 + 板缝 + 划痕 + 锈斑 + 噪点（128×64 可平铺，颜色由 material.color 染色）。 */
 function getPanelArt() {
@@ -164,7 +176,7 @@ export class Room {
     const texH = 560
     const roomW = this.data.worldW || 2000
     const tilesX = Math.max(3, Math.ceil((roomW + 4200) / texW))
-    const addLandscape = (tex, p, tint, opacity, yOff) => {
+    const addLandscape = (tex, p, tint, opacity, yOff, layer) => {
       if (!tex) return null
       tex.wrapS = THREE.RepeatWrapping
       tex.wrapT = THREE.ClampToEdgeWrapping
@@ -182,7 +194,7 @@ export class Room {
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, texH), mat)
       mesh.position.set(0, -(baseY + (yOff || 0)) + texH / 2, Z.far)
       group.add(mesh)
-      const entry = { mesh, p, mat, texW, texH, yOff: yOff || 0, tilesX }
+      const entry = { mesh, p, mat, texW, texH, yOff: yOff || 0, tilesX, layer: layer || null }
       layers.push(entry)
       return entry
     }
@@ -209,17 +221,143 @@ export class Room {
       // 室内关背景本身已是建筑内部，只做轻微压暗，避免整幅糊成黑色
       addLandscape(themeBd, 0.4, scene?.indoor ? 0xbfb8aa : 0xffffff, 1.0, -6)
     } else {
-      addLandscape(art?.far, 0.88, 0xd9c9a8, 0.95, 0)
-      addLandscape(art?.mid, 0.7, 0xfff0d8, 0.98, 0)
-      addLandscape(art?.near, 0.48, 0x6a5c4a, 0.98, 0)
+      addLandscape(art?.far, 0.88, 0xd9c9a8, 0.95, 0, 'far')
+      addLandscape(art?.mid, 0.7, 0xfff0d8, 0.98, 0, 'mid')
+      addLandscape(art?.near, 0.48, 0x6a5c4a, 0.98, 0, 'near')
     }
 
     // 房间编辑器的自定义背景层叠加在 biome 背景之上
     this.buildUserBgLayers(group, layers)
 
+    // AI 远景背景（按 biome 的 far.png），异步加载成功后替换程序化背景层
+    this.attachAiBackdrop(group, layers, baseY)
+    // AI 分层条带（far/mid/near 三条可平铺层），加载到哪条替换哪条程序化层
+    this.attachAiLayers(group, layers, baseY)
+
     this.bgLayers = layers
     this.buildSkyLayers(group)
     return group
+  }
+
+  /**
+   * AI 远景背景层。回退链：房间专属 -> 场景主题(painter) -> biome 远景；
+   * 成功后隐藏原有程序化背景（保留编辑器自定义 user 层）；主题房保留专属立绘；
+   * 全部缺失 / 加载失败静默回退到程序化背景。
+   */
+  attachAiBackdrop(group, layers, baseY) {
+    const scene = this.data.roomId ? getRoomScene(this.data.roomId) : null
+    // 房间专属图优先；主题房不回退到 scene/biome 磁盘图，缺失时保留已挂的程序化主题立绘
+    const candidates = [getRoomBackdropImage(this.data.roomId)]
+    if (!this.data.themeId) {
+      candidates.push(scene ? getSceneBackdropImage(scene.painter) : null, getBackdropImage(this.data.biome))
+    }
+    const filtered = candidates.filter(Boolean)
+    if (!filtered.length) return
+    const texW = 1280
+    const texH = 560
+    const roomW = this.data.worldW || 2000
+    const tilesX = Math.max(3, Math.ceil((roomW + 4200) / texW))
+    let done = false
+    const adopt = (tex) => {
+      if (done || !tex || !this.group.parent) return
+      done = true
+      tex.wrapS = THREE.RepeatWrapping
+      tex.wrapT = THREE.ClampToEdgeWrapping
+      tex.repeat.set(tilesX, 1)
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 1,
+        color: 0xffffff,
+        depthWrite: false,
+        toneMapped: false,
+      })
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(texW * tilesX, texH), mat)
+      mesh.position.set(0, -(baseY - 6) + texH / 2, Z.far)
+      group.add(mesh)
+      for (const l of layers) {
+        if (!l.user && l.mesh) l.mesh.visible = false
+      }
+      layers.push({ mesh, p: 0.4, mat, texW, texH, yOff: -6, tilesX, ai: true })
+    }
+    ;(async () => {
+      for (const p of filtered) {
+        const tex = await p
+        if (tex) { adopt(tex); return }
+      }
+    })()
+  }
+
+  /**
+   * AI 分层条带背景：far/mid/near 三条各自独立加载，哪条成功就替换对应程序化层。
+   * 条带底部对齐地面线，上部天空按 cfg.strip 裁除（不依赖透明抠图）；纹理横向
+   * RepeatWrapping 循环平铺，offset 按视差 + 自动漂移推进，实现无限横向延展；
+   * 层数据带 bob 浮动 / flicker 明灭动态，在 updateBackground 中按 this.time 驱动。
+   */
+  attachAiLayers(group, layers, baseY) {
+    const roomId = this.data.roomId
+    if (!roomId) return
+    const roomW = this.data.worldW || 2000
+    const texW = 1664
+    const tilesX = Math.max(3, Math.ceil((roomW + 4200) / texW))
+    for (const layer of ['far', 'mid', 'near']) {
+      const cfg = AI_LAYER_CFG[layer]
+      const promise = getRoomLayerImage(roomId, layer)
+      if (!promise) continue
+      promise.then((tex) => {
+        if (!tex || !this.group.parent) return
+        const k = 1 - cfg.strip
+        const dispH = cfg.texH * k
+        tex.wrapS = THREE.RepeatWrapping
+        tex.wrapT = THREE.ClampToEdgeWrapping
+        tex.repeat.set(tilesX, k)
+        tex.offset.set(0, 0)
+        const mat = new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          opacity: cfg.opacity,
+          color: cfg.tint,
+          depthWrite: false,
+          toneMapped: false,
+        })
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(texW * tilesX, dispH), mat)
+        mesh.position.set(0, -(baseY + cfg.yOff) + dispH / 2, cfg.z)
+        group.add(mesh)
+        // 隐藏同层程序化背景；far 层就位后同时盖住 AI 单层整图
+        for (const l of layers) {
+          if (l.user) continue
+          if (l.layer === layer || l.aiLayer === layer) l.mesh.visible = false
+          if (layer === 'far' && l.ai) l.mesh.visible = false
+        }
+        layers.push({
+          mesh, p: cfg.p, mat, texW, texH: dispH, yOff: cfg.yOff, tilesX,
+          aiLayer: layer, cfg, drift: cfg.drift, baseOpacity: cfg.opacity,
+          bob: cfg.bob, bobFreq: cfg.bobFreq, flicker: cfg.flicker, flickFreq: cfg.flickFreq,
+        })
+      })
+    }
+  }
+
+  /**
+   * 异步把摆件 mesh 的程序化贴图替换为磁盘 AI 透明 PNG（sprites/props/<kind>.png）。
+   * 图片缺失 / 加载失败时保留原程序化贴图；换图后按 PNG 宽高比重建平面，
+   * 保持脚底中心锚点。scale 为外部既有缩放，anchorY 为脚底世界 y 坐标回调。
+   */
+  tryReplacePropImage(mesh, kind, baseH, scale, anchorY) {
+    const promise = getPropImage(kind)
+    if (!promise) return
+    promise.then((tex) => {
+      if (!tex || !mesh.parent) return
+      const img = tex.image
+      if (!img || !img.width || !img.height) return
+      mesh.material.map = tex
+      mesh.material.needsUpdate = true
+      const h = baseH * scale
+      const w = h * (img.width / img.height)
+      mesh.geometry.dispose()
+      mesh.geometry = new THREE.PlaneGeometry(w, h)
+      if (typeof anchorY === 'function') anchorY(w, h)
+    })
   }
 
   /**
@@ -562,6 +700,17 @@ export class Room {
         l.mesh.position.x = l.user.x * (1 - l.p) + cx * l.p
         l.mesh.position.z = Z.far + (1 - l.p) * 40
         l.mesh.position.y = -(l.user.y + l.yOff) - (cy + this.bgBaseY) * 0.04
+        continue
+      }
+      if (l.aiLayer) {
+        // AI 分层条带：各自视差深度，纹理 offset 按时间无限循环漂移，叠加浮动 / 明灭动态
+        const t = this.time
+        l.mesh.position.x = cx * l.p
+        l.mesh.position.z = l.cfg.z
+        const bobY = l.bob ? Math.sin(t * l.bobFreq + l.aiLayer.length) * l.bob : 0
+        l.mesh.position.y = -(this.bgBaseY + l.yOff) + l.texH / 2 + bobY - (cy + this.bgBaseY) * 0.04
+        if (l.mat.map) l.mat.map.offset.x = (t * l.drift) % 1
+        if (l.flicker) l.mat.opacity = l.baseOpacity + Math.sin(t * l.flickFreq) * l.flicker
         continue
       }
       l.mesh.position.x = cx * l.p
@@ -944,6 +1093,9 @@ export class Room {
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat)
       mesh.scale.set(scale * ((seed & 1) ? -1 : 1), scale, 1)
       mesh.position.set(x, -floorY + (h * scale) / 2, Z.backProps - i * 0.05)
+      this.tryReplacePropImage(mesh, kind, h, scale, (_nw, nh) => {
+        mesh.position.y = -floorY + nh / 2
+      })
       mesh.renderOrder = -1
       this.group.add(mesh)
       this.sceneryMeshes = this.sceneryMeshes || []
@@ -978,6 +1130,9 @@ export class Room {
       const scale = p.scale || 1
       mesh.scale.set(scale * (p.flip ? -1 : 1), scale, 1)
       mesh.position.set(p.x, -p.y + (h * scale) / 2, p.z ?? Z.props)
+      this.tryReplacePropImage(mesh, p.kind, h, scale, (_nw, nh) => {
+        mesh.position.y = -p.y + nh / 2
+      })
       mesh.renderOrder = 2
       this.group.add(mesh)
       this.propMeshes.push({ mesh, def, prop: p })

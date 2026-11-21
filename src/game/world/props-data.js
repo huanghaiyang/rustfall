@@ -1112,6 +1112,462 @@ export const PROPS = {
     destructible: false,
     desc: '应力撕开的一道口子，边缘微微翘起。',
   },
+
+  // ---------------- 第二轮 AI 道具：废旧家电（装饰件） ----------------
+  fridge: {
+    name: '报废冰箱', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '双门冰箱凹陷变形，密封条烂成一条黑边，里面结着霉。',
+  },
+  washing_machine: {
+    name: '旧洗衣机', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '滚筒门圈锈死，桶里积着半筒发臭的浑水。',
+  },
+  microwave: {
+    name: '坏微波炉', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '炉门半开，转盘碎在里面，按键全掉了漆。',
+  },
+  ac_unit: {
+    name: '空调外机', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '风扇叶片缺了一片，散热片上糊满灰和虫壳。',
+  },
+  standing_fan: {
+    name: '落地扇', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '铁丝护网歪着，扇叶上缠着干硬的布丝。',
+  },
+  radio: {
+    name: '旧收音机', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '木壳磨得起毛，伸缩天线折了一截，拧开只有沙沙声。',
+  },
+  vacuum: {
+    name: '吸尘器', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '软管裂着口子，尘杯里堵满成团的灰。',
+  },
+  desk_lamp: {
+    name: '台灯', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '折臂台灯耷拉着灯罩，灯泡不知什么时候碎的。',
+  },
+  electric_heater: {
+    name: '电暖器', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '散热栅后面还留着一点暗红，通电估计会跳闸。',
+  },
+
+  // ---------------- 第二轮 AI 道具：废弃车辆 ----------------
+  pickup_wreck: {
+    name: '皮卡残骸', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '蓝色皮卡侧门瘪进一块，货斗里只剩生锈的螺栓。',
+  },
+  van_wreck: {
+    name: '厢式货车残骸', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '白厢货顶盖塌了一角，挡风玻璃碎成蛛网。',
+  },
+  motorbike: {
+    name: '旧摩托', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '黑色摩托撑着单边脚撑，油箱上刮出一道深痕。',
+  },
+  tricycle: {
+    name: '三轮货车', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '车斗木板裂着缝，车把歪向一边。',
+  },
+  dumpster: {
+    name: '垃圾箱', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '绿色大型垃圾箱塞得冒尖，轮胎和铁件顶在盖板上。',
+  },
+  sedan_wreck: {
+    name: '轿车残骸', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '红轿车车尾被撞瘪，后排车窗全空。',
+  },
+  route_bus: {
+    name: '报废面包车', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '青灰色面包车横在路边，窗框只剩深色的洞。',
+  },
+  trailer: {
+    name: '平板拖车', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '空货斗竖着锈栏杆，牵引钩上挂着半截断缆。',
+  },
+  forklift: {
+    name: '旧叉车', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '黄色叉车货叉着地，座椅靠背裂开口子。',
+  },
+
+  // ---------------- 第二轮 AI 道具：灯具 ----------------
+  floodlight: {
+    name: '投光灯', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '高杆投光灯蒙着油灰，反光碗里积了水。',
+  },
+  hanging_lamp: {
+    name: '吊灯', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '电线从天花板垂下来，灯罩歪成一个角度。',
+  },
+  signal_lamp: {
+    name: '信号灯', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '立式信号灯只剩一个还透光，灯壳掉着锈皮。',
+  },
+  neon_sign: {
+    name: '霓虹招牌', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '灯管缺了一半，剩下的几段也早就不亮了。',
+  },
+  oil_lamp: {
+    name: '煤油灯', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '玻璃灯罩有一道裂纹，灯芯结着黑结。',
+  },
+  wall_light: {
+    name: '壁灯', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '墙上的小壁灯，支架歪了，灯泡不见踪影。',
+  },
+  searchlight: {
+    name: '探照灯', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '大口径探照灯斜指着天，透镜上蒙着一层雾。',
+  },
+  string_light: {
+    name: '串灯', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '一串挂着的小灯，半数泡壳碎了，线皮发脆。',
+  },
+  warning_beacon: {
+    name: '警示灯', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '圆顶警示灯斜靠在铁架上，顶盖磕出凹痕。',
+  },
+
+  // ---------------- 第二轮 AI 道具：建筑小件 ----------------
+  door_frame: {
+    name: '破门框', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '旧木门框斜撑着一根木棍，门板上破了两个洞。',
+  },
+  brick_wall: {
+    name: '残砖墙', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '半堵红砖墙被砸穿一个豁口，墙根堆着碎砖。',
+  },
+  staircase: {
+    name: '残楼梯', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '水泥台阶缺了边角，铁扶手锈得发暗。',
+  },
+  arch_window: {
+    name: '拱窗', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '石砌拱形窗只剩空框，棂条断了两根。',
+  },
+  scaffold: {
+    name: '脚手架', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '钢管脚手架歪架在墙边，扣件松了一半。',
+  },
+  trash_bin: {
+    name: '铁皮垃圾桶', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '圆桶垃圾桶翻盖敞着，桶壁被踩出几个坑。',
+  },
+  mailbox: {
+    name: '旧邮箱', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '深蓝色邮箱翻着投信口，旗片锈成褐色。',
+  },
+  billboard_frame: {
+    name: '广告牌架', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '空广告牌铁架立在两根立柱上，面板早被拆走。',
+  },
+  broken_pillar: {
+    name: '断石柱', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '半截石柱歪倒，柱头裂成碎瓣，柱身爬着裂纹。',
+  },
+
+  // ---------------- 第三批 AI 道具：废旧家具 ----------------
+  armchair: {
+    name: '破扶手椅', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '坐垫撕出大洞，弹簧翘着，扶手包皮磨穿。',
+  },
+  wooden_table: {
+    name: '瘸腿木桌', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '三条腿垫着碎砖，桌面裂着长缝，沾着干涸的油渍。',
+  },
+  broken_chair: {
+    name: '散架木椅', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '靠背断了两根横档，椅面翘成斜面。',
+  },
+  iron_bed: {
+    name: '铁架床', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '锈铁架床板塌了一半，床垫霉得发黑。',
+  },
+  drawer_cabinet: {
+    name: '抽屉柜', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '几格抽屉半开，拉手掉了两个，柜角磕出凹痕。',
+  },
+  sideboard: {
+    name: '餐边矮柜', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '旧木矮柜门歪斜，台面积着一层灰。',
+  },
+  cracked_mirror: {
+    name: '裂框镜子', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '镜面爬满蛛网裂纹，木框起皮脱落。',
+  },
+  toilet: {
+    name: '破马桶', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '陶瓷马桶发黄开裂，水箱盖不知去向。',
+  },
+  wash_basin: {
+    name: '旧水槽', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '挂墙搪瓷水槽锈住龙头，池壁结着垢。',
+  },
+
+  // ---------------- 第三批 AI 道具：工业机械 ----------------
+  oil_tank: {
+    name: '立式储油罐', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '立式锈罐架在短腿上，罐顶接管弯曲，漆面成片剥落。',
+  },
+  engine_block: {
+    name: '旧发动机', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '裸机缸体积着油泥，附件皮带轮缺了大半。',
+  },
+  water_pump: {
+    name: '水泵机组', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '电机连带离心泵，进出水管锈死在法兰上。',
+  },
+  gas_cylinder: {
+    name: '气瓶', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '立式高压气瓶阀口蒙尘，瓶身锈出一道深痕。',
+  },
+  radiator: {
+    name: '旧暖气片', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '铸铁散热片堵满灰，接头处渗着锈水。',
+  },
+  air_duct: {
+    name: '锈蚀风管', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '方形铁皮风管段，接缝开胶，叶片里塞满絮状物。',
+  },
+  battery_bank: {
+    name: '电池组', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '一排旧工业电池单元接线松散，外壳鼓着锈包。',
+  },
+  drill_press: {
+    name: '台钻', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '台式钻床立柱歪斜，钻头夹里空无一物。',
+  },
+  old_lathe: {
+    name: '旧车床', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '废弃普通车床导轨磨亮，卡盘上夹着半截废件。',
+  },
+
+  // ---------------- 第三批 AI 道具：户外废墟 ----------------
+  traffic_cone: {
+    name: '压扁路锥', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '褪色塑料路锥被车压扁，反光条磨没了。',
+  },
+  road_block: {
+    name: '水泥路障', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '混凝土隔离墩边角崩裂，表面糊着旧漆皮。',
+  },
+  shopping_cart: {
+    name: '锈购物车', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '铁丝购物车缺了一轮，筐网歪向一边。',
+  },
+  wreck_bicycle: {
+    name: '旧自行车', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '锈自行车斜靠着，车胎瘪平，链条脱落。',
+  },
+  boulder: {
+    name: '风化石块', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '灰灰岩块裂成几瓣，表面蒙着风沙。',
+  },
+  dead_bush: {
+    name: '枯灌木', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '一丛枯死的细枝灌木，没有一片叶子。',
+  },
+  plank_pile: {
+    name: '断木板堆', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '长短不一的旧木板摞在一起，端头钉着锈钉。',
+  },
+  phone_booth: {
+    name: '破电话亭', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '铁皮电话亭玻璃全碎，门板凹陷，顶盖锈穿。',
+  },
+  sign_post: {
+    name: '歪斜路牌', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '木柱路牌歪向一侧，牌面字迹被雨冲光。',
+  },
+
+  // ---------------- 第三批 AI 道具：容器杂物 ----------------
+  cardboard_box: {
+    name: '压扁纸箱', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '胶带发黄的纸箱被压扁，边角受潮发软。',
+  },
+  suitcase: {
+    name: '旧行李箱', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '皮箱磨得起毛，提手断裂，锁扣锈死。',
+  },
+  backpack: {
+    name: '丢弃背包', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '帆布背包撕裂一道口子，背带耷拉着。',
+  },
+  bucket: {
+    name: '铁皮水桶', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '镀锌铁皮桶凹了一块，桶梁锈得发暗。',
+  },
+  wicker_basket: {
+    name: '破竹篮', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '藤条篮脱了好几根篾，篮底塌出一个洞。',
+  },
+  medicine_box: {
+    name: '壁挂药柜', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '墙上小药柜门半掩，玻璃蒙着一层灰。',
+  },
+  first_aid_case: {
+    name: '急救箱', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '金属急救箱掉漆，红十字磨得只剩淡痕。',
+  },
+  gas_can: {
+    name: '汽油桶', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '红色铁皮油桶瘪着，旋塞口渗着干硬油渍。',
+  },
+  bottle_jars: {
+    name: '瓶罐杂物堆', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '几个旧玻璃瓶和罐头罐摞在一起，标签全糊。',
+  },
+
+  // ---------------- 第四批 AI 道具：医疗专用件 ----------------
+  iv_drip: {
+    name: '输液架', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '落地输液杆挂着空囊袋，滚轮锈住，管路垂到地上。',
+  },
+  medicine_cart: {
+    name: '换药推车', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '不锈钢两层推车，抽屉半开，盘面结着干涸药渍。',
+  },
+  wheelchair: {
+    name: '破轮椅', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '旧轮椅大轮变形，扶手蒙皮开裂，刹车拉杆断掉。',
+  },
+  microscope: {
+    name: '旧显微镜', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '蒙尘的台式显微镜，物镜缺了一只，调焦轮打滑。',
+  },
+  filing_cabinet: {
+    name: '病历柜', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '铁皮多斗柜抽屉卡死半格，把手掉了两个，柜面掉漆。',
+  },
+  sterilizer: {
+    name: '灭菌锅', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '立式高压灭菌锅压力表归零，锅盖密封圈发硬开裂。',
+  },
+  xray_viewer: {
+    name: '观片灯箱', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '挂墙 X 光观片灯箱发黑，夹着半张碎裂的胶片。',
+  },
+  surgical_light: {
+    name: '无影灯', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '悬吊式手术无影灯横臂歪斜，灯罩里灯泡全碎。',
+  },
+  petri_stack: {
+    name: '培养器皿堆', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '几摞培养皿和试剂瓶混在一起，皿底结着干膜。',
+  },
+
+  // ---------------- 第四批 AI 道具：农田农具 ----------------
+  plow: {
+    name: '旧铁犁', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '锈蚀的犁铧斜靠在木架上，刃口卷了边。',
+  },
+  hay_bale: {
+    name: '干草捆', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '压扁的干草捆散出碎秸秆，捆绳朽得发脆。',
+  },
+  water_barrel: {
+    name: '储水缸', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '木制箍桶存着浑水，铁箍锈穿一块，桶身渗水。',
+  },
+  chicken_coop: {
+    name: '小鸡舍', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '木板鸡舍顶塌一角，栅栏门歪斜，里面空无一物。',
+  },
+  windmill: {
+    name: '残破风车', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '农场老风车叶片缺了大半，塔身木架爬着锈。',
+  },
+  sack_stack: {
+    name: '粮袋堆', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '几个旧麻袋摞在一起，袋口散开，漏出干瘪谷粒。',
+  },
+  wooden_cart: {
+    name: '木轮手推车', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '双轮木斗车车辐断了两根，车斗底板裂着长缝。',
+  },
+  scarecrow: {
+    name: '稻草人', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '木杆上的稻草人衣裳破烂，草帽歪掉，秸秆露出来。',
+  },
+  crop_dryer: {
+    name: '晾晒架', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '木梁搭成的晾晒架空空荡荡，横杆上挂着碎布条。',
+  },
+
+  // ---------------- 第四批 AI 道具：港口 / 轨道机械 ----------------
+  bollard: {
+    name: '系船柱', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '码头锈铸铁系船柱，柱身缠着半截断缆绳。',
+  },
+  anchor: {
+    name: '旧船锚', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '锈船锚斜靠在墙边，锚爪豁了一个缺口。',
+  },
+  ship_propeller: {
+    name: '螺旋桨', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '废弃铜质船用螺旋桨，叶片缺角，轮毂积着水垢。',
+  },
+  pallet: {
+    name: '木托盘', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '货运木托盘板条开裂，垫块朽烂，钉子外露。',
+  },
+  hand_cart: {
+    name: '拖板车', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '两轮平板手推车板面凹陷，扶手管锈穿。',
+  },
+  rail_buffer: {
+    name: '挡车器', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '轨道尽头的锈铁缓冲挡，木楔烂成一截。',
+  },
+  signal_box: {
+    name: '信号箱', solid: true, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '铁路信号控制箱门敞开，面板按钮脱落，线缆外露。',
+  },
+  coil_rigging: {
+    name: '索具卷', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '盘成圈的旧缆绳和钢索，绳皮磨出毛刺。',
+  },
+  mooring_chain: {
+    name: '锚链堆', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '一摞粗重的锈锚链，链环之间卡着海泥。',
+  },
+
+  // ---------------- 第四批 AI 道具：植被自然件 ----------------
+  pine_dead: {
+    name: '枯松树', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '高大的死松枝桠光秃，树皮剥落，树干劈着裂缝。',
+  },
+  stump: {
+    name: '树桩', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '风化老树桩露出断根，截面年轮发黑开裂。',
+  },
+  reed_cluster: {
+    name: '芦苇丛', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '一丛干枯芦苇和香蒲，穗子垂向水面。',
+  },
+  mushroom_cluster: {
+    name: '蘑菇簇', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '几株红顶小蘑菇簇生在潮黑的泥地上。',
+  },
+  tangled_root: {
+    name: '盘根', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '露出地表的纠结老根，虬结成一团。',
+  },
+  grass_tuft: {
+    name: '枯草簇', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '一小撮发干发黄的枯草，根须扎进裂土。',
+  },
+  fern: {
+    name: '枯蕨', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '蔫掉的蕨类叶片卷边发褐，贴在地面上。',
+  },
+  dry_cactus: {
+    name: '枯仙人掌', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '干瘪发皱的仙人掌，刺座发黑，株身歪倒。',
+  },
+  fallen_log: {
+    name: '倒木', solid: false, interact: null, loot: null, questTarget: null, destructible: false,
+    desc: '横在地上的腐木，树皮脱落，木心生着霉斑。',
+  },
 }
 
 // 190 间房的专属摆放物（rp_<roomId>_NN）：数据来自 rooms/index.js，
